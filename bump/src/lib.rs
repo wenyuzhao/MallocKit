@@ -6,7 +6,7 @@
 #![feature(const_raw_ptr_to_usize_cast)]
 
 use core::{alloc::{GlobalAlloc, Layout},  ptr};
-use malloctk::*;
+use malloctk::{Plan, util::Address, export_malloc_api};
 
 static mut DATA: [u8; 1 << 22] = [0u8; 1 << 22];
 static mut CURSOR: *mut u8 = ptr::null_mut();
@@ -39,8 +39,8 @@ impl Plan for Bump {
     }
 
     #[inline(always)]
-    fn get_layout(&self, ptr: *mut u8) -> Layout {
-        unsafe { *(ptr as *mut Layout).sub(1) }
+    fn get_layout(&self, ptr: Address) -> Layout {
+        unsafe { *ptr.as_ptr::<Layout>().sub(1) }
     }
 }
 

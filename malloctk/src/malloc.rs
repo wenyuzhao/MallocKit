@@ -1,6 +1,6 @@
 use core::{alloc::Layout,  ptr};
 use std::intrinsics::unlikely;
-use crate::lazy::Lazy;
+use crate::util::Lazy;
 use super::Plan;
 pub struct MallocAPI<GA: Plan>(pub &'static Lazy<GA>);
 
@@ -53,7 +53,7 @@ impl<GA: Plan> MallocAPI<GA> {
     #[inline(always)]
     pub unsafe fn free(&self, ptr: *mut u8) {
         if unlikely(ptr.is_null()) { return; }
-        let layout = self.ga().get_layout(ptr);
+        let layout = self.ga().get_layout(ptr.into());
         self.ga().dealloc(ptr, layout);
     }
 
@@ -65,7 +65,7 @@ impl<GA: Plan> MallocAPI<GA> {
             return ptr::null_mut();
         }
         let new_size = Self::align_up(new_size, Self::MIN_ALIGNMENT);
-        let layout = self.ga().get_layout(ptr as *mut u8);
+        let layout = self.ga().get_layout(ptr.into());
         let ptr = self.ga().realloc(ptr, layout, new_size);
         if unlikely(ptr.is_null()) {
             if free_if_fail {
@@ -112,7 +112,7 @@ macro_rules! export_malloc_api {
         pub mod __malloctk {
             use super::*;
             use $crate::Plan;
-            static GLOBAL: $crate::lazy::Lazy<impl $crate::Plan> = $crate::lazy::Lazy::new(|| {
+            static GLOBAL: $crate::util::Lazy<impl $crate::Plan> = $crate::util::Lazy::new(|| {
                 <$plan as $crate::Plan>::new()
             });
             type Malloc = $crate::malloc::MallocAPI<impl $crate::Plan>;
@@ -132,7 +132,7 @@ macro_rules! export_malloc_api {
             #[cfg(target_os = "linux")]
             #[no_mangle]
             pub unsafe extern "C" fn malloc_usable_size(ptr: *mut u8) -> usize {
-                MALLOC_IMPL.ga().get_layout(ptr).size()
+                MALLOC_IMPL.ga().get_layout(ptr.into()).size()
             }
 
             #[no_mangle]
