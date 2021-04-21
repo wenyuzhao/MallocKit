@@ -4,6 +4,7 @@ use std::mem::MaybeUninit;
 use std::cell::Cell;
 use std::sync::atomic::*;
 use std::marker::PhantomData;
+use std::intrinsics::likely;
 
 const UNINITIALIZED: u8 = 0;
 const INITIALIZING: u8 = 1;
@@ -74,7 +75,7 @@ impl <T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
             }
             Err(INITIALIZING) => {
                 loop {
-                    spin_loop_hint();
+                    std::hint::spin_loop();
                     if INITIALIZED == lazy.state.load(Ordering::SeqCst) {
                         break;
                     }
@@ -95,15 +96,14 @@ impl <T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
 
     #[inline(always)]
     pub fn force(lazy: &Self) {
-        #[allow(unused_unsafe)]
-        if likely!(INITIALIZED == lazy.state.load(Ordering::Relaxed)) {
+        if likely(INITIALIZED == lazy.state.load(Ordering::Relaxed)) {
             return
         }
         TL::force_slow(lazy);
     }
 
     #[inline(always)]
-    pub unsafe fn as_inited(&self) -> &T {
+    pub unsafe fn as_initialized(&self) -> &T {
         &*self.value.as_ptr()
     }
 }

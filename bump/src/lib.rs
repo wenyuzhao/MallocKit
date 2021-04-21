@@ -34,6 +34,10 @@ unsafe impl GlobalAlloc for Bump {
 }
 
 impl Plan for Bump {
+    fn new() -> Self {
+        Self
+    }
+
     #[inline(always)]
     fn get_layout(&self, ptr: *mut u8) -> Layout {
         unsafe { *(ptr as *mut Layout).sub(1) }
