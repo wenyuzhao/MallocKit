@@ -20,11 +20,11 @@ impl Address {
     }
 
     pub const fn as_ptr<T>(&self) -> *const T {
-        unsafe { mem::transmute(self) }
+        self.0 as _
     }
 
     pub const fn as_mut_ptr<T>(&self) -> *mut T {
-        unsafe { mem::transmute(self) }
+        self.0 as _
     }
 
     pub const unsafe fn as_ref<T: 'static>(&self) -> &'static T {

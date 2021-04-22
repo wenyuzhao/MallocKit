@@ -127,7 +127,7 @@ macro_rules! export_malloc_api {
             #[cfg(target_os = "macos")]
             #[no_mangle]
             pub unsafe extern "C" fn malloc_size(ptr: *mut u8) -> usize {
-                MALLOC_IMPL.ga().get_layout(ptr).size()
+                MALLOC_IMPL.mutator().get_layout(ptr.into()).size()
             }
 
             #[cfg(target_os = "linux")]
@@ -149,7 +149,10 @@ macro_rules! export_malloc_api {
 
             #[no_mangle]
             pub unsafe extern "C" fn calloc(count: usize, size: usize) -> *mut u8 {
-                MALLOC_IMPL.alloc_or_enomem(count * size, Malloc::MIN_ALIGNMENT)
+                let size = count * size;
+                let ptr = MALLOC_IMPL.alloc_or_enomem(size, Malloc::MIN_ALIGNMENT);
+                std::ptr::write_bytes(ptr, 0, size);
+                ptr
             }
 
             #[cfg(any(target_os = "linux", target_os = "macos"))]

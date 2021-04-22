@@ -6,8 +6,10 @@
 #![feature(const_raw_ptr_to_usize_cast)]
 #![feature(thread_local)]
 
+#[macro_use] extern crate malloctk;
+
 use core::alloc::Layout;
-use malloctk::{Mutator, Plan, export_malloc_api, util::{Address, AllocationArea, Lazy}};
+use malloctk::{Mutator, Plan, util::{Address, AllocationArea, Lazy}};
 use libc;
 
 
@@ -29,27 +31,34 @@ impl Plan for Bump {
 
 struct BumpMutator {
     allocation_area: AllocationArea,
+    retry: bool,
 }
 
 impl BumpMutator {
     const fn new() -> Self {
         Self {
             allocation_area: AllocationArea::EMPTY,
+            retry: false,
         }
     }
 
     #[cold]
     fn alloc_slow(&mut self, layout: Layout) -> Option<Address> {
+        assert!(!self.retry);
         let page_size = 1usize << 12;
         let block_size = page_size * 8;
-        let mmap_size = AllocationArea::align_up(usize::max(layout.size(), block_size), page_size);
+        let mmap_size = AllocationArea::align_up(usize::max(layout.size(), block_size) + std::mem::size_of::<Layout>(), page_size);
         let top = unsafe {
             let addr = libc::mmap(0 as _, mmap_size, libc::PROT_READ | libc::PROT_WRITE, libc::MAP_SHARED | libc::MAP_ANONYMOUS, -1, 0);
+            assert!(addr != libc::MAP_FAILED);
             Address::from(addr)
         };
         let limit = top + mmap_size;
         self.allocation_area = AllocationArea { top, limit };
-        self.alloc(layout)
+        self.retry = true;
+        let result = self.alloc(layout);
+        self.retry = false;
+        result
     }
 }
 
