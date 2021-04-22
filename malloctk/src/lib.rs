@@ -13,9 +13,11 @@
 #![feature(type_ascription)]
 #![feature(step_trait)]
 #![feature(step_trait_ext)]
+#![feature(const_likely)]
 
 pub mod util;
 pub mod malloc;
+pub mod log;
 
 use core::alloc::Layout;
 use std::ptr;
