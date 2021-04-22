@@ -32,6 +32,9 @@ build: FORCE
 
 test: build
 	$(dylib_env) ./a.out
-	# @lldb -b -o "settings set auto-confirm true" -o "env $(dylib_env)" -o "run" ./a.out
+
+# GDB to LLDB command map: https://lldb.llvm.org/use/map.html
+lldb: build
+	rust-lldb -b -o "settings set auto-confirm true" -o "env $(dylib_env)" -o "run" -- lsblk
 
 FORCE:
