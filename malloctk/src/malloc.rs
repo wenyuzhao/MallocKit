@@ -2,18 +2,22 @@ use core::{alloc::Layout,  ptr};
 use std::intrinsics::unlikely;
 use crate::util::Lazy;
 use super::Plan;
+use crate::Mutator;
+
+
 pub struct MallocAPI<GA: Plan>(pub &'static Lazy<GA>);
 
 #[allow(unused)]
-impl<GA: Plan> MallocAPI<GA> {
+impl<P: Plan> MallocAPI<P> {
     #[cfg(not(any(target_os = "macos", all(target_os = "windows", target_pointer_width = "64"))))]
     pub const MIN_ALIGNMENT: usize = 8;
     #[cfg(any(target_os = "macos", all(target_os = "windows", target_pointer_width = "64")))]
     pub const MIN_ALIGNMENT: usize = 16;
     pub const PAGE_SIZE: usize = 4096;
 
-    pub const fn ga(&self) -> &Lazy<GA> {
-        &self.0
+    #[inline(always)]
+    pub fn mutator(&self) -> &'static mut P::Mutator {
+        P::Mutator::current()
     }
 
     pub const fn align_up(value: usize, align: usize) -> usize {
@@ -31,11 +35,9 @@ impl<GA: Plan> MallocAPI<GA> {
         if cfg!(target_os = "linux") && unlikely(size == 0) { return Ok(None); }
         let size = Self::align_up(size, align);
         let layout = Layout::from_size_align(size, align).unwrap();
-        let ptr = self.ga().alloc(layout);
-        if ptr.is_null() {
-            Err(libc::ENOMEM)
-        } else {
-            Ok(Some(ptr))
+        match self.mutator().alloc(layout) {
+            Some(ptr) => Ok(Some(ptr.into())),
+            None => Err(libc::ENOMEM),
         }
     }
 
@@ -53,8 +55,8 @@ impl<GA: Plan> MallocAPI<GA> {
     #[inline(always)]
     pub unsafe fn free(&self, ptr: *mut u8) {
         if unlikely(ptr.is_null()) { return; }
-        let layout = self.ga().get_layout(ptr.into());
-        self.ga().dealloc(ptr, layout);
+        let layout = self.mutator().get_layout(ptr.into());
+        self.mutator().dealloc(ptr.into(), layout);
     }
 
     #[inline(always)]
@@ -65,15 +67,17 @@ impl<GA: Plan> MallocAPI<GA> {
             return ptr::null_mut();
         }
         let new_size = Self::align_up(new_size, Self::MIN_ALIGNMENT);
-        let layout = self.ga().get_layout(ptr.into());
-        let ptr = self.ga().realloc(ptr, layout, new_size);
-        if unlikely(ptr.is_null()) {
-            if free_if_fail {
-                self.free(ptr);
+        let layout = self.mutator().get_layout(ptr.into());
+        match self.mutator().realloc(ptr.into(), layout, new_size) {
+            Some(ptr) => ptr.into(),
+            None => {
+                if free_if_fail {
+                    self.free(ptr);
+                }
+                Self::set_error(libc::ENOMEM);
+                0 as _
             }
-            Self::set_error(libc::ENOMEM);
         }
-        ptr
     }
 
     #[inline(always)]
@@ -108,15 +112,12 @@ impl<GA: Plan> MallocAPI<GA> {
 
 #[macro_export]
 macro_rules! export_malloc_api {
-    ($plan: ty) => {
+    ($plan: expr) => {
         pub mod __malloctk {
             use super::*;
             use $crate::Plan;
-            static GLOBAL: $crate::util::Lazy<impl $crate::Plan> = $crate::util::Lazy::new(|| {
-                <$plan as $crate::Plan>::new()
-            });
             type Malloc = $crate::malloc::MallocAPI<impl $crate::Plan>;
-            static MALLOC_IMPL: Malloc = $crate::malloc::MallocAPI(&GLOBAL);
+            static MALLOC_IMPL: Malloc = $crate::malloc::MallocAPI(&$plan);
 
             #[no_mangle]
             pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
@@ -132,7 +133,7 @@ macro_rules! export_malloc_api {
             #[cfg(target_os = "linux")]
             #[no_mangle]
             pub unsafe extern "C" fn malloc_usable_size(ptr: *mut u8) -> usize {
-                MALLOC_IMPL.ga().get_layout(ptr.into()).size()
+                MALLOC_IMPL.mutator().get_layout(ptr.into()).size()
             }
 
             #[no_mangle]

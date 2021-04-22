@@ -4,36 +4,19 @@
 #![feature(core_intrinsics)]
 #![feature(const_fn)]
 #![feature(const_raw_ptr_to_usize_cast)]
+#![feature(thread_local)]
 
-use core::{alloc::{GlobalAlloc, Layout},  ptr};
-use malloctk::{Plan, util::Address, export_malloc_api};
+use core::alloc::Layout;
+use malloctk::{Mutator, Plan, export_malloc_api, util::{Address, AllocationArea, Lazy}};
+use libc;
 
-static mut DATA: [u8; 1 << 22] = [0u8; 1 << 22];
-static mut CURSOR: *mut u8 = ptr::null_mut();
-static mut LIMIT: *mut u8 = ptr::null_mut();
+
 
 struct Bump;
 
-unsafe impl GlobalAlloc for Bump {
-    #[inline(always)]
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        // let _guard = LOCK.lock();
-        let size = layout.size() + core::mem::size_of::<Layout>();
-        let align = layout.align();
-        if CURSOR.is_null() {
-            CURSOR = &mut DATA[0];
-            LIMIT = &mut DATA[DATA.len() - 1];
-        }
-        let start = ((CURSOR as usize).wrapping_add(align).wrapping_sub(1) & !align.wrapping_sub(1)) as *mut u8;
-        let end = start as usize + size;
-        CURSOR = end as *mut u8;
-        *(start as *mut Layout) = layout;
-        return (start as *mut u8).add(core::mem::size_of::<Layout>())
-    }
-    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {}
-}
-
 impl Plan for Bump {
+    type Mutator = BumpMutator;
+
     fn new() -> Self {
         Self
     }
@@ -44,4 +27,60 @@ impl Plan for Bump {
     }
 }
 
-export_malloc_api!(Bump);
+struct BumpMutator {
+    allocation_area: AllocationArea,
+}
+
+impl BumpMutator {
+    const fn new() -> Self {
+        Self {
+            allocation_area: AllocationArea::EMPTY,
+        }
+    }
+
+    #[cold]
+    fn alloc_slow(&mut self, layout: Layout) -> Option<Address> {
+        let page_size = 1usize << 12;
+        let block_size = page_size * 8;
+        let mmap_size = AllocationArea::align_up(usize::max(layout.size(), block_size), page_size);
+        let top = unsafe {
+            let addr = libc::mmap(0 as _, mmap_size, libc::PROT_READ | libc::PROT_WRITE, libc::MAP_SHARED | libc::MAP_ANONYMOUS, -1, 0);
+            Address::from(addr)
+        };
+        let limit = top + mmap_size;
+        self.allocation_area = AllocationArea { top, limit };
+        self.alloc(layout)
+    }
+}
+
+impl Mutator for BumpMutator {
+    type Plan = Bump;
+
+    fn current() -> &'static mut Self {
+        unsafe { &mut MUTATOR }
+    }
+
+    #[inline(always)]
+    fn plan(&self) -> &'static Self::Plan {
+        &PLAN
+    }
+
+    #[inline(always)]
+    fn alloc(&mut self, layout: Layout) -> Option<Address> {
+        if let Some(ptr) = self.allocation_area.alloc(layout, true) {
+            return Some(ptr)
+        }
+        self.alloc_slow(layout)
+    }
+
+    #[inline(always)]
+    fn dealloc(&mut self, _ptr: Address, _layout: Layout) {}
+
+}
+
+static PLAN: Lazy<Bump> = Lazy::new(|| Bump::new());
+
+#[thread_local]
+static mut MUTATOR: BumpMutator = BumpMutator::new();
+
+export_malloc_api!(PLAN);

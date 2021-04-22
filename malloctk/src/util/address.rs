@@ -3,7 +3,7 @@ use std::mem;
 use std::cmp::Ordering;
 use std::fmt;
 use super::address_non_null::AddressNonNull;
-
+use std::iter::Step;
 
 
 #[repr(transparent)]
@@ -213,5 +213,23 @@ impl const SubAssign<usize> for Address {
 impl fmt::Debug for Address {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.as_ptr::<u8>())
+    }
+}
+
+unsafe impl const Step for Address {
+    fn steps_between(start: &Self, end: &Self) -> Option<usize> {
+        if start.0 > end.0 {
+            None
+        } else {
+            Some(*end - *start)
+        }
+    }
+
+    fn forward_checked(start: Self, count: usize) -> Option<Self> {
+        Some(start + count)
+    }
+
+    fn backward_checked(start: Self, count: usize) -> Option<Self> {
+        Some(start - count)
     }
 }
