@@ -30,11 +30,13 @@ build: FORCE
 # 	clang -fuse-ld=lld -g -O3 -flto ./test.c $(target_dir)/libbump.a -o test
 # 	llvm-objdump -D -S -m -g -C  ./test > test.s
 
+program = gcc ./test.c -o ./target/test
+
 test: build
-	$(dylib_env) ./a.out
+	$(dylib_env) time $(program)
 
 # GDB to LLDB command map: https://lldb.llvm.org/use/map.html
 lldb: build
-	rust-lldb -b -o "settings set auto-confirm true" -o "env $(dylib_env)" -o "run" -- lsblk
+	rust-lldb -b -o "settings set auto-confirm true" -o "env $(dylib_env)" -o "run" -- $(program)
 
 FORCE:

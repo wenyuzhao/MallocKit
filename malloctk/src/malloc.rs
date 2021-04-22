@@ -34,7 +34,7 @@ impl<P: Plan> MallocAPI<P> {
     pub unsafe fn alloc(&self, size: usize, align: usize) -> Result<Option<*mut u8>, i32> {
         if cfg!(target_os = "linux") && unlikely(size == 0) { return Ok(None); }
         let size = Self::align_up(size, align);
-        let layout = Layout::from_size_align(size, align).unwrap();
+        let layout = Layout::from_size_align_unchecked(size, align);
         match self.mutator().alloc(layout) {
             Some(ptr) => Ok(Some(ptr.into())),
             None => Err(libc::ENOMEM),

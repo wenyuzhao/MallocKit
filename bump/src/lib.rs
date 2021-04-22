@@ -65,6 +65,7 @@ impl BumpMutator {
 impl Mutator for BumpMutator {
     type Plan = Bump;
 
+    #[inline(always)]
     fn current() -> &'static mut Self {
         unsafe { &mut MUTATOR }
     }
@@ -72,6 +73,11 @@ impl Mutator for BumpMutator {
     #[inline(always)]
     fn plan(&self) -> &'static Self::Plan {
         &PLAN
+    }
+
+    #[inline(always)]
+    fn get_layout(&self, ptr: Address) -> Layout {
+        unsafe { *ptr.as_ptr::<Layout>().sub(1) }
     }
 
     #[inline(always)]
