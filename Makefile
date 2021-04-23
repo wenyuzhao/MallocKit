@@ -25,6 +25,8 @@ build: FORCE
 	@llvm-objdump -d -S  $(target_dir)/lib$(malloc).a > $(target_dir)/lib$(malloc).s 2>/dev/null
 	@$(CC) $(CFLAGS) ./test.c
 
+# clang ./test.c /home/wenyu/malloctk/target/release/libbump.a -lpthread -ldl -g -O3 -o test
+
 # build: FORCE
 # 	cargo build $(cargo_build_flag)
 # 	clang -fuse-ld=lld -g -O3 -flto ./test.c $(target_dir)/libbump.a -o test
@@ -33,7 +35,14 @@ build: FORCE
 program = gcc ./test.c -o ./target/test
 
 test: build
-	$(dylib_env) time $(program)
+	$(dylib_env) $(program)
+
+bench: perf=faults,dTLB-loads,dTLB-load-misses,cache-misses,cache-references
+bench: build
+	perf stat -e '$(perf)' env $(dylib_env) $(program)
+	@echo ---
+	@echo
+	perf stat -e '$(perf)' $(program)
 
 # GDB to LLDB command map: https://lldb.llvm.org/use/map.html
 lldb: build
