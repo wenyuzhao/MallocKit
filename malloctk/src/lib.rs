@@ -14,15 +14,23 @@
 #![feature(step_trait)]
 #![feature(step_trait_ext)]
 #![feature(const_likely)]
+#![feature(thread_local)]
+#![feature(allocator_api)]
+#![feature(never_type)]
+#![feature(box_syntax)]
 
-pub mod util;
-pub mod malloc;
+#[macro_use]
 pub mod log;
+pub mod util;
+pub mod space;
+pub mod malloc;
 
 use core::alloc::Layout;
 use std::ptr;
 use std::cmp;
 use util::Address;
+pub use ctor::ctor;
+pub use libc;
 
 
 pub trait Plan: Sized + 'static {
@@ -31,6 +39,7 @@ pub trait Plan: Sized + 'static {
     fn new() -> Self;
     fn get_layout(&self, ptr: Address) -> Layout;
 }
+
 pub trait Mutator: Sized + 'static {
     type Plan: Plan<Mutator=Self>;
 
@@ -68,4 +77,8 @@ pub trait Mutator: Sized + 'static {
         }
         new_ptr
     }
+}
+
+#[doc(hidden)]
+pub unsafe fn __ctor() {
 }

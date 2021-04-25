@@ -3,7 +3,6 @@ use std::mem;
 use super::Address;
 
 
-
 #[derive(Debug)]
 pub struct AllocationArea {
     pub top: Address,

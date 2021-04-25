@@ -5,22 +5,26 @@
 #![feature(const_fn)]
 #![feature(const_raw_ptr_to_usize_cast)]
 #![feature(thread_local)]
+#![feature(allocator_api)]
 
 #[macro_use] extern crate malloctk;
 
 use core::alloc::Layout;
-use malloctk::{Mutator, Plan, util::{Address, AllocationArea, Lazy}};
-use libc;
+use malloctk::{Mutator, Plan, space::*, space::immortal_space::ImmortalSpace, util::{Address, AllocationArea, Lazy}};
 
+const IMMORTAL_SPACE: SpaceId = SpaceId::DEFAULT;
 
-
-struct Bump;
+struct Bump {
+    immortal: ImmortalSpace,
+}
 
 impl Plan for Bump {
     type Mutator = BumpMutator;
 
     fn new() -> Self {
-        Self
+        Self {
+            immortal: ImmortalSpace::new(IMMORTAL_SPACE),
+        }
     }
 
     #[inline(always)]
@@ -47,13 +51,10 @@ impl BumpMutator {
         assert!(!self.retry);
         let page_size = 1usize << 12;
         let block_size = page_size * 8;
-        let mmap_size = AllocationArea::align_up(usize::max(layout.size(), block_size) + std::mem::size_of::<Layout>(), page_size);
-        let top = unsafe {
-            let addr = libc::mmap(0 as _, mmap_size, libc::PROT_READ | libc::PROT_WRITE, libc::MAP_SHARED | libc::MAP_ANONYMOUS, -1, 0);
-            assert!(addr != libc::MAP_FAILED);
-            Address::from(addr)
-        };
-        let limit = top + mmap_size;
+        let alloc_size = AllocationArea::align_up(usize::max(layout.size(), block_size) + std::mem::size_of::<Layout>(), page_size);
+        let alloc_pages = alloc_size >> 12;
+        let top = PLAN.immortal.acquire(alloc_pages)?;
+        let limit = top + alloc_size;
         self.allocation_area = AllocationArea { top, limit };
         self.retry = true;
         let result = self.alloc(layout);

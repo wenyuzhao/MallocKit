@@ -119,6 +119,11 @@ macro_rules! export_malloc_api {
             type Malloc = $crate::malloc::MallocAPI<impl $crate::Plan>;
             static MALLOC_IMPL: Malloc = $crate::malloc::MallocAPI(&$plan);
 
+            #[$crate::ctor]
+            unsafe fn ctor() {
+                $crate::__ctor();
+            }
+
             #[no_mangle]
             pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
                 MALLOC_IMPL.alloc_or_enomem(size, Malloc::MIN_ALIGNMENT)
