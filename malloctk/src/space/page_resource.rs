@@ -52,7 +52,11 @@ impl PageResource {
     }
 
     fn map_pages<S: PageSize>(&self, start: Page<S>, pages: usize) -> bool {
-        let addr = unsafe { libc::mmap(start.start().as_mut_ptr(), pages << S::LOG_BYTES, libc::PROT_READ | libc::PROT_WRITE, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_FIXED_NOREPLACE, -1, 0) };
+        let size = pages << S::LOG_BYTES;
+        let addr = unsafe { libc::mmap(start.start().as_mut_ptr(), size, libc::PROT_READ | libc::PROT_WRITE, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_FIXED_NOREPLACE, -1, 0) };
+        if cfg!(feature="transparent_huge_page") && S::LOG_BYTES != Size4K::LOG_BYTES {
+            unsafe { libc::madvise(start.start().as_mut_ptr(), size, libc::MADV_HUGEPAGE); }
+        }
         if addr == libc::MAP_FAILED {
             false
         } else {

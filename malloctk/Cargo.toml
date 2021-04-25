@@ -13,3 +13,7 @@ spin = "0.9"
 ctor = "0.1"
 libmimalloc-sys = "0.1"
 array-init = "2.0"
+
+[features]
+default = [ "transparent_huge_page" ]
+transparent_huge_page = []
