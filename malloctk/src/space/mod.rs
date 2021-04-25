@@ -4,7 +4,6 @@ pub(crate) mod page_table;
 pub mod page_resource;
 pub mod immortal_space;
 
-// static SPACE_ID_COUNTER:
 
 pub static PAGE_REGISTRY: PageRegistry = PageRegistry::new();
 
@@ -35,9 +34,21 @@ pub trait Space: Sized + 'static {
     fn new(id: SpaceId) -> Self;
     fn id(&self) -> SpaceId;
     fn page_resource(&self) -> &PageResource;
+
+    #[inline(always)]
+    fn contains(&self, address: Address) -> bool {
+        SpaceId::from(address) == self.id()
+    }
+
+    #[inline(always)]
+    fn committed_size(&self) -> usize {
+        self.page_resource().committed_size()
+    }
+
     fn acquire(&self, pages: usize) -> Option<Address> {
         self.page_resource().acquire_pages(pages)
     }
+
     fn release(&self, start: Address) {
         self.page_resource().release_pages(start)
     }

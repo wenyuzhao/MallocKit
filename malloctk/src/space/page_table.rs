@@ -1,6 +1,6 @@
 use spin::RwLock;
 use crate::util::{Address, System};
-use std::{marker::PhantomData, mem};
+use std::{marker::PhantomData, mem, sync::atomic::{AtomicUsize, Ordering}};
 
 
 
@@ -20,24 +20,19 @@ impl BitField {
         *slot = new_value;
     }
 
-    const fn add(&self, slot: &mut usize, inc: usize) -> usize {
+    const fn delta(&self, slot: &mut usize, delta: isize) -> usize {
         let old = self.get(*slot);
-        self.set(slot, old + inc);
-        old + inc
-    }
-
-    const fn sub(&self, slot: &mut usize, dec: usize) -> usize {
-        let old = self.get(*slot);
-        self.set(slot, old - dec);
-        old - dec
+        let new = if delta > 0 { old + (delta as usize) } else { old - ((-delta) as usize) };
+        self.set(slot, new);
+        new
     }
 }
 
 #[repr(transparent)]
-pub struct PageTableEntry<L: PageTableLevel>(usize, PhantomData<L>);
+struct PageTableEntry<L: PageTableLevel>(usize, PhantomData<L>);
 
-pub enum PageTableEntryData<L: PageTableLevel> {
-    NextLevelPageTable { table: &'static mut PageTable<L>, used_entries: usize },
+enum PageTableEntryData<L: PageTableLevel> {
+    NextLevelPageTable { table: &'static mut PageTable<L> },
     Page4K { contiguous_pages: Option<usize> },
 }
 
@@ -60,13 +55,12 @@ impl<L: PageTableLevel> PageTableEntry<L> {
         self.0 = 0;
     }
 
-    fn get(&self) -> Option<PageTableEntryData<L::NextLevel>> {
+    const fn get(&self) -> Option<PageTableEntryData<L::NextLevel>> {
         let value = self.0;
         if Self::PRESENT.get(value) == 0 { return None }
         if Self::IS_PAGE_TABLE.get(value) != 0 {
             let table: &'static mut PageTable<L::NextLevel> = unsafe { mem::transmute(value & Self::PAGE_TABLE_POINTER_MASK) };
-            let used_entries = Self::PAGE_TABLE_USED_ENTRIES.get(value);
-            Some(PageTableEntryData::NextLevelPageTable { table, used_entries })
+            Some(PageTableEntryData::NextLevelPageTable { table })
         } else {
             let contiguous_pages = Self::PAGE_CONTIGUOUS_PAGES.get(value);
             Some(PageTableEntryData::Page4K { contiguous_pages: if contiguous_pages == 0 { None } else { Some(contiguous_pages) } })
@@ -90,20 +84,17 @@ impl<L: PageTableLevel> PageTableEntry<L> {
         Self::PAGE_CONTIGUOUS_PAGES.set(&mut self.0, pages.unwrap_or(0));
     }
 
-    fn add_entries(&mut self, entries: usize) -> usize {
-        Self::PAGE_TABLE_USED_ENTRIES.add(&mut self.0, entries)
-    }
-
-    fn sub_entries(&mut self, entries: usize) -> usize {
-        Self::PAGE_TABLE_USED_ENTRIES.sub(&mut self.0, entries)
+    const fn delta_entries(&mut self, entries: i32) -> usize {
+        Self::PAGE_TABLE_USED_ENTRIES.delta(&mut self.0, entries as _)
     }
 }
 
-pub trait PageTableLevel: 'static {
+trait PageTableLevel: 'static {
     type NextLevel: PageTableLevel;
     const SHIFT: usize = Self::NextLevel::SHIFT + 9;
     const MASK: usize = 0b1_1111_1111 << Self::SHIFT;
 
+    #[inline(always)]
     fn get_index(addr: Address) -> usize {
         (usize::from(addr) & Self::MASK) >> Self::SHIFT
     }
@@ -115,19 +106,19 @@ impl PageTableLevel for L4 {
     type NextLevel = L3;
 }
 
-pub struct L3;
+struct L3;
 
 impl PageTableLevel for L3 {
     type NextLevel = L2;
 }
 
-pub struct L2;
+struct L2;
 
 impl PageTableLevel for L2 {
     type NextLevel = L1;
 }
 
-pub struct L1;
+struct L1;
 
 impl PageTableLevel for L1 {
     type NextLevel = !;
@@ -139,16 +130,17 @@ impl PageTableLevel for ! {
     const SHIFT: usize = 0;
 }
 
-pub struct PageMeta {
+struct PageMeta {
     pub contiguous_pages: Option<usize>,
 }
 
-pub struct PageTable<L: PageTableLevel> {
+struct PageTable<L: PageTableLevel> {
     table: [PageTableEntry::<L>; 512],
     phantom: PhantomData<L>,
 }
 
 impl<L: PageTableLevel> PageTable<L> {
+    #[inline(always)]
     fn get_entry(&self, address: Address) -> Option<PageTableEntryData<L::NextLevel>> {
         self.table[L::get_index(address)].get()
     }
@@ -179,14 +171,15 @@ impl<L: PageTableLevel> PageTable<L> {
 }
 
 impl PageTable<L4> {
-    pub(crate) const fn new() -> Self {
+    const fn new() -> Self {
         Self {
             table: unsafe { mem::transmute([0usize; 512]) },
             phantom: PhantomData
         }
     }
 
-    pub(crate) fn get(&self, address: Address) -> Option<PageMeta> {
+    #[inline(always)]
+    fn get(&self, address: Address) -> Option<PageMeta> {
         let l3 = match self.get_entry(address)? {
             PageTableEntryData::NextLevelPageTable { table, .. } => table,
             _ => unreachable!(),
@@ -207,41 +200,41 @@ impl PageTable<L4> {
         }
     }
 
-    pub(crate) fn insert_one_page(&mut self, page: Address, num_pages: Option<usize>) {
+    fn insert_one_page(&mut self, page: Address, num_pages: Option<usize>) {
         let l4 = self;
         let l3 = l4.get_or_allocate_next_page_table(page, || {});
-        let l2 = l3.get_or_allocate_next_page_table(page, || { l4.table[L4::get_index(page)].add_entries(1); });
-        let l1 = l2.get_or_allocate_next_page_table(page, || { l3.table[L3::get_index(page)].add_entries(1); });
+        let l2 = l3.get_or_allocate_next_page_table(page, || { l4.table[L4::get_index(page)].delta_entries(1); });
+        let l1 = l2.get_or_allocate_next_page_table(page, || { l3.table[L3::get_index(page)].delta_entries(1); });
         debug_assert!(l1.get_entry(page).is_none());
         l1.table[L1::get_index(page)].set_next_page(num_pages);
     }
 
-    pub(crate) fn insert_pages(&mut self, start: Address, num_pages: usize) {
+    fn insert_pages(&mut self, start: Address, num_pages: usize) {
         for i in 0..num_pages {
             let page = start + (i << 12);
             self.insert_one_page(page, if i == 0 { Some(num_pages) } else { None })
         }
     }
 
-    pub(crate) fn delete_one_page(&mut self, page: Address) {
+    fn delete_one_page(&mut self, page: Address) {
         let l4 = self;
         let l3 = l4.get_next_page_table(page);
         let l2 = l3.get_next_page_table(page);
         let l1 = l2.get_next_page_table(page);
         debug_assert!(l1.get_entry(page).is_some());
         l1.table[L1::get_index(page)].clear();
-        if l2.table[L2::get_index(page)].sub_entries(1) == 0 {
+        if l2.table[L2::get_index(page)].delta_entries(-1) == 0 {
             l2.table[L2::get_index(page)].clear();
-            if l3.table[L3::get_index(page)].sub_entries(1) == 0 {
+            if l3.table[L3::get_index(page)].delta_entries(-1) == 0 {
                 l3.table[L3::get_index(page)].clear();
-                if l4.table[L4::get_index(page)].sub_entries(1) == 0 {
+                if l4.table[L4::get_index(page)].delta_entries(-1) == 0 {
                     l4.table[L4::get_index(page)].clear();
                 }
             }
         }
     }
 
-    pub(crate) fn delete_pages(&mut self, start: Address, num_pages: usize) {
+    fn delete_pages(&mut self, start: Address, num_pages: usize) {
         for i in 0..num_pages {
             let page = start + (i << 12);
             self.delete_one_page(page)
@@ -252,28 +245,41 @@ impl PageTable<L4> {
 
 pub struct PageRegistry {
     p4: RwLock<PageTable<L4>>,
+    committed_size: AtomicUsize,
 }
 
 impl PageRegistry {
     pub(crate) const fn new() -> Self {
         Self {
             p4: RwLock::new(PageTable::new()),
+            committed_size: AtomicUsize::new(0),
         }
     }
 
+    #[inline(always)]
+    pub fn committed_size(&self) -> usize {
+        self.committed_size.load(Ordering::SeqCst)
+    }
+
+    #[inline(always)]
     pub fn is_allocated(&self, address: Address) -> bool {
         self.p4.read().get(address).is_some()
     }
 
-    pub(crate) fn get_contiguous_pages(&self, start: Address) -> usize {
+    #[inline(always)]
+    pub fn get_contiguous_pages(&self, start: Address) -> usize {
         self.p4.read().get(start).unwrap().contiguous_pages.unwrap()
     }
 
     pub(crate) fn insert_pages(&self, start: Address, num_pages: usize) {
+        self.committed_size.fetch_add(num_pages << 12, Ordering::SeqCst);
         self.p4.write().insert_pages(start, num_pages)
     }
 
-    pub(crate) fn delete_pages(&self, start: Address, num_pages: usize) {
-        self.p4.write().delete_pages(start, num_pages)
+    pub(crate) fn delete_pages(&self, start: Address) -> usize {
+        let pages = self.get_contiguous_pages(start);
+        self.committed_size.fetch_sub(pages << 12, Ordering::SeqCst);
+        self.p4.write().delete_pages(start, pages);
+        pages
     }
 }

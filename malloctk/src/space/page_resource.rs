@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use crate::util::{Address, System};
 use spin::Mutex;
 use super::{PAGE_REGISTRY, SpaceId};
@@ -15,6 +17,7 @@ pub struct PageResource {
     pub id: SpaceId,
     base: Address,
     freelist: Mutex<[Option<Box<Cell, System>>; NUM_SIZE_CLASS]>,
+    committed_size: AtomicUsize,
 }
 
 impl PageResource {
@@ -25,9 +28,15 @@ impl PageResource {
             id,
             base,
             freelist: Mutex::new(array_init::array_init(|_| None)),
+            committed_size: AtomicUsize::new(0),
         };
         pr.freelist.lock()[NUM_SIZE_CLASS - 1] = Some(Box::new_in(Cell { next: None, unit: 0 }, System));
         pr
+    }
+
+    #[inline(always)]
+    pub fn committed_size(&self) -> usize {
+        self.committed_size.load(Ordering::SeqCst)
     }
 
     fn pages_to_size_class(pages: usize) -> usize {
@@ -95,17 +104,19 @@ impl PageResource {
         }
     }
 
-    unsafe fn map_pages(start: Address, pages: usize) -> bool {
-        let addr = libc::mmap(start.as_mut_ptr(), pages << LOG_PAGE_SIZE, libc::PROT_READ | libc::PROT_WRITE, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_FIXED_NOREPLACE, -1, 0);
+    fn map_pages(&self, start: Address, pages: usize) -> bool {
+        let addr = unsafe { libc::mmap(start.as_mut_ptr(), pages << LOG_PAGE_SIZE, libc::PROT_READ | libc::PROT_WRITE, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_FIXED_NOREPLACE, -1, 0) };
         if addr == libc::MAP_FAILED {
             false
         } else {
+            self.committed_size.fetch_add(pages << LOG_PAGE_SIZE, Ordering::SeqCst);
             true
         }
     }
 
-    unsafe fn unmap_pages(start: Address, pages: usize) {
-        libc::munmap(start.as_mut_ptr(), pages << LOG_PAGE_SIZE);
+    fn unmap_pages(&self, start: Address, pages: usize) {
+        unsafe { libc::munmap(start.as_mut_ptr(), pages << LOG_PAGE_SIZE); }
+        self.committed_size.fetch_sub(pages << LOG_PAGE_SIZE, Ordering::SeqCst);
     }
 
     fn try_acquire_pages_locked(&self, freelist: &mut [Option<Box<Cell, System>>; NUM_SIZE_CLASS], pages: usize) -> Option<Address> {
@@ -114,7 +125,7 @@ impl PageResource {
         let actural_pages = 1usize << size_class;
         let unit = Self::try_allocate_unit(freelist, size_class)?;
         let start = self.unit_to_address(unit);
-        if unsafe { !Self::map_pages(start, actural_pages) } {
+        if !self.map_pages(start, actural_pages) {
             return self.try_acquire_pages_locked(freelist, pages); // Retry
         }
         PAGE_REGISTRY.insert_pages(start, actural_pages);
@@ -127,9 +138,8 @@ impl PageResource {
     }
 
     pub fn release_pages(&self, start: Address) {
-        let pages = PAGE_REGISTRY.get_contiguous_pages(start);
-        PAGE_REGISTRY.delete_pages(start, pages);
-        unsafe { Self::unmap_pages(start, pages) };
+        let pages = PAGE_REGISTRY.delete_pages(start);
+        self.unmap_pages(start, pages);
         let size_class = Self::pages_to_size_class(pages);
         let unit = self.address_to_unit(start);
         let mut freelist = self.freelist.lock();
