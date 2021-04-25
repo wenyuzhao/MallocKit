@@ -10,7 +10,7 @@
 #[macro_use] extern crate malloctk;
 
 use core::alloc::Layout;
-use malloctk::{Mutator, Plan, space::*, space::immortal_space::ImmortalSpace, util::{Address, AllocationArea, Lazy}};
+use malloctk::{Mutator, Plan, space::*, space::immortal_space::ImmortalSpace, util::*};
 
 const IMMORTAL_SPACE: SpaceId = SpaceId::DEFAULT;
 
@@ -49,11 +49,11 @@ impl BumpMutator {
     #[cold]
     fn alloc_slow(&mut self, layout: Layout) -> Option<Address> {
         assert!(!self.retry);
-        let page_size = 1usize << 12;
-        let block_size = page_size * 8;
-        let alloc_size = AllocationArea::align_up(usize::max(layout.size(), block_size) + std::mem::size_of::<Layout>(), page_size);
-        let alloc_pages = alloc_size >> 12;
-        let top = PLAN.immortal.acquire(alloc_pages)?;
+        let block_size = Size2M::BYTES;
+        let alloc_size = AllocationArea::align_up(usize::max(layout.size(), block_size) + std::mem::size_of::<Layout>(), Size2M::BYTES);
+        let alloc_pages = alloc_size >> Size2M::LOG_BYTES;
+        let pages = PLAN.immortal.acquire::<Size2M>(alloc_pages)?;
+        let top = pages.start.start();
         let limit = top + alloc_size;
         self.allocation_area = AllocationArea { top, limit };
         self.retry = true;

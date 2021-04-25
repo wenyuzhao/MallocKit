@@ -1,6 +1,6 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
-
-use crate::util::{Address, System};
+use std::{ops::Range, sync::atomic::{AtomicUsize, Ordering}};
+use std::iter::Step;
+use crate::util::*;
 use spin::Mutex;
 use super::{PAGE_REGISTRY, SpaceId};
 
@@ -10,8 +10,8 @@ struct Cell {
     unit: usize,
 }
 
-const NUM_SIZE_CLASS: usize = SpaceId::LOG_MAX_SPACE_SIZE - 12 + 1;
-const LOG_PAGE_SIZE: usize = 12;
+const NUM_SIZE_CLASS: usize = SpaceId::LOG_MAX_SPACE_SIZE - Page::<Size4K>::LOG_BYTES + 1;
+// const LOG_PAGE_SIZE: usize = 12;
 
 pub struct PageResource {
     pub id: SpaceId,
@@ -39,16 +39,17 @@ impl PageResource {
         self.committed_size.load(Ordering::SeqCst)
     }
 
-    fn pages_to_size_class(pages: usize) -> usize {
-        pages.next_power_of_two().trailing_zeros() as _
+    fn pages_to_size_class<S: PageSize>(pages: usize) -> usize {
+        let small_pages =pages << (S::LOG_BYTES - Size4K::LOG_BYTES);
+        small_pages.next_power_of_two().trailing_zeros() as _
     }
 
     fn address_to_unit(&self, address: Address) -> usize {
-        (address - self.base) >> LOG_PAGE_SIZE
+        (address - self.base) >> Page::<Size4K>::LOG_BYTES
     }
 
     fn unit_to_address(&self, unit: usize) -> Address {
-        self.base + (unit << LOG_PAGE_SIZE)
+        self.base + (unit << Page::<Size4K>::LOG_BYTES)
     }
 
     fn try_allocate_unit(freelist: &mut [Option<Box<Cell, System>>; NUM_SIZE_CLASS], size_class: usize) -> Option<usize> {
@@ -104,44 +105,47 @@ impl PageResource {
         }
     }
 
-    fn map_pages(&self, start: Address, pages: usize) -> bool {
-        let addr = unsafe { libc::mmap(start.as_mut_ptr(), pages << LOG_PAGE_SIZE, libc::PROT_READ | libc::PROT_WRITE, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_FIXED_NOREPLACE, -1, 0) };
+    fn map_pages<S: PageSize>(&self, start: Page<S>, pages: usize) -> bool {
+        let addr = unsafe { libc::mmap(start.start().as_mut_ptr(), pages << S::LOG_BYTES, libc::PROT_READ | libc::PROT_WRITE, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_FIXED_NOREPLACE, -1, 0) };
         if addr == libc::MAP_FAILED {
             false
         } else {
-            self.committed_size.fetch_add(pages << LOG_PAGE_SIZE, Ordering::SeqCst);
+            self.committed_size.fetch_add(pages << S::LOG_BYTES, Ordering::SeqCst);
             true
         }
     }
 
-    fn unmap_pages(&self, start: Address, pages: usize) {
-        unsafe { libc::munmap(start.as_mut_ptr(), pages << LOG_PAGE_SIZE); }
-        self.committed_size.fetch_sub(pages << LOG_PAGE_SIZE, Ordering::SeqCst);
+    fn unmap_pages<S: PageSize>(&self, start: Page<S>, pages: usize) {
+        unsafe { libc::munmap(start.start().as_mut_ptr(), pages << S::LOG_BYTES); }
+        self.committed_size.fetch_sub(pages << S::LOG_BYTES, Ordering::SeqCst);
     }
 
-    fn try_acquire_pages_locked(&self, freelist: &mut [Option<Box<Cell, System>>; NUM_SIZE_CLASS], pages: usize) -> Option<Address> {
+    fn try_acquire_pages_locked<S: PageSize>(&self, freelist: &mut [Option<Box<Cell, System>>; NUM_SIZE_CLASS], pages: usize) -> Option<Range<Page<S>>> {
         debug_assert_ne!(pages, 0);
-        let size_class = Self::pages_to_size_class(pages);
+        let size_class = Self::pages_to_size_class::<S>(pages);
         let actural_pages = 1usize << size_class;
         let unit = Self::try_allocate_unit(freelist, size_class)?;
         let start = self.unit_to_address(unit);
+        debug_assert!(Page::<S>::is_aligned(start));
+        let start = Page::<S>::new(start);
         if !self.map_pages(start, actural_pages) {
             return self.try_acquire_pages_locked(freelist, pages); // Retry
         }
+        let end = Step::forward(start, actural_pages);
         PAGE_REGISTRY.insert_pages(start, actural_pages);
-        Some(start)
+        Some(start..end)
     }
 
-    pub fn acquire_pages(&self, pages: usize) -> Option<Address> {
+    pub fn acquire_pages<S: PageSize>(&self, pages: usize) -> Option<Range<Page<S>>> {
         let mut freelist = self.freelist.lock();
         self.try_acquire_pages_locked(&mut freelist, pages)
     }
 
-    pub fn release_pages(&self, start: Address) {
+    pub fn release_pages<S: PageSize>(&self, start: Page<S>) {
         let pages = PAGE_REGISTRY.delete_pages(start);
         self.unmap_pages(start, pages);
-        let size_class = Self::pages_to_size_class(pages);
-        let unit = self.address_to_unit(start);
+        let size_class = Self::pages_to_size_class::<S>(pages);
+        let unit = self.address_to_unit(start.start());
         let mut freelist = self.freelist.lock();
         Self::release_unit(&mut freelist, unit, size_class)
     }

@@ -1,4 +1,6 @@
-use crate::util::Address;
+use std::ops::Range;
+
+use crate::util::*;
 use self::{page_resource::PageResource, page_table::PageRegistry};
 pub(crate) mod page_table;
 pub mod page_resource;
@@ -28,6 +30,10 @@ impl SpaceId {
         debug_assert!(id != 0);
         Self(id as u8)
     }
+
+    pub const fn contains(&self, addr: Address) -> bool {
+        Self::from(addr).0 == self.0
+    }
 }
 
 pub trait Space: Sized + 'static {
@@ -45,11 +51,11 @@ pub trait Space: Sized + 'static {
         self.page_resource().committed_size()
     }
 
-    fn acquire(&self, pages: usize) -> Option<Address> {
+    fn acquire<S: PageSize>(&self, pages: usize) -> Option<Range<Page<S>>> {
         self.page_resource().acquire_pages(pages)
     }
 
-    fn release(&self, start: Address) {
+    fn release<S: PageSize>(&self, start: Page<S>) {
         self.page_resource().release_pages(start)
     }
 }
