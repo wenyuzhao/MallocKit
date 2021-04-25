@@ -64,9 +64,35 @@ impl PageResource {
     }
 
     fn release_unit(freelist: &mut [Option<Box<Cell, System>>; NUM_SIZE_CLASS], unit: usize, size_class: usize) {
-        // TODO: Merge cells
-        let head = freelist[size_class].take();
-        freelist[size_class] = Some(Box::new_in(Cell { next: head, unit }, System));
+        debug_assert_eq!(unit & ((1usize << size_class) - 1), 0);
+        debug_assert!(size_class < NUM_SIZE_CLASS);
+        // Get sibling of `unit`
+        let unit2 = if (unit & (1 << size_class)) == 0 {
+            unit + (1 << size_class)
+        } else {
+            unit & !((1 << size_class))
+        };
+        let sibling_in_freelist = {
+            let mut found = false;
+            let mut head = &mut freelist[size_class];
+            while head.is_some() {
+                if head.as_ref().map(|x| x.unit).unwrap() == unit2 {
+                    // Remove sibling from freelist
+                    let next = head.as_mut().unwrap().next.take();
+                    *head = next;
+                    found = true;
+                    break;
+                }
+                head =  &mut head.as_mut().unwrap().next;
+            }
+            found
+        };
+        if sibling_in_freelist {
+            Self::release_unit(freelist, usize::min(unit, unit2), size_class + 1)
+        } else {
+            let head = freelist[size_class].take();
+            freelist[size_class] = Some(Box::new_in(Cell { next: head, unit }, System));
+        }
     }
 
     unsafe fn map_pages(start: Address, pages: usize) -> bool {
