@@ -37,7 +37,7 @@ pub struct Page<S: PageSize = Size4K>(NonZeroUsize, PhantomData<S>);
 impl<S: PageSize> Page<S> {
     pub const LOG_BYTES: usize = S::LOG_BYTES;
     pub const BYTES: usize = S::BYTES;
-    const MASK: usize = S::BYTES - 1;
+    pub const MASK: usize = S::BYTES - 1;
 
     pub const fn new(address: Address) -> Self {
         debug_assert!(!address.is_zero());

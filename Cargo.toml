@@ -1,7 +1,8 @@
 [workspace]
 members = [
     "malloctk",
-    "bump"
+    "bump",
+    "buddy",
 ]
 
 [profile.dev]

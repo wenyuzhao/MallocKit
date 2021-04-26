@@ -1,5 +1,5 @@
 [package]
-name = "bump"
+name = "buddy"
 version = "0.1.0"
 authors = ["Wenyu Zhao <wenyu.zhao@anu.edu.au>"]
 edition = "2018"

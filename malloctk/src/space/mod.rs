@@ -5,6 +5,8 @@ use self::{page_resource::PageResource, page_table::PageRegistry};
 pub(crate) mod page_table;
 pub mod page_resource;
 pub mod immortal_space;
+pub mod freelist_space;
+pub mod large_object_space;
 
 
 pub static PAGE_REGISTRY: PageRegistry = PageRegistry::new();
@@ -14,11 +16,13 @@ pub static PAGE_REGISTRY: PageRegistry = PageRegistry::new();
 pub struct SpaceId(u8);
 
 impl SpaceId {
+    pub(crate) const HEAP_START: Address = Address::from(1usize << 45);
     pub const LOG_MAX_SPACE_SIZE: usize = 41;
     pub(crate) const SHIFT: usize = Self::LOG_MAX_SPACE_SIZE;
     pub(crate) const MASK: usize = 0b1111 << Self::SHIFT;
 
     pub const DEFAULT: Self = Self(0);
+    pub const LARGE_OBJECT_SPACE: Self = Self(1);
 
     pub const fn next(&self) -> Self {
         debug_assert!(self.0 != 0b1111);
@@ -27,16 +31,23 @@ impl SpaceId {
 
     pub const fn from(addr: Address) -> Self {
         let id = (usize::from(addr) & Self::MASK) >> Self::SHIFT;
-        debug_assert!(id != 0);
         Self(id as u8)
     }
 
     pub const fn contains(&self, addr: Address) -> bool {
         Self::from(addr).0 == self.0
     }
+
+    pub const fn address_space(&self) -> Range<Address> {
+        let start = Self::HEAP_START + ((self.0 as usize) << Self::LOG_MAX_SPACE_SIZE);
+        let end = start + (1usize << Self::LOG_MAX_SPACE_SIZE);
+        start..end
+    }
 }
 
 pub trait Space: Sized + 'static {
+    const MAX_ALLOCATION_SIZE: usize = usize::MAX;
+
     fn new(id: SpaceId) -> Self;
     fn id(&self) -> SpaceId;
     fn page_resource(&self) -> &PageResource;

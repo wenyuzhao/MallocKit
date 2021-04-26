@@ -51,13 +51,10 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
     }
 
     pub fn allocate(&mut self, units: usize) -> Option<Range<usize>> {
+        debug_assert!(units.is_power_of_two());
         let size_class = Self::units_to_size_class(units);
+        let units = 1 << size_class;
         let start = self.allocate_aligned_units(size_class)?;
-        let free_units = (1 << size_class) - units;
-        if free_units != 0 {
-            let free_start = start + units;
-            self.release(free_start, free_units);
-        }
         self.free_units -= units;
         Some(start..(start + units))
     }
@@ -71,7 +68,8 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
         } else {
             unit & !((1 << size_class))
         };
-        let sibling_in_freelist = {
+        let is_max_size_class = size_class + 1 == NUM_SIZE_CLASS;
+        let sibling_in_freelist = !is_max_size_class && {
             let mut found = false;
             let mut head = &mut self.table[size_class];
             while head.is_some() {
@@ -94,23 +92,11 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
         }
     }
 
-    pub fn release(&mut self, mut start: usize, mut units: usize) {
+    pub fn release(&mut self, start: usize, units: usize) {
+        debug_assert!(units.is_power_of_two());
+        let size_class = Self::units_to_size_class(units);
+        let units = 1 << size_class;
         self.free_units += units;
-        let limit = start + units;
-        while start < limit {
-            let max_size_class = Self::units_to_size_class(units);
-            for size_class in (0..=max_size_class).rev() {
-                let size = 1usize << size_class;
-                let mask = size - 1;
-                let end = start + size;
-                if (start & mask) == 0 && end <= limit {
-                    self.release_aligned_units(start, size_class);
-                    start = end;
-                    units = limit - end;
-                    break
-                }
-            }
-        }
-        debug_assert_eq!(start, limit);
+        self.release_aligned_units(start, size_class);
     }
 }

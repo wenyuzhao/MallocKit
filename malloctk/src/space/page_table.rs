@@ -42,7 +42,7 @@ impl<L: PageTableLevel> PageTableEntry<L> {
     const IS_PAGE_TABLE: BitField = BitField { bits: 1, shift: 62 };
     // Page table fields
     const PAGE_TABLE_POINTER_MASK: usize = 0x0000_ffff_ffff_f000; // 1: page table, 0: page
-    const PAGE_TABLE_USED_ENTRIES: BitField = BitField { bits: 8, shift: 0 };
+    const PAGE_TABLE_USED_ENTRIES: BitField = BitField { bits: 10, shift: 0 };
     // Page fields
     const PAGE_CONTIGUOUS_PAGES: BitField = BitField { bits: 16, shift: 8 };
 
@@ -186,17 +186,21 @@ impl PageTable<L4> {
         };
         let l2 = match l3.get_entry(address)? {
             PageTableEntryData::NextLevelPageTable { table, .. } => table,
-            _ => unreachable!(), // 1G page
+            PageTableEntryData::Page { contiguous_pages } => return Some(PageMeta {
+                contiguous_pages: contiguous_pages,
+            }),
         };
         let l1 = match l2.get_entry(address)? {
             PageTableEntryData::NextLevelPageTable { table, .. } => table,
-            _ => unreachable!(), // 2M page
+            PageTableEntryData::Page { contiguous_pages } => return Some(PageMeta {
+                contiguous_pages: contiguous_pages,
+            }),
         };
         match l1.get_entry(address)? {
             PageTableEntryData::Page { contiguous_pages } => Some(PageMeta {
                 contiguous_pages: contiguous_pages,
             }),
-            _ => unreachable!(), // 2M page
+            _ => unreachable!(),
         }
     }
 
@@ -207,17 +211,20 @@ impl PageTable<L4> {
         if S::BYTES == Size1G::BYTES {
             debug_assert!(l3.get_entry(start).is_none());
             l3.table[L3::get_index(start)].set_next_page(num_pages);
+            l4.table[L4::get_index(start)].delta_entries(1);
             return
         }
         let l2 = l3.get_or_allocate_next_page_table(start, || { l4.table[L4::get_index(start)].delta_entries(1); });
         if S::BYTES == Size2M::BYTES {
             debug_assert!(l2.get_entry(start).is_none());
             l2.table[L2::get_index(start)].set_next_page(num_pages);
+            l3.table[L3::get_index(start)].delta_entries(1);
             return
         }
         let l1 = l2.get_or_allocate_next_page_table(start, || { l3.table[L3::get_index(start)].delta_entries(1); });
         debug_assert!(l1.get_entry(start).is_none());
         l1.table[L1::get_index(start)].set_next_page(num_pages);
+        l2.table[L2::get_index(start)].delta_entries(1);
     }
 
     fn insert_pages<S: PageSize>(&mut self, start: Page<S>, num_pages: usize) {

@@ -23,7 +23,7 @@ pub struct PageResource {
 impl PageResource {
     pub fn new(id: SpaceId) -> Self {
         debug_assert!(id.0 < 0b0000_1111);
-        let base = Address::from(1usize << 45) + ((id.0 as usize) << 41);
+        let base = SpaceId::HEAP_START + ((id.0 as usize) << SpaceId::LOG_MAX_SPACE_SIZE);
         let mut freelist = FreeList::new();
         freelist.release(0, 1 << (NUM_SIZE_CLASS - 1));
         Self {
@@ -71,7 +71,7 @@ impl PageResource {
     }
 
     pub fn acquire_pages<S: PageSize>(&self, pages: usize) -> Option<Range<Page<S>>> {
-        let units = Self::pages_to_units::<S>(pages);
+        let units = Self::pages_to_units::<S>(pages).next_power_of_two();
         let start_unit = self.freelist.lock().allocate(units)?.start;
         let start = self.unit_to_page(start_unit);
         if !self.map_pages(start, pages) {
@@ -85,8 +85,12 @@ impl PageResource {
     pub fn release_pages<S: PageSize>(&self, start: Page<S>) {
         let pages = PAGE_REGISTRY.delete_pages(start);
         self.unmap_pages(start, pages);
-        let units = Self::pages_to_units::<S>(pages);
+        let units = Self::pages_to_units::<S>(pages).next_power_of_two();
         let start_unit = self.page_to_unit(start);
         self.freelist.lock().release(start_unit, units);
+    }
+
+    pub fn get_contiguous_pages<S: PageSize>(&self, start: Page<S>) -> usize {
+        PAGE_REGISTRY.get_contiguous_pages(start.start())
     }
 }
