@@ -25,10 +25,6 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
         }
     }
 
-    fn units_to_size_class(units: usize) -> usize {
-        units.next_power_of_two().trailing_zeros() as _
-    }
-
     fn allocate_aligned_units(&mut self, size_class: usize) -> Option<usize> {
         if size_class >= NUM_SIZE_CLASS {
             return None
@@ -48,15 +44,6 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
                 Some(unit1)
             }
         }
-    }
-
-    pub fn allocate(&mut self, units: usize) -> Option<Range<usize>> {
-        debug_assert!(units.is_power_of_two());
-        let size_class = Self::units_to_size_class(units);
-        let units = 1 << size_class;
-        let start = self.allocate_aligned_units(size_class)?;
-        self.free_units -= units;
-        Some(start..(start + units))
     }
 
     fn release_aligned_units(&mut self, unit: usize, size_class: usize) {
@@ -92,9 +79,18 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
         }
     }
 
-    pub fn release(&mut self, start: usize, units: usize) {
-        debug_assert!(units.is_power_of_two());
-        let size_class = Self::units_to_size_class(units);
+    pub const fn size_class(units: usize) -> usize {
+        units.next_power_of_two().trailing_zeros() as _
+    }
+
+    pub fn allocate(&mut self, size_class: usize) -> Option<Range<usize>> {
+        let units = 1 << size_class;
+        let start = self.allocate_aligned_units(size_class)?;
+        self.free_units -= units;
+        Some(start..(start + units))
+    }
+
+    pub fn release(&mut self, start: usize, size_class: usize) {
         let units = 1 << size_class;
         self.free_units += units;
         self.release_aligned_units(start, size_class);

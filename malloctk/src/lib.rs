@@ -18,6 +18,7 @@
 #![feature(allocator_api)]
 #![feature(never_type)]
 #![feature(box_syntax)]
+#![feature(const_ptr_offset)]
 
 #[macro_use]
 pub mod log;
@@ -63,17 +64,18 @@ pub trait Mutator: Sized + 'static {
         ptr
     }
 
-    fn dealloc(&mut self, ptr: Address, layout: Layout);
+    fn dealloc(&mut self, ptr: Address);
 
     #[inline(always)]
-    fn realloc(&mut self, ptr: Address, layout: Layout, new_size: usize) -> Option<Address> {
+    fn realloc(&mut self, ptr: Address, new_size: usize) -> Option<Address> {
+        let layout = self.get_layout(ptr);
         let new_layout = unsafe { Layout::from_size_align_unchecked(new_size, layout.align()) };
         let new_ptr = self.alloc(new_layout);
         if let Some(new_ptr) = new_ptr {
             unsafe {
                 ptr::copy_nonoverlapping(ptr.as_ptr::<u8>(), new_ptr.as_mut_ptr::<u8>(), cmp::min(layout.size(), new_size));
             }
-            self.dealloc(ptr, layout);
+            self.dealloc(ptr);
         }
         new_ptr
     }

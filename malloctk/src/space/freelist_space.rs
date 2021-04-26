@@ -45,24 +45,24 @@ impl FreeListSpace {
     }
 
     #[inline(always)]
-    pub const fn size_class(&self, size: usize) -> usize {
+    pub const fn size_class(size: usize) -> usize {
         debug_assert!(size <= Size2M::BYTES);
-        size.next_power_of_two().trailing_zeros() as _
+        FreeList::<{NUM_SIZE_CLASS}>::size_class(size)
     }
 
     #[inline(always)]
     pub fn alloc(&self, size_class: usize) -> Option<Address> {
-        if let Some(start) = self.freelist.lock().allocate(1 << size_class).map(|x| x.start) {
+        if let Some(start) = self.freelist.lock().allocate(size_class).map(|x| x.start) {
             return Some(self.base + start)
         }
         let unit = self.acquire::<Size2M>(1)?.start.start() - self.base;
-        self.freelist.lock().release(unit, Size2M::BYTES);
+        self.freelist.lock().release(unit, Size2M::LOG_BYTES);
         self.alloc(size_class)
     }
 
     #[inline(always)]
     pub fn dealloc(&self, ptr: Address, size_class: usize) {
         let unit = self.address_to_unit(ptr);
-        self.freelist.lock().release(unit, 1 << size_class);
+        self.freelist.lock().release(unit, size_class);
     }
 }

@@ -26,19 +26,35 @@ impl AllocationArea {
     }
 
     #[inline(always)]
-    pub fn alloc(&mut self, layout: Layout, with_layout: bool) -> Option<Address> {
-        let top = self.top + if with_layout { mem::size_of::<Layout>() } else { 0 };
+    pub const fn alloc(&mut self, layout: Layout) -> Option<Address> {
+        let top = self.top;
         let start = Self::align_allocation(top, layout.align());
         let end = start + layout.size();
-        if likely(end <= self.limit) {
+        if likely(usize::from(end) <= usize::from(self.limit)) {
             self.top = end;
-            if with_layout {
-                unsafe { (start - mem::size_of::<Layout>()).store(layout) };
-            }
             Some(start)
         } else {
             None
         }
+    }
+
+    #[inline(always)]
+    pub const fn alloc_with_layout(&mut self, layout: Layout) -> Option<Address> {
+        let top = self.top + mem::size_of::<Layout>();
+        let start = Self::align_allocation(top, layout.align());
+        let end = start + layout.size();
+        if likely(usize::from(end) <= usize::from(self.limit)) {
+            self.top = end;
+            unsafe { *(start - mem::size_of::<Layout>()).as_mut::<Layout>() = layout };
+            Some(start)
+        } else {
+            None
+        }
+    }
+
+    #[inline(always)]
+    pub const fn load_layout(ptr: Address) -> Layout {
+        unsafe { *ptr.as_ptr::<Layout>().sub(1) }
     }
 }
 

@@ -55,8 +55,7 @@ impl<P: Plan> MallocAPI<P> {
     #[inline(always)]
     pub unsafe fn free(&self, ptr: *mut u8) {
         if unlikely(ptr.is_null()) { return; }
-        let layout = self.mutator().get_layout(ptr.into());
-        self.mutator().dealloc(ptr.into(), layout);
+        self.mutator().dealloc(ptr.into());
     }
 
     #[inline(always)]
@@ -67,8 +66,7 @@ impl<P: Plan> MallocAPI<P> {
             return ptr::null_mut();
         }
         let new_size = Self::align_up(new_size, Self::MIN_ALIGNMENT);
-        let layout = self.mutator().get_layout(ptr.into());
-        match self.mutator().realloc(ptr.into(), layout, new_size) {
+        match self.mutator().realloc(ptr.into(), new_size) {
             Some(ptr) => ptr.into(),
             None => {
                 if free_if_fail {

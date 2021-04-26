@@ -38,8 +38,8 @@ impl Plan for Buddy {
     }
 
     #[inline(always)]
-    fn get_layout(&self, ptr: Address) -> Layout {
-        unsafe { *ptr.as_ptr::<Layout>().sub(1) }
+    fn get_layout(&self, _: Address) -> Layout {
+        unreachable!()
     }
 }
 
@@ -103,7 +103,7 @@ impl Mutator for BuddyMutator {
         debug_assert!(layout.align().is_power_of_two());
         let (extended_layout, offset) = Layout::new::<Cell>().extend(layout).unwrap();
         if likely(extended_layout.size() < FreeListSpace::MAX_ALLOCATION_SIZE) {
-            let size_class = PLAN.freelist_space.size_class(extended_layout.size());
+            let size_class = FreeListSpace::size_class(extended_layout.size());
             let start = PLAN.freelist_space.alloc(size_class)?;
             let data_start = start + offset;
             Cell::from(data_start).set(start, 1 << size_class);
@@ -119,18 +119,17 @@ impl Mutator for BuddyMutator {
     }
 
     #[inline(always)]
-    fn dealloc(&mut self, ptr: Address, _layout: Layout) {
+    fn dealloc(&mut self, ptr: Address) {
         if likely(FREELIST_SPACE.contains(ptr)) {
             let cell = Cell::from(ptr);
             let bytes = cell.size();
             debug_assert!(bytes.is_power_of_two());
-            let size_class = PLAN.freelist_space.size_class(bytes);
+            let size_class = FreeListSpace::size_class(bytes);
             PLAN.freelist_space.dealloc(cell.start(), size_class)
         } else {
             PLAN.large_object_space.release(Page::<Size2M>::new(ptr))
         }
     }
-
 }
 
 static PLAN: Lazy<Buddy> = Lazy::new(|| Buddy::new());

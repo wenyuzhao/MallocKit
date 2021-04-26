@@ -25,7 +25,7 @@ impl PageResource {
         debug_assert!(id.0 < 0b0000_1111);
         let base = SpaceId::HEAP_START + ((id.0 as usize) << SpaceId::LOG_MAX_SPACE_SIZE);
         let mut freelist = FreeList::new();
-        freelist.release(0, 1 << (NUM_SIZE_CLASS - 1));
+        freelist.release(0, NUM_SIZE_CLASS - 1);
         Self {
             id,
             base,
@@ -39,15 +39,21 @@ impl PageResource {
         self.committed_size.load(Ordering::SeqCst)
     }
 
-    fn pages_to_units<S: PageSize>(pages: usize) -> usize {
-        pages << (S::LOG_BYTES - Size4K::LOG_BYTES)
+    const fn size_class<S: PageSize>(pages: usize) -> usize {
+        let units = pages << (S::LOG_BYTES - Size4K::LOG_BYTES);
+        FreeList::<{NUM_SIZE_CLASS}>::size_class(units)
     }
 
-    fn page_to_unit<S: PageSize>(&self, page: Page<S>) -> usize {
+    const fn size_class_to_pages<S: PageSize>(size_class: usize) -> usize {
+        let units = 1 << size_class;
+        units >> (S::LOG_BYTES - Size4K::LOG_BYTES)
+    }
+
+    const fn page_to_unit<S: PageSize>(&self, page: Page<S>) -> usize {
         (page.start() - self.base) >> Page::<Size4K>::LOG_BYTES
     }
 
-    fn unit_to_page<S: PageSize>(&self, unit: usize) -> Page<S> {
+    const fn unit_to_page<S: PageSize>(&self, unit: usize) -> Page<S> {
         Page::<S>::new(self.base + (unit << Page::<Size4K>::LOG_BYTES))
     }
 
@@ -70,9 +76,10 @@ impl PageResource {
         self.committed_size.fetch_sub(pages << S::LOG_BYTES, Ordering::SeqCst);
     }
 
-    pub fn acquire_pages<S: PageSize>(&self, pages: usize) -> Option<Range<Page<S>>> {
-        let units = Self::pages_to_units::<S>(pages).next_power_of_two();
-        let start_unit = self.freelist.lock().allocate(units)?.start;
+    pub fn acquire_pages<S: PageSize>(&self, required_pages: usize) -> Option<Range<Page<S>>> {
+        let size_class = Self::size_class::<S>(required_pages);
+        let pages = Self::size_class_to_pages::<S>(size_class);
+        let start_unit = self.freelist.lock().allocate(size_class)?.start;
         let start = self.unit_to_page(start_unit);
         if !self.map_pages(start, pages) {
             return self.acquire_pages(pages); // Retry
@@ -84,10 +91,11 @@ impl PageResource {
 
     pub fn release_pages<S: PageSize>(&self, start: Page<S>) {
         let pages = PAGE_REGISTRY.delete_pages(start);
+        debug_assert!(pages.is_power_of_two());
         self.unmap_pages(start, pages);
-        let units = Self::pages_to_units::<S>(pages).next_power_of_two();
+        let size_class = Self::size_class::<S>(pages);
         let start_unit = self.page_to_unit(start);
-        self.freelist.lock().release(start_unit, units);
+        self.freelist.lock().release(start_unit, size_class);
     }
 
     pub fn get_contiguous_pages<S: PageSize>(&self, start: Page<S>) -> usize {
