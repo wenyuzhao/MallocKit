@@ -13,11 +13,11 @@
 #![feature(const_mut_refs)]
 #![feature(const_trait_impl)]
 
-#[macro_use] extern crate malloctk;
+#[macro_use] extern crate mallockit;
 
 use core::alloc::Layout;
 use std::intrinsics::likely;
-use malloctk::{Mutator, Plan, space::*, space::{freelist_space::FreeListSpace, large_object_space::LargeObjectSpace}, util::*};
+use mallockit::{Mutator, Plan, space::*, space::{freelist_space::FreeListSpace, large_object_space::LargeObjectSpace}, util::*};
 
 const FREELIST_SPACE: SpaceId = SpaceId::DEFAULT;
 const LARGE_OBJECT_SPACE: SpaceId = SpaceId::LARGE_OBJECT_SPACE;

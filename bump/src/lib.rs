@@ -10,10 +10,10 @@
 #![feature(const_raw_ptr_deref)]
 #![feature(const_mut_refs)]
 
-#[macro_use] extern crate malloctk;
+#[macro_use] extern crate mallockit;
 
 use core::alloc::Layout;
-use malloctk::{Mutator, Plan, space::*, space::immortal_space::ImmortalSpace, util::*};
+use mallockit::{Mutator, Plan, space::*, space::immortal_space::ImmortalSpace, util::*};
 
 const IMMORTAL_SPACE: SpaceId = SpaceId::DEFAULT;
 

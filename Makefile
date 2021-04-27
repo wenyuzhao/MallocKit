@@ -25,7 +25,7 @@ build: FORCE
 	@llvm-objdump -d -S  $(target_dir)/lib$(malloc).a > $(target_dir)/lib$(malloc).s 2>/dev/null
 	@$(CC) $(CFLAGS) ./test.c
 
-# clang ./test.c /home/wenyu/malloctk/target/release/libbump.a -lpthread -ldl -g -O3 -o test
+# clang ./test.c ./target/release/libbump.a -lpthread -ldl -g -O3 -o test
 
 # build: FORCE
 # 	cargo build $(cargo_build_flag)

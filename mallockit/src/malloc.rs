@@ -111,7 +111,7 @@ impl<P: Plan> MallocAPI<P> {
 #[macro_export]
 macro_rules! export_malloc_api {
     ($plan: expr) => {
-        pub mod __malloctk {
+        pub mod __mallockit {
             use super::*;
             use $crate::Plan;
             type Malloc = $crate::malloc::MallocAPI<impl $crate::Plan>;
