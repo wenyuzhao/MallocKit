@@ -119,8 +119,8 @@ macro_rules! export_malloc_api {
 
             #[$crate::ctor]
             unsafe fn ctor() {
-                $plan.init();
-                $crate::__ctor();
+                $crate::hooks::process_start(&*$plan);
+                $crate::libc::atexit($crate::hooks::process_exit);
             }
 
             #[no_mangle]

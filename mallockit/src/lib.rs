@@ -28,6 +28,8 @@ pub mod log;
 pub mod util;
 pub mod space;
 pub mod malloc;
+#[doc(hidden)]
+pub mod hooks;
 
 use core::alloc::Layout;
 use std::ptr;
@@ -83,8 +85,4 @@ pub trait Mutator: Sized + 'static {
         }
         new_ptr
     }
-}
-
-#[doc(hidden)]
-pub unsafe fn __ctor() {
 }
