@@ -19,6 +19,9 @@
 #![feature(never_type)]
 #![feature(box_syntax)]
 #![feature(const_ptr_offset)]
+#![feature(const_maybe_uninit_assume_init)]
+#![feature(const_ptr_write)]
+#![feature(const_maybe_uninit_as_ptr)]
 
 #[macro_use]
 pub mod log;

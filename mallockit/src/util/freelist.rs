@@ -17,9 +17,15 @@ pub struct FreeList<const NUM_SIZE_CLASS: usize> {
 }
 
 impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
+        let mut table = std::mem::MaybeUninit::<[Option<Box<Cell, System>>; NUM_SIZE_CLASS]>::uninit();
+        let mut i = 0;
+        while i < NUM_SIZE_CLASS {
+            unsafe { (table.as_mut_ptr() as *mut Option<Box<Cell, System>>).add(i).write(None); }
+            i += 1;
+        }
         Self {
-            table: array_init::array_init(|_| None),
+            table: unsafe { table.assume_init() },
             free_units: 0,
             total_units: 0,
         }

@@ -1,7 +1,5 @@
-use spin::mutex::Mutex;
-
+use std::intrinsics::unlikely;
 use crate::util::*;
-
 use super::{Allocator, Space, SpaceId, page_resource::PageResource};
 
 
@@ -12,7 +10,6 @@ pub struct FreeListSpace {
     id: SpaceId,
     base: Address,
     pr: PageResource,
-    freelist: Mutex<FreeList<{NUM_SIZE_CLASS}>>,
 }
 
 impl Space for FreeListSpace {
@@ -23,7 +20,6 @@ impl Space for FreeListSpace {
             id,
             base: id.address_space().start,
             pr: PageResource::new(id),
-            freelist: Mutex::new(FreeList::new()),
         }
     }
 
@@ -40,36 +36,14 @@ impl Space for FreeListSpace {
 
 
 impl FreeListSpace {
-    const fn address_to_unit(&self, addr: Address) -> usize {
-        addr - self.base
-    }
-
-    #[inline(always)]
     pub const fn size_class(size: usize) -> usize {
         debug_assert!(size <= Size2M::BYTES);
         FreeList::<{NUM_SIZE_CLASS}>::size_class(size)
     }
 
-    #[inline(always)]
     pub fn can_allocate(layout: Layout) -> bool {
         let (extended_layout, _) = Layout::new::<Cell>().extend(layout).unwrap();
         extended_layout.size() < FreeListSpace::MAX_ALLOCATION_SIZE
-    }
-
-    #[inline(always)]
-    pub fn alloc(&self, size_class: usize) -> Option<Address> {
-        if let Some(start) = self.freelist.lock().allocate_cell_aligned(1 << size_class).map(|x| x.start) {
-            return Some(self.base + start)
-        }
-        let unit = self.acquire::<Size2M>(1)?.start.start() - self.base;
-        self.freelist.lock().release_cell_aligned(unit, Size2M::BYTES);
-        self.alloc(size_class)
-    }
-
-    #[inline(always)]
-    pub fn dealloc(&self, ptr: Address, size_class: usize) {
-        let unit = self.address_to_unit(ptr);
-        self.freelist.lock().release_cell_aligned(unit, 1 << size_class);
     }
 }
 
@@ -96,13 +70,40 @@ impl Cell {
 
 pub struct FreeListAllocator {
     space: Lazy<&'static FreeListSpace, Local>,
+    base: Address,
+    freelist: FreeList<{NUM_SIZE_CLASS}>,
 }
 
 impl FreeListAllocator {
     pub const fn new(space: Lazy<&'static FreeListSpace, Local>) -> Self {
         Self {
             space,
+            base: Address::ZERO,
+            freelist: FreeList::new(),
         }
+    }
+
+    #[inline(always)]
+    fn alloc_cell(&mut self, size_class: usize) -> Option<Address> {
+        if unlikely(self.base.is_zero()) {
+            self.base = self.space.base;
+        }
+        if let Some(start) = self.freelist.allocate_cell_aligned(1 << size_class).map(|x| x.start) {
+            return Some(self.base + start)
+        }
+        let unit = self.space.acquire::<Size2M>(1)?.start.start() - self.base;
+        self.freelist.release_cell_aligned(unit, Size2M::BYTES);
+        self.alloc_cell(size_class)
+    }
+
+    const fn address_to_unit(&self, addr: Address) -> usize {
+        addr - self.base
+    }
+
+    #[inline(always)]
+    fn dealloc_cell(&mut self, ptr: Address, size_class: usize) {
+        let unit = self.address_to_unit(ptr);
+        self.freelist.release_cell_aligned(unit, 1 << size_class);
     }
 }
 
@@ -119,7 +120,7 @@ impl Allocator for FreeListAllocator {
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let (extended_layout, offset) = Layout::new::<Cell>().extend(layout).unwrap();
         let size_class = FreeListSpace::size_class(extended_layout.size());
-        let start = self.space.alloc(size_class)?;
+        let start = self.alloc_cell(size_class)?;
         let data_start = start + offset;
         Cell::from(data_start).set(start, 1 << size_class);
         debug_assert_eq!(usize::from(data_start) & (layout.align() - 1), 0);
@@ -132,6 +133,6 @@ impl Allocator for FreeListAllocator {
         let bytes = cell.size();
         debug_assert!(bytes.is_power_of_two());
         let size_class = FreeListSpace::size_class(bytes);
-        self.space.dealloc(cell.start(), size_class)
+        self.dealloc_cell(cell.start(), size_class)
     }
 }
