@@ -38,23 +38,30 @@ impl AllocationArea {
         }
     }
 
-    #[inline(always)]
+    const fn get_layout_slot(ptr: Address) -> &'static mut (u32, u32) {
+        debug_assert!(mem::size_of::<(u32, u32)>() == mem::size_of::<usize>());
+        unsafe { (ptr - mem::size_of::<usize>()).as_mut::<(u32, u32)>() }
+    }
+
     pub const fn alloc_with_layout(&mut self, layout: Layout) -> Option<Address> {
-        let top = self.top + mem::size_of::<Layout>();
-        let start = Self::align_allocation(top, layout.align());
-        let end = start + layout.size();
+        debug_assert!(layout.align() >= std::mem::size_of::<usize>());
+        let new_layout = unsafe { Layout::from_size_align_unchecked(layout.size() + layout.align(), layout.align()) };
+        let top = self.top;
+        let start = Self::align_allocation(top, new_layout.align());
+        let end = start + new_layout.size();
         if likely(usize::from(end) <= usize::from(self.limit)) {
+            let data_start = start + layout.align();
+            *Self::get_layout_slot(data_start) = (layout.size() as u32, layout.align() as u32);
             self.top = end;
-            unsafe { *(start - mem::size_of::<Layout>()).as_mut::<Layout>() = layout };
-            Some(start)
+            Some(data_start)
         } else {
             None
         }
     }
 
-    #[inline(always)]
     pub const fn load_layout(ptr: Address) -> Layout {
-        unsafe { *ptr.as_ptr::<Layout>().sub(1) }
+        let (size, align) = *Self::get_layout_slot(ptr);
+        unsafe { Layout::from_size_align_unchecked(size as _, align as _) }
     }
 }
 
