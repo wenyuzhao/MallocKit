@@ -52,17 +52,17 @@ impl FreeListSpace {
 
     #[inline(always)]
     pub fn alloc(&self, size_class: usize) -> Option<Address> {
-        if let Some(start) = self.freelist.lock().allocate(size_class).map(|x| x.start) {
+        if let Some(start) = self.freelist.lock().allocate_cell_aligned(1 << size_class).map(|x| x.start) {
             return Some(self.base + start)
         }
         let unit = self.acquire::<Size2M>(1)?.start.start() - self.base;
-        self.freelist.lock().release(unit, Size2M::LOG_BYTES);
+        self.freelist.lock().release_cell_aligned(unit, Size2M::BYTES);
         self.alloc(size_class)
     }
 
     #[inline(always)]
     pub fn dealloc(&self, ptr: Address, size_class: usize) {
         let unit = self.address_to_unit(ptr);
-        self.freelist.lock().release(unit, size_class);
+        self.freelist.lock().release_cell_aligned(unit, 1 << size_class);
     }
 }

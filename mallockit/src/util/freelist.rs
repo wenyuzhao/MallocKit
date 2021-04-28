@@ -25,6 +25,7 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
         }
     }
 
+    #[inline]
     fn allocate_aligned_units(&mut self, size_class: usize) -> Option<usize> {
         if size_class >= NUM_SIZE_CLASS {
             return None
@@ -46,6 +47,7 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
         }
     }
 
+    #[inline]
     fn release_aligned_units(&mut self, unit: usize, size_class: usize) {
         debug_assert_eq!(unit & ((1usize << size_class) - 1), 0);
         debug_assert!(size_class < NUM_SIZE_CLASS);
@@ -83,16 +85,54 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
         units.next_power_of_two().trailing_zeros() as _
     }
 
-    pub fn allocate(&mut self, size_class: usize) -> Option<Range<usize>> {
-        let units = 1 << size_class;
-        let start = self.allocate_aligned_units(size_class)?;
+    /// Allocate a cell with a power-of-two size, and aligned to the size.
+    #[inline]
+    pub fn allocate_cell_aligned(&mut self, units: usize) -> Option<Range<usize>> {
+        debug_assert!(units.is_power_of_two());
+        let start = self.allocate_aligned_units(Self::size_class(units))?;
         self.free_units -= units;
         Some(start..(start + units))
     }
 
-    pub fn release(&mut self, start: usize, size_class: usize) {
-        let units = 1 << size_class;
+    /// Allocate a cell with a power-of-two alignment.
+    #[inline]
+    pub fn allocate_cell(&mut self, units: usize) -> Option<Range<usize>> {
+        let size_class = Self::size_class(units);
+        let start = self.allocate_aligned_units(size_class)?;
+        let free_units = (1 << size_class) - units;
+        if free_units != 0 {
+            let free_start = start + units;
+            self.release_cell(free_start, free_units);
+        }
+        self.free_units -= units;
+        Some(start..(start + units))
+    }
+
+    #[inline]
+    pub fn release_cell_aligned(&mut self, start: usize, units: usize) {
+        debug_assert!(units.is_power_of_two());
+        debug_assert!(start & (units - 1) == 0);
         self.free_units += units;
-        self.release_aligned_units(start, size_class);
+        self.release_aligned_units(start, Self::size_class(units));
+    }
+
+    #[inline]
+    pub fn release_cell(&mut self, mut start: usize, mut units: usize) {
+        self.free_units += units;
+        let limit = start + units;
+        while start < limit {
+            let max_size_class = Self::size_class(units);
+            for size_class in (0..=max_size_class).rev() {
+                let size = 1usize << size_class;
+                let end = start + size;
+                if (start & (size - 1)) == 0 && end <= limit {
+                    self.release_aligned_units(start, size_class);
+                    start = end;
+                    units = limit - end;
+                    break
+                }
+            }
+        }
+        debug_assert_eq!(start, limit);
     }
 }
