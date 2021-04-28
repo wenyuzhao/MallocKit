@@ -2,3 +2,5 @@
 Cargo.lock
 a.out
 .DS_Store
+/*.txt
+/bench/*.txt
