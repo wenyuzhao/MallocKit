@@ -38,6 +38,7 @@ pub trait Plan: Sized + 'static {
     type Mutator: Mutator<Plan=Self>;
 
     fn new() -> Self;
+    fn init(&self) {}
     fn get_layout(&self, ptr: Address) -> Layout;
 }
 

@@ -119,6 +119,7 @@ macro_rules! export_malloc_api {
 
             #[$crate::ctor]
             unsafe fn ctor() {
+                $plan.init();
                 $crate::__ctor();
             }
 
