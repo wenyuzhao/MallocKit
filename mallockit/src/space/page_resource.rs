@@ -4,14 +4,8 @@ use crate::util::*;
 use spin::Mutex;
 use super::{PAGE_REGISTRY, SpaceId};
 
-#[derive(Debug)]
-struct Cell {
-    next: Option<Box<Cell, System>>,
-    unit: usize,
-}
 
 const NUM_SIZE_CLASS: usize = SpaceId::LOG_MAX_SPACE_SIZE - Page::<Size4K>::LOG_BYTES + 1;
-// const LOG_PAGE_SIZE: usize = 12;
 
 pub struct PageResource {
     pub id: SpaceId,

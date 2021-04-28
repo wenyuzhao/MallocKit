@@ -57,34 +57,35 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
     fn release_aligned_units(&mut self, unit: usize, size_class: usize) {
         debug_assert_eq!(unit & ((1usize << size_class) - 1), 0);
         debug_assert!(size_class < NUM_SIZE_CLASS);
+        // FIXME: Performance issue
         // Get sibling of `unit`
-        let unit2 = if (unit & (1 << size_class)) == 0 {
-            unit + (1 << size_class)
-        } else {
-            unit & !((1 << size_class))
-        };
-        let is_max_size_class = size_class + 1 == NUM_SIZE_CLASS;
-        let sibling_in_freelist = !is_max_size_class && {
-            let mut found = false;
-            let mut head = &mut self.table[size_class];
-            while head.is_some() {
-                if head.as_ref().map(|x| x.unit).unwrap() == unit2 {
-                    // Remove sibling from freelist
-                    let next = head.as_mut().unwrap().next.take();
-                    *head = next;
-                    found = true;
-                    break;
-                }
-                head =  &mut head.as_mut().unwrap().next;
-            }
-            found
-        };
-        if sibling_in_freelist {
-            self.release_aligned_units(usize::min(unit, unit2), size_class + 1)
-        } else {
+        // let unit2 = if (unit & (1 << size_class)) == 0 {
+        //     unit + (1 << size_class)
+        // } else {
+        //     unit & !((1 << size_class))
+        // };
+        // let is_max_size_class = size_class + 1 == NUM_SIZE_CLASS;
+        // let sibling_in_freelist = !is_max_size_class && {
+        //     let mut found = false;
+        //     let mut head = &mut self.table[size_class];
+        //     while head.is_some() {
+        //         if head.as_ref().map(|x| x.unit).unwrap() == unit2 {
+        //             // Remove sibling from freelist
+        //             let next = head.as_mut().unwrap().next.take();
+        //             *head = next;
+        //             found = true;
+        //             break;
+        //         }
+        //         head =  &mut head.as_mut().unwrap().next;
+        //     }
+        //     found
+        // };
+        // if sibling_in_freelist {
+        //     self.release_aligned_units(usize::min(unit, unit2), size_class + 1)
+        // } else {
             let head = self.table[size_class].take();
             self.table[size_class] = Some(Box::new_in(Cell { next: head, unit }, System));
-        }
+        // }
     }
 
     pub const fn size_class(units: usize) -> usize {
