@@ -2,7 +2,7 @@ use spin::mutex::Mutex;
 
 use crate::util::*;
 
-use super::{Space, SpaceId, page_resource::PageResource};
+use super::{Allocator, Space, SpaceId, page_resource::PageResource};
 
 
 
@@ -51,6 +51,12 @@ impl FreeListSpace {
     }
 
     #[inline(always)]
+    pub fn can_allocate(layout: Layout) -> bool {
+        let (extended_layout, _) = Layout::new::<Cell>().extend(layout).unwrap();
+        extended_layout.size() < FreeListSpace::MAX_ALLOCATION_SIZE
+    }
+
+    #[inline(always)]
     pub fn alloc(&self, size_class: usize) -> Option<Address> {
         if let Some(start) = self.freelist.lock().allocate_cell_aligned(1 << size_class).map(|x| x.start) {
             return Some(self.base + start)
@@ -64,5 +70,68 @@ impl FreeListSpace {
     pub fn dealloc(&self, ptr: Address, size_class: usize) {
         let unit = self.address_to_unit(ptr);
         self.freelist.lock().release_cell_aligned(unit, 1 << size_class);
+    }
+}
+
+
+
+#[repr(C)]
+struct Cell(Address, usize);
+
+impl Cell {
+    const fn from(ptr: Address) -> &'static mut Self {
+        unsafe { &mut *ptr.as_mut_ptr::<Self>().sub(1) }
+    }
+    const fn set(&mut self, start: Address, size: usize) {
+        self.0 = start;
+        self.1 = size;
+    }
+    const fn size(&self) -> usize {
+        self.1
+    }
+    const fn start(&self) -> Address {
+        self.0
+    }
+}
+
+pub struct FreeListAllocator {
+    space: Lazy<&'static FreeListSpace, Local>,
+}
+
+impl FreeListAllocator {
+    pub const fn new(space: Lazy<&'static FreeListSpace, Local>) -> Self {
+        Self {
+            space,
+        }
+    }
+}
+
+impl Allocator for FreeListAllocator {
+    #[inline(always)]
+    fn get_layout(&self, ptr: Address) -> Layout {
+        let bytes = Cell::from(ptr).size();
+        debug_assert_ne!(bytes, 0);
+        debug_assert!(bytes.is_power_of_two(), "{:?}", bytes);
+        unsafe { Layout::from_size_align_unchecked(bytes, bytes) }
+    }
+
+    #[inline(always)]
+    fn alloc(&mut self, layout: Layout) -> Option<Address> {
+        let (extended_layout, offset) = Layout::new::<Cell>().extend(layout).unwrap();
+        let size_class = FreeListSpace::size_class(extended_layout.size());
+        let start = self.space.alloc(size_class)?;
+        let data_start = start + offset;
+        Cell::from(data_start).set(start, 1 << size_class);
+        debug_assert_eq!(usize::from(data_start) & (layout.align() - 1), 0);
+        Some(data_start)
+    }
+
+    #[inline(always)]
+    fn dealloc(&mut self, ptr: Address) {
+        let cell = Cell::from(ptr);
+        let bytes = cell.size();
+        debug_assert!(bytes.is_power_of_two());
+        let size_class = FreeListSpace::size_class(bytes);
+        self.space.dealloc(cell.start(), size_class)
     }
 }

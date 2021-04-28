@@ -1,5 +1,5 @@
 use std::ops::Range;
-
+use std::ptr;
 use crate::util::*;
 use self::{page_resource::PageResource, page_table::PageRegistry};
 pub(crate) mod page_table;
@@ -69,4 +69,22 @@ pub trait Space: Sized + 'static {
     fn release<S: PageSize>(&self, start: Page<S>) {
         self.page_resource().release_pages(start)
     }
+}
+
+pub trait Allocator {
+    fn get_layout(&self, ptr: Address) -> Layout;
+
+    fn alloc(&mut self, layout: Layout) -> Option<Address>;
+
+    #[inline(always)]
+    fn alloc_zeroed(&mut self, layout: Layout) -> Option<Address> {
+        let size = layout.size();
+        let ptr = self.alloc(layout);
+        if let Some(ptr) = ptr {
+            unsafe { ptr::write_bytes(ptr.as_mut_ptr::<u8>(), 0, size) };
+        }
+        ptr
+    }
+
+    fn dealloc(&mut self, ptr: Address);
 }

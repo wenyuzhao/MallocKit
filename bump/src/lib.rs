@@ -9,11 +9,12 @@
 #![feature(const_ptr_offset)]
 #![feature(const_raw_ptr_deref)]
 #![feature(const_mut_refs)]
+#![feature(const_fn_fn_ptr_basics)]
 
 #[macro_use] extern crate mallockit;
 
 use core::alloc::Layout;
-use mallockit::{Mutator, Plan, space::*, space::immortal_space::ImmortalSpace, util::*};
+use mallockit::{Mutator, Plan, space::*, space::immortal_space::*, util::*};
 
 const IMMORTAL_SPACE: SpaceId = SpaceId::DEFAULT;
 
@@ -37,32 +38,14 @@ impl Plan for Bump {
 }
 
 struct BumpMutator {
-    allocation_area: AllocationArea,
-    retry: bool,
+    bump: BumpAllocator,
 }
 
 impl BumpMutator {
     const fn new() -> Self {
         Self {
-            allocation_area: AllocationArea::EMPTY,
-            retry: false,
+            bump: BumpAllocator::new(Lazy::new(|| &PLAN.immortal)),
         }
-    }
-
-    #[cold]
-    fn alloc_slow(&mut self, layout: Layout) -> Option<Address> {
-        assert!(!self.retry);
-        let block_size = Size2M::BYTES;
-        let alloc_size = AllocationArea::align_up(usize::max(layout.size(), block_size) + std::mem::size_of::<Layout>(), Size2M::BYTES);
-        let alloc_pages = alloc_size >> Size2M::LOG_BYTES;
-        let pages = PLAN.immortal.acquire::<Size2M>(alloc_pages)?;
-        let top = pages.start.start();
-        let limit = pages.end.start();
-        self.allocation_area = AllocationArea { top, limit };
-        self.retry = true;
-        let result = self.alloc(layout);
-        self.retry = false;
-        result
     }
 }
 
@@ -86,14 +69,11 @@ impl Mutator for BumpMutator {
 
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
-        if let Some(ptr) = self.allocation_area.alloc_with_layout(layout) {
-            return Some(ptr)
-        }
-        self.alloc_slow(layout)
+        self.bump.alloc(layout)
     }
 
     #[inline(always)]
-    fn dealloc(&mut self, _ptr: Address) {}
+    fn dealloc(&mut self, _: Address) {}
 }
 
 static PLAN: Lazy<Bump> = Lazy::new(|| Bump::new());
