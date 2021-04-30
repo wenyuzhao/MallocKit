@@ -71,6 +71,15 @@ impl<S: PageSize> Page<S> {
             end: self.end(),
         }
     }
+
+    pub fn is_zeroed(&self) -> bool {
+        for a in self.range() {
+            if unsafe { a.load::<u8>() != 0 } {
+                return false;
+            }
+        }
+        return true;
+    }
 }
 
 impl<S: PageSize> fmt::Debug for Page<S> {

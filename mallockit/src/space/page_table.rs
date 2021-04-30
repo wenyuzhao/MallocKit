@@ -33,7 +33,7 @@ struct PageTableEntry<L: PageTableLevel>(usize, PhantomData<L>);
 
 enum PageTableEntryData<L: PageTableLevel> {
     NextLevelPageTable { table: &'static mut PageTable<L> },
-    Page { contiguous_pages: Option<usize> },
+    Page { contiguous_pages: Option<usize>, pointer_meta: Address },
 }
 
 impl<L: PageTableLevel> PageTableEntry<L> {
@@ -44,7 +44,8 @@ impl<L: PageTableLevel> PageTableEntry<L> {
     const PAGE_TABLE_POINTER_MASK: usize = 0x0000_ffff_ffff_f000; // 1: page table, 0: page
     const PAGE_TABLE_USED_ENTRIES: BitField = BitField { bits: 10, shift: 0 };
     // Page fields
-    const PAGE_CONTIGUOUS_PAGES: BitField = BitField { bits: 16, shift: 8 };
+    const PAGE_POINTER_META: BitField = BitField { bits: 45, shift: 0 };
+    const PAGE_CONTIGUOUS_PAGES: BitField = BitField { bits: 16, shift: 45 };
 
     fn clear(&mut self) {
         let value = self.0;
@@ -63,7 +64,8 @@ impl<L: PageTableLevel> PageTableEntry<L> {
             Some(PageTableEntryData::NextLevelPageTable { table })
         } else {
             let contiguous_pages = Self::PAGE_CONTIGUOUS_PAGES.get(value);
-            Some(PageTableEntryData::Page { contiguous_pages: if contiguous_pages == 0 { None } else { Some(contiguous_pages) } })
+            let pointer_meta = Address::from(Self::PAGE_POINTER_META.get(value) << 3);
+            Some(PageTableEntryData::Page { contiguous_pages: if contiguous_pages == 0 { None } else { Some(contiguous_pages) }, pointer_meta })
         }
     }
 
@@ -89,7 +91,15 @@ impl<L: PageTableLevel> PageTableEntry<L> {
     }
 }
 
-trait PageTableLevel: 'static {
+impl PageTableEntry<L1> {
+    const fn set_pointer_meta(&mut self, ptr: Address) {
+        debug_assert!(Self::PRESENT.get(self.0) != 0);
+        debug_assert!(Self::IS_PAGE_TABLE.get(self.0) == 0);
+        Self::PAGE_POINTER_META.set(&mut self.0, usize::from(ptr) >> 3);
+    }
+}
+
+pub(crate) trait PageTableLevel: 'static {
     type NextLevel: PageTableLevel;
     const SHIFT: usize = Self::NextLevel::SHIFT + 9;
     const MASK: usize = 0b1_1111_1111 << Self::SHIFT;
@@ -100,25 +110,25 @@ trait PageTableLevel: 'static {
     }
 }
 
-pub struct L4;
+pub(crate) struct L4;
 
 impl PageTableLevel for L4 {
     type NextLevel = L3;
 }
 
-struct L3;
+pub(crate) struct L3;
 
 impl PageTableLevel for L3 {
     type NextLevel = L2;
 }
 
-struct L2;
+pub(crate) struct L2;
 
 impl PageTableLevel for L2 {
     type NextLevel = L1;
 }
 
-struct L1;
+pub(crate) struct L1;
 
 impl PageTableLevel for L1 {
     type NextLevel = !;
@@ -132,9 +142,10 @@ impl PageTableLevel for ! {
 
 struct PageMeta {
     pub contiguous_pages: Option<usize>,
+    pub pointer_meta: Address,
 }
 
-struct PageTable<L: PageTableLevel> {
+pub(crate) struct PageTable<L: PageTableLevel = L4> {
     table: [PageTableEntry::<L>; 512],
     phantom: PhantomData<L>,
 }
@@ -170,8 +181,15 @@ impl<L: PageTableLevel> PageTable<L> {
     }
 }
 
+impl PageTable<L1> {
+    #[inline(always)]
+    fn set_pointer_meta(&mut self, address: Address, pointer_meta: Address) {
+        self.table[L1::get_index(address)].set_pointer_meta(pointer_meta);
+    }
+}
+
 impl PageTable<L4> {
-    const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self {
             table: unsafe { mem::transmute([0usize; 512]) },
             phantom: PhantomData
@@ -186,19 +204,19 @@ impl PageTable<L4> {
         };
         let l2 = match l3.get_entry(address)? {
             PageTableEntryData::NextLevelPageTable { table, .. } => table,
-            PageTableEntryData::Page { contiguous_pages } => return Some(PageMeta {
-                contiguous_pages: contiguous_pages,
+            PageTableEntryData::Page { contiguous_pages, pointer_meta } => return Some(PageMeta {
+                contiguous_pages, pointer_meta,
             }),
         };
         let l1 = match l2.get_entry(address)? {
             PageTableEntryData::NextLevelPageTable { table, .. } => table,
-            PageTableEntryData::Page { contiguous_pages } => return Some(PageMeta {
-                contiguous_pages: contiguous_pages,
+            PageTableEntryData::Page { contiguous_pages, pointer_meta } => return Some(PageMeta {
+                contiguous_pages, pointer_meta,
             }),
         };
         match l1.get_entry(address)? {
-            PageTableEntryData::Page { contiguous_pages } => Some(PageMeta {
-                contiguous_pages: contiguous_pages,
+            PageTableEntryData::Page { contiguous_pages, pointer_meta } => Some(PageMeta {
+                contiguous_pages, pointer_meta,
             }),
             _ => unreachable!(),
         }
@@ -227,7 +245,7 @@ impl PageTable<L4> {
         l2.table[L2::get_index(start)].delta_entries(1);
     }
 
-    fn insert_pages<S: PageSize>(&mut self, start: Page<S>, num_pages: usize) {
+    pub(crate) fn insert_pages<S: PageSize>(&mut self, start: Page<S>, num_pages: usize) {
         for i in 0..num_pages {
             let page = Step::forward(start, i);
             self.insert_one_page(page, if i == 0 { Some(num_pages) } else { None })
@@ -269,14 +287,37 @@ impl PageTable<L4> {
         if dead { Self::decrease_used_entries(l4, start_page); }
     }
 
-    fn delete_pages<S: PageSize>(&mut self, start: Page<S>, num_pages: usize) {
+    pub(crate) fn delete_pages<S: PageSize>(&mut self, start: Page<S>, num_pages: usize) {
         for i in 0..num_pages {
             let page = Step::forward(start, i);
             self.delete_one_page(page)
         }
     }
-}
 
+    #[inline(always)]
+    pub fn is_allocated(&self, address: Address) -> bool {
+        self.get(address).is_some()
+    }
+
+    #[inline(always)]
+    pub fn get_contiguous_pages(&self, start: Address) -> usize {
+        self.get(start).unwrap().contiguous_pages.unwrap()
+    }
+
+    #[inline(always)]
+    pub fn get_pointer_meta(&self, start: Address) -> Address {
+        self.get(start).unwrap().pointer_meta
+    }
+
+    pub fn set_pointer_meta(&mut self, address: Address, pointer_meta: Address) {
+        debug_assert!(usize::from(pointer_meta) & !(((1 << 45) - 1) << 3) == 0);
+        let l4 = self;
+        let l3 = l4.get_next_page_table(address);
+        let l2 = l3.get_next_page_table(address);
+        let l1 = l2.get_next_page_table(address);
+        l1.set_pointer_meta(address, pointer_meta);
+    }
+}
 
 pub struct PageRegistry {
     p4: RwLock<PageTable<L4>>,
@@ -298,12 +339,21 @@ impl PageRegistry {
 
     #[inline(always)]
     pub fn is_allocated(&self, address: Address) -> bool {
-        self.p4.read().get(address).is_some()
+        self.p4.read().is_allocated(address)
     }
 
     #[inline(always)]
     pub fn get_contiguous_pages(&self, start: Address) -> usize {
-        self.p4.read().get(start).unwrap().contiguous_pages.unwrap()
+        self.p4.read().get_contiguous_pages(start)
+    }
+
+    #[inline(always)]
+    pub fn get_pointer_meta(&self, start: Address) -> Address {
+        self.p4.read().get_pointer_meta(start)
+    }
+
+    pub fn set_pointer_meta(&self, start: Address, pointer_meta: Address) {
+        self.p4.write().set_pointer_meta(start, pointer_meta)
     }
 
     pub(crate) fn insert_pages<S: PageSize>(&self, start: Page<S>, num_pages: usize) {

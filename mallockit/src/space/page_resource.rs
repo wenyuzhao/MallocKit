@@ -1,16 +1,17 @@
 use std::{ops::Range, sync::atomic::{AtomicUsize, Ordering}};
 use std::iter::Step;
 use crate::util::*;
+use crate::util::freelist::PageFreeList;
 use spin::Mutex;
 use super::{PAGE_REGISTRY, SpaceId};
 
 
-const NUM_SIZE_CLASS: usize = SpaceId::LOG_MAX_SPACE_SIZE - Page::<Size4K>::LOG_BYTES + 1;
+const NUM_SIZE_CLASS: usize = SpaceId::LOG_MAX_SPACE_SIZE - Page::<Size4K>::LOG_BYTES;
 
 pub struct PageResource {
     pub id: SpaceId,
     base: Address,
-    freelist: Mutex<FreeList<{NUM_SIZE_CLASS}>>,
+    freelist: Mutex<PageFreeList<{NUM_SIZE_CLASS}>>,
     committed_size: AtomicUsize,
 }
 
@@ -18,7 +19,7 @@ impl PageResource {
     pub fn new(id: SpaceId) -> Self {
         debug_assert!(id.0 < 0b0000_1111);
         let base = SpaceId::HEAP_START + ((id.0 as usize) << SpaceId::LOG_MAX_SPACE_SIZE);
-        let mut freelist = FreeList::new();
+        let mut freelist = PageFreeList::new(base);
         freelist.release_cell(0, 1 << (NUM_SIZE_CLASS - 1));
         Self {
             id,

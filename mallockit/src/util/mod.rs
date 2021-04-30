@@ -13,4 +13,3 @@ pub use lazy::*;
 pub use lab::*;
 pub use page::*;
 pub use sys_alloc::*;
-pub use freelist::*;

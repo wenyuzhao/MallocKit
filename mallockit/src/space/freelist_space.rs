@@ -1,5 +1,6 @@
 use std::intrinsics::unlikely;
 use crate::util::*;
+use crate::util::freelist::FreeList;
 use super::{Allocator, Space, SpaceId, page_resource::PageResource};
 
 
@@ -133,6 +134,9 @@ impl Allocator for FreeListAllocator {
         let bytes = cell.size();
         debug_assert!(bytes.is_power_of_two());
         let size_class = FreeListSpace::size_class(bytes);
-        self.dealloc_cell(cell.start(), size_class)
+        self.dealloc_cell(cell.start(), size_class);
+        while let Some(start) = self.freelist.allocate_cell_aligned(1 << FreeListSpace::size_class(Size2M::BYTES)).map(|x| x.start) {
+            self.space.release(Page::<Size2M>::new(self.base + start));
+        }
     }
 }

@@ -22,6 +22,8 @@
 #![feature(const_maybe_uninit_assume_init)]
 #![feature(const_ptr_write)]
 #![feature(const_maybe_uninit_as_ptr)]
+#![feature(const_generics)]
+#![feature(const_evaluatable_checked)]
 
 #[macro_use]
 pub mod log;
