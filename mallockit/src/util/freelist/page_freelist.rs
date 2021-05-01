@@ -19,8 +19,6 @@ pub struct PageFreeList<const NUM_SIZE_CLASS: usize> {
     base: Address,
     table: [Option<CellPtr>; NUM_SIZE_CLASS],
     bst: LazyBst,
-    pub free_units: usize,
-    pub total_units: usize,
     page_table: PageTable,
 }
 
@@ -36,15 +34,6 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{NUM
     #[inline(always)]
     fn bst_mut(&mut self) -> &mut LazyBst {
         &mut self.bst
-    }
-
-    #[inline(always)]
-    fn delta_free_units(&mut self, delta: isize) {
-        if delta > 0 {
-            self.free_units += delta as usize;
-        } else {
-            self.free_units -= delta as usize;
-        }
     }
 
     #[inline(always)]
@@ -116,8 +105,6 @@ impl<const NUM_SIZE_CLASS: usize> PageFreeList<{NUM_SIZE_CLASS}> {
             base,
             table: [None; NUM_SIZE_CLASS],
             bst: LazyBst::new(),
-            free_units: 0,
-            total_units: 0,
             page_table: PageTable::new(),
         }
     }

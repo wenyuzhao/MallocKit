@@ -8,7 +8,7 @@ use super::{Allocator, Space, SpaceId, page_resource::PageResource};
 struct AddressSpace;
 
 impl AddressSpaceConfig for AddressSpace {
-    const MIN_ALIGNMENT: usize = 0;
+    const LOG_MIN_ALIGNMENT: usize = 3;
     const LOG_COVERAGE: usize = SpaceId::LOG_MAX_SPACE_SIZE;
 }
 

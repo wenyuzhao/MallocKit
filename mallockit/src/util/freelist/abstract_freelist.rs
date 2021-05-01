@@ -103,8 +103,6 @@ pub(super) trait InternalAbstractFreeList: Sized + AbstractFreeList {
     fn push_cell(&mut self, unit: Unit, size_class: usize);
     fn remove_cell(&mut self, unit: Unit, size_class: usize);
 
-    fn delta_free_units(&mut self, delta: isize);
-
     #[inline(always)]
     fn unit_to_index(&self, unit: Unit, size_class: usize) -> BstIndex {
         let start = 1 << (Self::NUM_SIZE_CLASS - size_class - 1);
@@ -225,7 +223,6 @@ pub(super) trait InternalAbstractFreeList: Sized + AbstractFreeList {
         debug_assert!(units.is_power_of_two());
         let size_class = <Self as InternalAbstractFreeList>::size_class(units);
         let start = self.allocate_aligned_units(size_class)?;
-        self.delta_free_units(-(units as isize));
         Some(start..Unit(*start + units))
     }
 
@@ -233,7 +230,6 @@ pub(super) trait InternalAbstractFreeList: Sized + AbstractFreeList {
     fn release_cell_aligned(&mut self, start: Unit, units: usize) {
         debug_assert!(units.is_power_of_two());
         debug_assert!(*start & (units - 1) == 0);
-        self.delta_free_units(units as _);
         let size_class = <Self as InternalAbstractFreeList>::size_class(units);
         self.release_aligned_units(start, size_class);
     }

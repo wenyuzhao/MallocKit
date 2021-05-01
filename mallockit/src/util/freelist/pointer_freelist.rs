@@ -22,9 +22,9 @@ impl PartialEq for Cell {
 type CellPtr = NonNull<Cell>;
 
 pub trait AddressSpaceConfig: Sized {
-    const MIN_ALIGNMENT: usize;
+    const LOG_MIN_ALIGNMENT: usize;
     const LOG_COVERAGE: usize;
-    const NUM_SIZE_CLASS: usize = Self::LOG_COVERAGE + 1 - Self::MIN_ALIGNMENT.next_power_of_two().trailing_zeros() as usize;
+    const NUM_SIZE_CLASS: usize = Self::LOG_COVERAGE + 1 - Self::LOG_MIN_ALIGNMENT;
 }
 
 /// Manage allocation of 0..(1 << NUM_SIZE_CLASS) units
@@ -32,13 +32,11 @@ pub struct PointerFreeList<Config: AddressSpaceConfig> where [Option<CellPtr>; C
     base: Address,
     table: [Option<CellPtr>; Config::NUM_SIZE_CLASS],
     bst: LazyBst,
-    pub free_units: usize,
-    pub total_units: usize,
     phantom: PhantomData<Config>
 }
 
 impl<Config: AddressSpaceConfig> InternalAbstractFreeList for PointerFreeList<Config> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
-    const MIN_SIZE_CLASS: usize = 4;
+    const MIN_SIZE_CLASS: usize = 1;
     const NUM_SIZE_CLASS: usize = Config::NUM_SIZE_CLASS;
 
     #[inline(always)]
@@ -48,15 +46,6 @@ impl<Config: AddressSpaceConfig> InternalAbstractFreeList for PointerFreeList<Co
     #[inline(always)]
     fn bst_mut(&mut self) -> &mut LazyBst {
         &mut self.bst
-    }
-
-    #[inline(always)]
-    fn delta_free_units(&mut self, delta: isize) {
-        if delta > 0 {
-            self.free_units += delta as usize;
-        } else {
-            self.free_units -= delta as usize;
-        }
     }
 
     #[inline(always)]
@@ -135,20 +124,18 @@ impl<Config: AddressSpaceConfig> PointerFreeList<Config> where [Option<CellPtr>;
             base,
             table: [None; Config::NUM_SIZE_CLASS],
             bst: LazyBst::new(),
-            free_units: 0,
-            total_units: 0,
             phantom: PhantomData,
         }
     }
 
     #[inline(always)]
     fn unit_to_cell(&self, unit: Unit) -> CellPtr {
-        unsafe { NonNull::new_unchecked((self.base + *unit).as_mut_ptr()) }
+        unsafe { NonNull::new_unchecked((self.base + (*unit << Config::LOG_MIN_ALIGNMENT)).as_mut_ptr()) }
     }
 
     #[inline(always)]
     fn cell_to_unit(&self, cell: CellPtr) -> Unit {
-        Unit(Address::from(cell.as_ptr()) - self.base)
+        Unit((Address::from(cell.as_ptr()) - self.base) >> Config::LOG_MIN_ALIGNMENT)
     }
 
     fn is_on_current_list_slow(&self, unit: Unit, size_class: Option<usize>) -> bool {
@@ -185,7 +172,9 @@ impl<Config: AddressSpaceConfig> AbstractFreeList for PointerFreeList<Config> wh
 
     /// Allocate a cell with a power-of-two size, and aligned to the size.
     #[inline(always)]
-    fn allocate_cell(&mut self, units: usize) -> Option<Range<Address>> {
+    fn allocate_cell(&mut self, bytes: usize) -> Option<Range<Address>> {
+        debug_assert!(bytes & ((1 << Config::LOG_MIN_ALIGNMENT) - 1) == 0);
+        let units = bytes >> Config::LOG_MIN_ALIGNMENT;
         let Range { start, end } = Self::allocate_cell_aligned(self, units)?;
         let start = Address::from(self.unit_to_cell(start).as_ptr());
         let end = Address::from(self.unit_to_cell(end).as_ptr());
@@ -193,7 +182,9 @@ impl<Config: AddressSpaceConfig> AbstractFreeList for PointerFreeList<Config> wh
     }
 
     #[inline(always)]
-    fn release_cell(&mut self, start: Address, units: usize) {
+    fn release_cell(&mut self, start: Address, bytes: usize) {
+        debug_assert!(bytes & ((1 << Config::LOG_MIN_ALIGNMENT) - 1) == 0);
+        let units = bytes >> Config::LOG_MIN_ALIGNMENT;
         let unit = self.cell_to_unit(unsafe { NonNull::new_unchecked(start.as_mut_ptr()) });
         Self::release_cell_aligned(self, unit, units);
     }
