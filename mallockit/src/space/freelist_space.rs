@@ -1,6 +1,6 @@
 use std::intrinsics::unlikely;
 use crate::util::*;
-use crate::util::freelist::{FreeList, AbstractFreeList};
+use crate::util::freelist::{PointerFreeList, AbstractFreeList};
 use super::{Allocator, Space, SpaceId, page_resource::PageResource};
 
 
@@ -40,7 +40,7 @@ impl FreeListSpace {
     #[inline(always)]
     pub fn size_class(size: usize) -> usize {
         debug_assert!(size <= Size2M::BYTES);
-        FreeList::<{NUM_SIZE_CLASS}>::size_class(size)
+        PointerFreeList::<{NUM_SIZE_CLASS}>::size_class(size)
     }
 
     pub fn can_allocate(layout: Layout) -> bool {
@@ -73,7 +73,7 @@ impl Cell {
 pub struct FreeListAllocator {
     space: Lazy<&'static FreeListSpace, Local>,
     base: Address,
-    freelist: FreeList<{NUM_SIZE_CLASS}>,
+    freelist: PointerFreeList<{NUM_SIZE_CLASS}>,
 }
 
 impl FreeListAllocator {
@@ -81,7 +81,7 @@ impl FreeListAllocator {
         Self {
             space,
             base: Address::ZERO,
-            freelist: FreeList::new(space_id.address_space().start),
+            freelist: PointerFreeList::new(space_id.address_space().start),
         }
     }
 

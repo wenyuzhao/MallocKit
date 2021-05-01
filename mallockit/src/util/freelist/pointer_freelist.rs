@@ -22,7 +22,7 @@ impl PartialEq for Cell {
 type CellPtr = NonNull<Cell>;
 
 /// Manage allocation of 0..(1 << NUM_SIZE_CLASS) units
-pub struct FreeList<const NUM_SIZE_CLASS: usize> {
+pub struct PointerFreeList<const NUM_SIZE_CLASS: usize> {
     base: Address,
     table: [Option<CellPtr>; NUM_SIZE_CLASS],
     bst: LazyBst,
@@ -30,7 +30,7 @@ pub struct FreeList<const NUM_SIZE_CLASS: usize> {
     pub total_units: usize,
 }
 
-impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for FreeList<{NUM_SIZE_CLASS}> {
+impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PointerFreeList<{NUM_SIZE_CLASS}> {
     const MIN_SIZE_CLASS: usize = 4;
     const NUM_SIZE_CLASS: usize = NUM_SIZE_CLASS;
 
@@ -121,7 +121,7 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for FreeList<{NUM_SIZ
     }
 }
 
-impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
+impl<const NUM_SIZE_CLASS: usize> PointerFreeList<{NUM_SIZE_CLASS}> {
     pub const fn new(base: Address) -> Self {
         debug_assert!(std::mem::size_of::<Cell>() == 16);
         Self {
@@ -169,7 +169,7 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
     }
 }
 
-impl<const NUM_SIZE_CLASS: usize> AbstractFreeList for FreeList<{NUM_SIZE_CLASS}> {
+impl<const NUM_SIZE_CLASS: usize> AbstractFreeList for PointerFreeList<{NUM_SIZE_CLASS}> {
     #[inline(always)]
     fn size_class(units: usize) -> usize {
         <Self as InternalAbstractFreeList>::size_class(units)
