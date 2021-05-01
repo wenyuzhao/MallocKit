@@ -11,7 +11,6 @@ const NUM_SIZE_CLASS: usize = SpaceId::LOG_MAX_SPACE_SIZE - Page::<Size4K>::LOG_
 
 pub struct PageResource {
     pub id: SpaceId,
-    base: Address,
     freelist: Mutex<PageFreeList<{NUM_SIZE_CLASS}>>,
     committed_size: AtomicUsize,
 }
@@ -19,12 +18,11 @@ pub struct PageResource {
 impl PageResource {
     pub fn new(id: SpaceId) -> Self {
         debug_assert!(id.0 < 0b0000_1111);
-        let base = SpaceId::HEAP_START + ((id.0 as usize) << SpaceId::LOG_MAX_SPACE_SIZE);
+        let base = id.address_space().start;
         let mut freelist = PageFreeList::new(base);
-        freelist.release_cell_aligned(0, 1 << (NUM_SIZE_CLASS - 1));
+        freelist.release_cell(base, 1 << (NUM_SIZE_CLASS - 1));
         Self {
             id,
-            base,
             freelist: Mutex::new(freelist),
             committed_size: AtomicUsize::new(0),
         }
@@ -33,14 +31,6 @@ impl PageResource {
     #[inline(always)]
     pub fn committed_size(&self) -> usize {
         self.committed_size.load(Ordering::SeqCst)
-    }
-
-    const fn page_to_unit<S: PageSize>(&self, page: Page<S>) -> usize {
-        (page.start() - self.base) >> Page::<Size4K>::LOG_BYTES
-    }
-
-    const fn unit_to_page<S: PageSize>(&self, unit: usize) -> Page<S> {
-        Page::<S>::new(self.base + (unit << Page::<Size4K>::LOG_BYTES))
     }
 
     fn map_pages<S: PageSize>(&self, start: Page<S>, pages: usize) -> bool {
@@ -64,8 +54,8 @@ impl PageResource {
 
     pub fn acquire_pages<S: PageSize>(&self, pages: usize) -> Option<Range<Page<S>>> {
         let units = pages << (S::LOG_BYTES - Size4K::LOG_BYTES);
-        let start_unit = self.freelist.lock().allocate_cell_aligned(units)?.start;
-        let start = self.unit_to_page(start_unit);
+        let start = self.freelist.lock().allocate_cell(units)?.start;
+        let start = Page::<S>::new(start);
         if !self.map_pages(start, pages) {
             return self.acquire_pages(pages); // Retry
         }
@@ -78,8 +68,7 @@ impl PageResource {
         let pages = PAGE_REGISTRY.delete_pages(start);
         debug_assert!(pages.is_power_of_two());
         self.unmap_pages(start, pages);
-        let start_unit = self.page_to_unit(start);
-        self.freelist.lock().release_cell_aligned(start_unit, pages);
+        self.freelist.lock().release_cell(start.start(), pages);
     }
 
     pub fn get_contiguous_pages<S: PageSize>(&self, start: Page<S>) -> usize {

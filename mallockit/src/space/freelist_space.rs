@@ -1,11 +1,16 @@
 use std::intrinsics::unlikely;
 use crate::util::*;
-use crate::util::freelist::{PointerFreeList, AbstractFreeList};
+use crate::util::freelist::{PointerFreeList, AbstractFreeList, AddressSpaceConfig};
 use super::{Allocator, Space, SpaceId, page_resource::PageResource};
 
 
 
-const NUM_SIZE_CLASS: usize = super::SpaceId::LOG_MAX_SPACE_SIZE + 1;
+struct AddressSpace;
+
+impl AddressSpaceConfig for AddressSpace {
+    const MIN_ALIGNMENT: usize = 0;
+    const LOG_COVERAGE: usize = SpaceId::LOG_MAX_SPACE_SIZE;
+}
 
 pub struct FreeListSpace {
     id: SpaceId,
@@ -40,7 +45,7 @@ impl FreeListSpace {
     #[inline(always)]
     pub fn size_class(size: usize) -> usize {
         debug_assert!(size <= Size2M::BYTES);
-        PointerFreeList::<{NUM_SIZE_CLASS}>::size_class(size)
+        PointerFreeList::<AddressSpace>::size_class(size)
     }
 
     pub fn can_allocate(layout: Layout) -> bool {
@@ -73,7 +78,7 @@ impl Cell {
 pub struct FreeListAllocator {
     space: Lazy<&'static FreeListSpace, Local>,
     base: Address,
-    freelist: PointerFreeList<{NUM_SIZE_CLASS}>,
+    freelist: PointerFreeList<AddressSpace>,
 }
 
 impl FreeListAllocator {
@@ -90,22 +95,17 @@ impl FreeListAllocator {
         if unlikely(self.base.is_zero()) {
             self.base = self.space.base;
         }
-        if let Some(start) = self.freelist.allocate_cell_aligned(1 << size_class).map(|x| x.start) {
-            return Some(self.base + start)
+        if let Some(start) = self.freelist.allocate_cell(1 << size_class).map(|x| x.start) {
+            return Some(start)
         }
-        let unit = self.space.acquire::<Size2M>(1)?.start.start() - self.base;
-        self.freelist.release_cell_aligned(unit, Size2M::BYTES);
+        let page = self.space.acquire::<Size2M>(1)?.start.start();
+        self.freelist.release_cell(page, Size2M::BYTES);
         self.alloc_cell(size_class)
-    }
-
-    const fn address_to_unit(&self, addr: Address) -> usize {
-        addr - self.base
     }
 
     #[inline(always)]
     fn dealloc_cell(&mut self, ptr: Address, size_class: usize) {
-        let unit = self.address_to_unit(ptr);
-        self.freelist.release_cell_aligned(unit, 1 << size_class);
+        self.freelist.release_cell(ptr, 1 << size_class);
     }
 }
 

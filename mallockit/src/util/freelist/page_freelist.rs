@@ -123,19 +123,31 @@ impl<const NUM_SIZE_CLASS: usize> PageFreeList<{NUM_SIZE_CLASS}> {
     }
 
     #[inline(always)]
+    fn unit_to_address(&self, unit: Unit) -> Address {
+        self.base + (*unit << Size4K::LOG_BYTES)
+    }
+
+    #[inline(always)]
+    fn address_to_unit(&self, a: Address) -> Unit {
+        Unit((a - self.base) >> Size4K::LOG_BYTES)
+    }
+
+    #[inline(always)]
     fn unit_to_cell(&self, unit: Unit) -> CellPtr {
-        unsafe { NonNull::new_unchecked((self.base + *unit).as_mut_ptr()) }
+        let ptr = self.page_table.get_pointer_meta(self.unit_to_address(unit));
+        unsafe { NonNull::new_unchecked(ptr.as_mut_ptr()) }
     }
 
     #[inline(always)]
     fn delete_pages(&mut self, unit: Unit) {
-        self.page_table.delete_pages::<Size4K>(Page::new(self.base + (*unit << 12)), 1);
+        self.page_table.delete_pages::<Size4K>(Page::new(self.unit_to_address(unit)), 1);
     }
 
     #[inline(always)]
     fn insert_pages(&mut self, unit: Unit, pointer_meta: Address) {
-        self.page_table.insert_pages::<Size4K>(Page::new(self.base + (*unit << 12)), 1);
-        self.page_table.set_pointer_meta(self.base + (*unit << 12), pointer_meta);
+        let addr = self.unit_to_address(unit);
+        self.page_table.insert_pages::<Size4K>(Page::new(addr), 1);
+        self.page_table.set_pointer_meta(addr, pointer_meta);
     }
 }
 
@@ -148,12 +160,16 @@ impl<const NUM_SIZE_CLASS: usize> AbstractFreeList for PageFreeList<{NUM_SIZE_CL
 
     /// Allocate a cell with a power-of-two size, and aligned to the size.
     #[inline(always)]
-    fn allocate_cell_aligned(&mut self, units: usize) -> Option<Range<usize>> {
-        <Self as InternalAbstractFreeList>::allocate_cell_aligned(self, units)
+    fn allocate_cell(&mut self, units: usize) -> Option<Range<Address>> {
+        let Range { start, end } = self.allocate_cell_aligned(units)?;
+        let start = self.unit_to_address(start);
+        let end = self.unit_to_address(end);
+        Some(start..end)
     }
 
     #[inline(always)]
-    fn release_cell_aligned(&mut self, start: usize, units: usize) {
-        <Self as InternalAbstractFreeList>::release_cell_aligned(self, start, units)
+    fn release_cell(&mut self, start: Address, units: usize) {
+        let unit = self.address_to_unit(start);
+        self.release_cell_aligned(unit, units);
     }
 }

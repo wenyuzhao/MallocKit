@@ -1,4 +1,4 @@
-use std::{intrinsics::unlikely, ops::Range};
+use std::{intrinsics::unlikely, ops::{Add, Range}};
 use crate::util::*;
 
 
@@ -221,29 +221,30 @@ pub(super) trait InternalAbstractFreeList: Sized + AbstractFreeList {
 
     /// Allocate a cell with a power-of-two size, and aligned to the size.
     #[inline(always)]
-    fn allocate_cell_aligned(&mut self, units: usize) -> Option<Range<usize>> {
+    fn allocate_cell_aligned(&mut self, units: usize) -> Option<Range<Unit>> {
         debug_assert!(units.is_power_of_two());
         let size_class = <Self as InternalAbstractFreeList>::size_class(units);
         let start = self.allocate_aligned_units(size_class)?;
         self.delta_free_units(-(units as isize));
-        Some(*start..(*start + units))
+        Some(start..Unit(*start + units))
     }
 
     #[inline(always)]
-    fn release_cell_aligned(&mut self, start: usize, units: usize) {
+    fn release_cell_aligned(&mut self, start: Unit, units: usize) {
         debug_assert!(units.is_power_of_two());
-        debug_assert!(start & (units - 1) == 0);
+        debug_assert!(*start & (units - 1) == 0);
         self.delta_free_units(units as _);
         let size_class = <Self as InternalAbstractFreeList>::size_class(units);
-        self.release_aligned_units(Unit(start), size_class);
+        self.release_aligned_units(start, size_class);
     }
 }
 
 pub trait AbstractFreeList: Sized {
+    type Value: Copy + Add = Address;
     fn size_class(units: usize) -> usize;
 
     /// Allocate a cell with a power-of-two size, and aligned to the size.
-    fn allocate_cell_aligned(&mut self, units: usize) -> Option<Range<usize>>;
+    fn allocate_cell(&mut self, units: usize) -> Option<Range<Self::Value>>;
 
-    fn release_cell_aligned(&mut self, start: usize, units: usize);
+    fn release_cell(&mut self, start: Self::Value, units: usize);
 }

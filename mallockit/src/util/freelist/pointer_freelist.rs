@@ -1,4 +1,4 @@
-use std::{intrinsics::unlikely, ops::Range, ptr::NonNull};
+use std::{intrinsics::unlikely, marker::PhantomData, ops::Range, ptr::NonNull};
 use crate::util::*;
 
 use super::abstract_freelist::{AbstractFreeList, InternalAbstractFreeList, LazyBst, Unit};
@@ -7,7 +7,7 @@ use super::abstract_freelist::{AbstractFreeList, InternalAbstractFreeList, LazyB
 
 #[derive(Debug)]
 #[repr(C)]
-struct Cell {
+pub struct Cell {
     prev: Option<CellPtr>,
     next: Option<CellPtr>,
 }
@@ -21,18 +21,25 @@ impl PartialEq for Cell {
 
 type CellPtr = NonNull<Cell>;
 
+pub trait AddressSpaceConfig: Sized {
+    const MIN_ALIGNMENT: usize;
+    const LOG_COVERAGE: usize;
+    const NUM_SIZE_CLASS: usize = Self::LOG_COVERAGE + 1 - Self::MIN_ALIGNMENT.next_power_of_two().trailing_zeros() as usize;
+}
+
 /// Manage allocation of 0..(1 << NUM_SIZE_CLASS) units
-pub struct PointerFreeList<const NUM_SIZE_CLASS: usize> {
+pub struct PointerFreeList<Config: AddressSpaceConfig> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
     base: Address,
-    table: [Option<CellPtr>; NUM_SIZE_CLASS],
+    table: [Option<CellPtr>; Config::NUM_SIZE_CLASS],
     bst: LazyBst,
     pub free_units: usize,
     pub total_units: usize,
+    phantom: PhantomData<Config>
 }
 
-impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PointerFreeList<{NUM_SIZE_CLASS}> {
+impl<Config: AddressSpaceConfig> InternalAbstractFreeList for PointerFreeList<Config> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
     const MIN_SIZE_CLASS: usize = 4;
-    const NUM_SIZE_CLASS: usize = NUM_SIZE_CLASS;
+    const NUM_SIZE_CLASS: usize = Config::NUM_SIZE_CLASS;
 
     #[inline(always)]
     fn bst(&self) -> &LazyBst {
@@ -121,15 +128,16 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PointerFreeList<{
     }
 }
 
-impl<const NUM_SIZE_CLASS: usize> PointerFreeList<{NUM_SIZE_CLASS}> {
+impl<Config: AddressSpaceConfig> PointerFreeList<Config> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
     pub const fn new(base: Address) -> Self {
         debug_assert!(std::mem::size_of::<Cell>() == 16);
         Self {
             base,
-            table: [None; NUM_SIZE_CLASS],
+            table: [None; Config::NUM_SIZE_CLASS],
             bst: LazyBst::new(),
             free_units: 0,
             total_units: 0,
+            phantom: PhantomData,
         }
     }
 
@@ -158,7 +166,7 @@ impl<const NUM_SIZE_CLASS: usize> PointerFreeList<{NUM_SIZE_CLASS}> {
             false
         } else {
             let mut count = 0;
-            for i in 0..NUM_SIZE_CLASS {
+            for i in 0..Config::NUM_SIZE_CLASS {
                 if self.is_on_current_list_slow(unit, Some(i)) {
                     count += 1;
                 }
@@ -169,7 +177,7 @@ impl<const NUM_SIZE_CLASS: usize> PointerFreeList<{NUM_SIZE_CLASS}> {
     }
 }
 
-impl<const NUM_SIZE_CLASS: usize> AbstractFreeList for PointerFreeList<{NUM_SIZE_CLASS}> {
+impl<Config: AddressSpaceConfig> AbstractFreeList for PointerFreeList<Config> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
     #[inline(always)]
     fn size_class(units: usize) -> usize {
         <Self as InternalAbstractFreeList>::size_class(units)
@@ -177,12 +185,16 @@ impl<const NUM_SIZE_CLASS: usize> AbstractFreeList for PointerFreeList<{NUM_SIZE
 
     /// Allocate a cell with a power-of-two size, and aligned to the size.
     #[inline(always)]
-    fn allocate_cell_aligned(&mut self, units: usize) -> Option<Range<usize>> {
-        <Self as InternalAbstractFreeList>::allocate_cell_aligned(self, units)
+    fn allocate_cell(&mut self, units: usize) -> Option<Range<Address>> {
+        let Range { start, end } = Self::allocate_cell_aligned(self, units)?;
+        let start = Address::from(self.unit_to_cell(start).as_ptr());
+        let end = Address::from(self.unit_to_cell(end).as_ptr());
+        Some(start..end)
     }
 
     #[inline(always)]
-    fn release_cell_aligned(&mut self, start: usize, units: usize) {
-        <Self as InternalAbstractFreeList>::release_cell_aligned(self, start, units)
+    fn release_cell(&mut self, start: Address, units: usize) {
+        let unit = self.cell_to_unit(unsafe { NonNull::new_unchecked(start.as_mut_ptr()) });
+        Self::release_cell_aligned(self, unit, units);
     }
 }
