@@ -70,7 +70,6 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for FreeList<{NUM_SIZ
         cell.next = head;
         self.table[size_class] = Some(cell_ptr);
         debug_assert!(self.cell_to_unit(cell_ptr) == unit);
-        self.set_as_free(unit, size_class);
         if cfg!(feature="slow_assert") {
             debug_assert!(self.is_on_current_list_slow(unit, Some(size_class)));
         }
@@ -119,7 +118,6 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for FreeList<{NUM_SIZ
                 next.as_mut().prev = prev;
             }
         }
-        self.set_as_used(self.cell_to_unit(cell_ptr), size_class);
     }
 }
 
