@@ -14,43 +14,31 @@ type CellPtr = *mut Cell;
 
 const MIN_SIZE_CLASS: usize = 5;
 
-/// Manage allocation of 0..(1 << NUM_SIZE_CLASS) units
-pub struct FreeList<const NUM_SIZE_CLASS: usize> {
-    base: Address,
-    table: [Option<CellPtr>; NUM_SIZE_CLASS],
-    bits: Vec<Option<Page>, System>,
-    pub free_units: usize,
-    pub total_units: usize,
-}
-
-#[derive(Deref, Clone, Copy, PartialEq, Eq)]
-#[deref(forward)]
+#[derive(Deref, Clone, Copy, PartialEq, Eq, Debug)]
 struct Unit(usize);
 
-#[derive(Deref, Clone, Copy, PartialEq, Eq)]
-#[deref(forward)]
-struct BstIndex(usize);
-
-impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
-    pub const fn new(base: Address) -> Self {
-        Self {
-            base,
-            table: [None; NUM_SIZE_CLASS],
-            bits: Vec::new_in(System),
-            free_units: 0,
-            total_units: 0,
-        }
+impl Unit {
+    fn parent(&self, size_class: usize) -> Self {
+        Self(self.0 & !(1 << size_class))
     }
-
-    const fn get_parent_index(index: usize) -> usize {
-        index >> 1
+    fn sibling(&self, size_class: usize) -> Self {
+        Self(self.0 ^ (1 << size_class))
     }
-
-    const fn get_sibling_index(index: usize) -> usize {
-        index ^ 1
+    fn is_aligned(&self, size_class: usize) -> bool {
+        (self.0 & ((1usize << size_class) - 1)) == 0
     }
+}
 
-    fn resize(&mut self, index: usize) {
+struct LazyBst {
+    bits: Vec<Option<Page>, System>,
+}
+
+impl LazyBst {
+    const fn new() -> Self {
+        Self { bits: Vec::new_in(System) }
+    }
+    fn resize(&mut self, index: BstIndex) {
+        let index = *index;
         let byte_index = index >> 3;
         let page_index = byte_index >> Size2M::LOG_BYTES;
         if page_index >= self.bits.len() {
@@ -66,59 +54,92 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
             self.bits[page_index] = Some(page);
         }
     }
-
-    fn get_bit_location(&mut self, index: usize) -> (Address, usize) {
-        self.resize(index);
+    fn get_bit_location(&self, index: BstIndex) -> Option<(Address, usize)> {
+        let index = *index;
         let byte_index = index >> 3;
         let page_index = byte_index >> Size2M::LOG_BYTES;
+        if page_index >= self.bits.len() { return None }
         let byte_offset_in_page = byte_index & Page::<Size2M>::MASK;
         let bit_offset_in_byte = index & 0b111;
-        let addr = self.bits[page_index].unwrap().start() + byte_offset_in_page;
-        (addr, bit_offset_in_byte)
+        let addr = self.bits[page_index]?.start() + byte_offset_in_page;
+        Some((addr, bit_offset_in_byte))
     }
-
-    fn index_is_free(&mut self, index: usize) -> bool {
-        let (addr, bit_index) = self.get_bit_location(index);
-        unsafe { (addr.load::<u8>() & (1 << bit_index)) == 1 }
+    fn get(&self, index: BstIndex) -> Option<bool> {
+        let (addr, bit_index) = self.get_bit_location(index)?;
+        Some(unsafe { (addr.load::<u8>() & (1 << bit_index)) != 0 })
     }
-
-    fn mark_index_as_free(&mut self, index: usize) {
-        let (addr, bit_index) = self.get_bit_location(index);
-        unsafe { addr.store::<u8>(addr.load::<u8>() | (1 << bit_index)); }
-    }
-
-    fn mark_index_as_allocated(&mut self, index: usize) {
+    fn set(&mut self, index: BstIndex, value: bool) {
         self.resize(index);
-        let (addr, bit_index) = self.get_bit_location(index);
-        unsafe {
-            addr.store::<u8>(addr.load::<u8>() & !(1 << bit_index));
+        let (addr, bit_index) = self.get_bit_location(index).unwrap();
+        if value {
+            unsafe { addr.store::<u8>(addr.load::<u8>() | (1 << bit_index)); }
+        } else {
+            unsafe { addr.store::<u8>(addr.load::<u8>() & !(1 << bit_index)); }
+        }
+    }
+}
+
+#[derive(Deref, Clone, Copy, PartialEq, Eq, Debug)]
+struct BstIndex(usize);
+
+/// Manage allocation of 0..(1 << NUM_SIZE_CLASS) units
+pub struct FreeList<const NUM_SIZE_CLASS: usize> {
+    base: Address,
+    table: [Option<CellPtr>; NUM_SIZE_CLASS],
+    bst: LazyBst,
+    pub free_units: usize,
+    pub total_units: usize,
+}
+
+impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
+    pub const fn new(base: Address) -> Self {
+        Self {
+            base,
+            table: [None; NUM_SIZE_CLASS],
+            bst: LazyBst::new(),
+            free_units: 0,
+            total_units: 0,
         }
     }
 
-    const fn get_unit_index(unit: usize, size_class: usize) -> usize {
+    fn unit_to_index(&self, unit: Unit, size_class: usize) -> BstIndex {
         let start = 1 << (NUM_SIZE_CLASS - size_class - 1);
-        let index = unit >> size_class;
-        start + index
+        let index = *unit >> size_class;
+        debug_assert!(start + index < (1 << (NUM_SIZE_CLASS - size_class)));
+        BstIndex(start + index)
     }
 
-    const fn unit_to_cell(&self, unit: usize) -> *mut Cell {
-        (self.base + unit).as_mut_ptr()
+    fn unit_to_cell(&self, unit: Unit) -> *mut Cell {
+        (self.base + *unit).as_mut_ptr()
     }
 
-    const fn cell_to_unit(&self, cell: *mut Cell) -> usize {
-        Address::from(cell) - self.base
+    fn cell_to_unit(&self, cell: *mut Cell) -> Unit {
+        Unit(Address::from(cell) - self.base)
     }
 
-    const fn index_to_unit(&self, index: usize, size_class: usize) -> usize {
-        let start = 1 << (NUM_SIZE_CLASS - size_class - 1);
-        let off = index - start;
-        let x = off << size_class;
-        debug_assert!(Self::get_unit_index(x, size_class) == index);
-        x
+    fn is_free(&self, unit: Unit, size_class: usize) -> bool {
+        self.bst.get(self.unit_to_index(unit, size_class)).unwrap_or(false)
     }
 
-    #[inline]
-    fn push(&mut self, unit: usize, size_class: usize) -> *mut Cell {
+    fn set_as_free(&mut self, unit: Unit, size_class: usize) {
+        if cfg!(feature="slow_assert") {
+            debug_assert!(self.is_not_free_slow(unit));
+        }
+        self.bst.set(self.unit_to_index(unit, size_class), true);
+    }
+
+    fn set_as_used(&mut self, unit: Unit, size_class: usize) {
+        debug_assert!(self.is_free(unit, size_class));
+        self.bst.set(self.unit_to_index(unit, size_class), false);
+        if cfg!(feature="slow_assert") {
+            debug_assert!(self.is_not_free_slow(unit));
+        }
+    }
+
+    fn push(&mut self, unit: Unit, size_class: usize) -> *mut Cell {
+        if cfg!(feature="slow_assert") {
+            debug_assert!(!self.is_on_current_list_slow(unit, None));
+        }
         let head = self.table[size_class].take();
         let mut cell = unsafe { &mut *self.unit_to_cell(unit) };
         cell.prev = None;
@@ -132,10 +153,13 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
         let cell_ptr = cell as *mut _;
         self.table[size_class] = Some(cell);
         debug_assert!(self.cell_to_unit(cell_ptr) == unit);
+        self.set_as_free(unit, size_class);
+        if cfg!(feature="slow_assert") {
+            debug_assert!(self.is_on_current_list_slow(unit, Some(size_class)));
+        }
         cell_ptr
     }
 
-    #[inline]
     fn pop(&mut self, size_class: usize) -> Option<*mut Cell> {
         let head = self.table[size_class].take();
         if head.is_none() {
@@ -153,11 +177,11 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
             self.table[size_class] = next;
             debug_assert!(head.prev.is_none());
             debug_assert!(head.next.is_none());
+            self.set_as_used(self.cell_to_unit(head), size_class);
             return Some(head);
         }
     }
 
-    #[inline]
     fn remove(&mut self, cell_ptr: *mut Cell, size_class: usize) {
         let cell = unsafe { &mut *cell_ptr };
         let next = cell.next.take();
@@ -168,13 +192,8 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
                 (*prev).next = next;
             }
         } else {
-            debug_assert_eq!(self.table[size_class], Some(cell_ptr), "{:?} list@{:?}", self.cell_to_unit(cell_ptr), self as *const _);
-            // if self.table[size_class] == Some(cell_ptr) {
-                self.table[size_class] = next;
-            // } else {
-                // self.table[size_class] = next;
-            // }
-
+            debug_assert_eq!(self.table[size_class], Some(cell_ptr));
+            self.table[size_class] = next;
         }
         if let Some(next) = next {
             unsafe {
@@ -182,84 +201,95 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
                 (*next).prev = prev;
             }
         }
+        self.set_as_used(self.cell_to_unit(cell_ptr), size_class);
     }
 
-    #[inline]
-    fn allocate_aligned_units(&mut self, size_class: usize) -> Option<usize> {
+    fn allocate_aligned_units(&mut self, size_class: usize) -> Option<Unit> {
         if size_class >= NUM_SIZE_CLASS {
             return None
         }
         if let Some(cell) = self.pop(size_class) {
             let unit = self.cell_to_unit(cell);
-            // update bitmap
-            let index = Self::get_unit_index(unit, size_class);
-            self.mark_index_as_allocated(index);
-            debug_assert!(!self.index_is_free(index));
+            debug_assert!(!self.is_free(unit, size_class));
             return Some(unit);
         }
         // Get a larger cell
-        let super_cell = self.allocate_aligned_units(size_class + 1)?;
-        debug_assert!(!self.index_is_free(Self::get_unit_index(super_cell, size_class + 1)));
+        let parent = self.allocate_aligned_units(size_class + 1)?;
+        debug_assert!(!self.is_free(parent, size_class + 1)); // parent is used
         // Split into two
-        let unit1 = super_cell;
-        let unit2 = super_cell + (1usize << size_class);
-        debug_assert!(!self.index_is_free(Self::get_unit_index(unit1, size_class)));
-        debug_assert!(!self.index_is_free(Self::get_unit_index(unit2, size_class)));
+        let unit1 = parent;
+        let unit2 = unit1.sibling(size_class);
+        debug_assert!(!self.is_free(unit1, size_class)); // child#0 is used
+        debug_assert!(!self.is_free(unit2, size_class)); // child#1 is used
         // Add second cell to list
         debug_assert!(size_class < NUM_SIZE_CLASS);
         self.push(unit2, size_class);
-        // update bitmap
-        // debug_assert!(!self.index_is_free(Self::get_unit_index(unit1, size_class + 1)));
-        self.mark_index_as_allocated(Self::get_unit_index(unit1, size_class));
-        // debug_assert!(!self.index_is_free(Self::get_unit_index(0x3ca000, 10)));
-        self.mark_index_as_free(Self::get_unit_index(unit2, size_class));
-        // debug_assert!(!self.index_is_free(Self::get_unit_index(unit1, size_class)), "{:x} {}", unit1, size_class);
+        debug_assert!(!self.is_free(parent, size_class + 1)); // parent is used
+        debug_assert!(!self.is_free(unit1, size_class)); // child#0 is used
+        debug_assert!(self.is_free(unit2, size_class)); // child#1 is free
         Some(unit1)
     }
 
-    #[inline]
-    fn is_on_current_list_slow(&mut self, unit: usize, size_class: usize) -> bool {
-        let mut head = self.table[size_class];
-        while let Some(c) = head {
-            unsafe {
-                if self.cell_to_unit(c) == unit {
-                    return true;
-                }
-                head = (*c).next;
-            }
+    fn is_not_free_slow(&self, unit: Unit) -> bool {
+        assert!(cfg!(feature="slow_assert"));
+        for sz in 0..NUM_SIZE_CLASS {
+            if self.is_free(unit, sz) { return true }
         }
         false
     }
 
-    #[inline(never)]
-    fn release_aligned_units(&mut self, unit: usize, size_class: usize) {
-        debug_assert_eq!(unit & ((1usize << size_class) - 1), 0);
-        debug_assert!(size_class < NUM_SIZE_CLASS);
-        let unit_index = Self::get_unit_index(unit, size_class);
-        let sibling_index = Self::get_sibling_index(unit_index);
-        debug_assert!(!self.index_is_free(unit_index));
-        if (size_class < NUM_SIZE_CLASS - 1) && (unit_index > 1) && self.index_is_free(sibling_index) {
-            debug_assert!(self.is_on_current_list_slow(unit ^ (1 << size_class), size_class), "self.index_is_free(sibling_index)={} sibling_index={} sibling_unit={} index={} unit={:?} list={:?} size_class={}", self.index_is_free(sibling_index), sibling_index, self.index_to_unit(sibling_index, size_class), unit_index, unit, self as *const _, size_class);
-            self.mark_index_as_allocated(sibling_index);
-            let parent = Self::get_parent_index(sibling_index);
-            debug_assert_eq!(parent, Self::get_parent_index(unit_index));
-            debug_assert!(!self.index_is_free(parent));
-            // Remove sibling from list
-            {
-                // debug_assert!(self.is_on_current_list_slow(self.index_to_unit(sibling_index, size_class), size_class));
-                let sibling_cell = self.unit_to_cell(self.index_to_unit(sibling_index, size_class));
-                self.remove(sibling_cell, size_class);
+    fn is_on_current_list_slow(&self, unit: Unit, size_class: Option<usize>) -> bool {
+        assert!(cfg!(feature="slow_assert"));
+        if let Some(sz) = size_class {
+            let mut head = self.table[sz];
+            while let Some(c) = head {
+                unsafe {
+                    if self.cell_to_unit(c) == unit {
+                        return true;
+                    }
+                    head = (*c).next;
+                }
             }
-            let sibling_unit = self.index_to_unit(sibling_index, size_class);
-            let parent_unit = self.index_to_unit(parent, size_class + 1);
-            debug_assert!(parent_unit == sibling_unit || parent_unit == unit);
-            // if size_class + 1 >= NUM_SIZE_CLASS {
-            self.release_aligned_units(parent_unit, size_class + 1)
-            // }
+            false
         } else {
-            self.mark_index_as_free(Self::get_unit_index(unit, size_class));
+            let mut count = 0;
+            for i in 0..NUM_SIZE_CLASS {
+                if self.is_on_current_list_slow(unit, Some(i)) {
+                    count += 1;
+                }
+            }
+            debug_assert!(count <= 1, "{}", count);
+            count != 0
+        }
+    }
+
+    fn release_aligned_units(&mut self, unit: Unit, size_class: usize) {
+        debug_assert!(unit.is_aligned(size_class));
+        debug_assert!(size_class < NUM_SIZE_CLASS);
+        let sibling = unit.sibling(size_class);
+        debug_assert!(!self.is_free(unit, size_class));
+        if (size_class < NUM_SIZE_CLASS - 1) && self.is_free(sibling, size_class) {
+            if cfg!(feature="slow_assert") {
+                debug_assert!(self.is_on_current_list_slow(sibling, Some(size_class)));
+            }
+            let parent = unit.parent(size_class);
+            debug_assert!(!self.is_free(parent, size_class + 1), "{:?} {}", parent, size_class); // parent is used
+            // Remove sibling from list
+            self.remove(self.unit_to_cell(sibling), size_class);
+            debug_assert!(!self.is_free(unit, size_class)); // unit is used
+            debug_assert!(!self.is_free(sibling, size_class)); // sibling is used
+            // Merge unit and sibling
+            self.release_aligned_units(parent, size_class + 1);
+        } else {
             debug_assert!(size_class < NUM_SIZE_CLASS);
+            if cfg!(feature="slow_assert") {
+                debug_assert!(!self.is_on_current_list_slow(unit, None));
+            }
             self.push(unit, size_class);
+            debug_assert!(self.is_free(unit, size_class)); // unit is free
+            if cfg!(feature="slow_assert") {
+                debug_assert!(self.is_on_current_list_slow(unit, Some(size_class)));
+            }
         }
     }
 
@@ -277,7 +307,7 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
         let start = self.allocate_aligned_units(size_class)?;
         // debug_assert!(!self.index_is_free(Self::get_unit_index(start, Self::size_class(units))));
         self.free_units -= units;
-        Some(start..(start + units))
+        Some(*start..(*start + units))
     }
 
     #[inline]
@@ -286,7 +316,7 @@ impl<const NUM_SIZE_CLASS: usize> FreeList<{NUM_SIZE_CLASS}> {
         debug_assert!(start & (units - 1) == 0);
         self.free_units += units;
         let size_class = Self::size_class(units);
-        self.release_aligned_units(start, size_class);
+        self.release_aligned_units(Unit(start), size_class);
     }
 
     // /// Allocate a cell with a power-of-two alignment.

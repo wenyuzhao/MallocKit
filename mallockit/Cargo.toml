@@ -17,3 +17,4 @@ derive_more = "0.99"
 [features]
 default = [ "transparent_huge_page" ]
 transparent_huge_page = []
+slow_assert = []

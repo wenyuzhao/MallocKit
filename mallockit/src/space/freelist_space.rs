@@ -5,7 +5,7 @@ use super::{Allocator, Space, SpaceId, page_resource::PageResource};
 
 
 
-const NUM_SIZE_CLASS: usize = Size2M::LOG_BYTES + 1;
+const NUM_SIZE_CLASS: usize = super::SpaceId::LOG_MAX_SPACE_SIZE + 1;
 
 pub struct FreeListSpace {
     id: SpaceId,
