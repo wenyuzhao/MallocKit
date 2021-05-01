@@ -95,6 +95,7 @@ pub(super) struct BstIndex(usize);
 pub(super) trait InternalAbstractFreeList: Sized + AbstractFreeList {
     const MIN_SIZE_CLASS: usize;
     const NUM_SIZE_CLASS: usize;
+    const NON_COALESCEABLE_SIZE_CLASS_THRESHOLD: usize = Self::NUM_SIZE_CLASS - 1;
 
     fn bst(&self) -> &LazyBst;
     fn bst_mut(&mut self) -> &mut LazyBst;
@@ -154,30 +155,43 @@ pub(super) trait InternalAbstractFreeList: Sized + AbstractFreeList {
         self.set_as_used(unit, size_class);
     }
 
+    #[cold]
+    fn allocate_aligned_units_slow(&mut self, request_size_class: usize) -> Option<Unit> {
+        for size_class in request_size_class..=Self::NON_COALESCEABLE_SIZE_CLASS_THRESHOLD {
+            if let Some(unit) = self.pop(size_class) {
+                debug_assert!(!self.is_free(unit, size_class));
+                let parent = unit;
+                for parent_size_class in ((request_size_class+1)..=size_class).rev() {
+                    let child_size_class = parent_size_class - 1;
+                    debug_assert!(!self.is_free(parent, child_size_class + 1)); // parent is used
+                    // Split into two
+                    let unit1 = parent;
+                    let unit2 = unit1.sibling(child_size_class);
+                    debug_assert!(!self.is_free(unit1, child_size_class)); // child#0 is used
+                    debug_assert!(!self.is_free(unit2, child_size_class)); // child#1 is used
+                    // Add second cell to list
+                    debug_assert!(child_size_class < Self::NUM_SIZE_CLASS);
+                    self.push(unit2, child_size_class);
+                    debug_assert!(!self.is_free(parent, child_size_class + 1)); // parent is used
+                    debug_assert!(!self.is_free(unit1, child_size_class)); // child#0 is used
+                    debug_assert!(self.is_free(unit2, child_size_class)); // child#1 is free
+                }
+                return Some(unit);
+            }
+        }
+        None
+    }
+
     #[inline(always)]
     fn allocate_aligned_units(&mut self, size_class: usize) -> Option<Unit> {
-        if size_class >= Self::NUM_SIZE_CLASS {
+        if size_class > Self::NON_COALESCEABLE_SIZE_CLASS_THRESHOLD {
             return None
         }
         if let Some(unit) = self.pop(size_class) {
             debug_assert!(!self.is_free(unit, size_class));
             return Some(unit);
         }
-        // Get a larger cell
-        let parent = self.allocate_aligned_units(size_class + 1)?;
-        debug_assert!(!self.is_free(parent, size_class + 1)); // parent is used
-        // Split into two
-        let unit1 = parent;
-        let unit2 = unit1.sibling(size_class);
-        debug_assert!(!self.is_free(unit1, size_class)); // child#0 is used
-        debug_assert!(!self.is_free(unit2, size_class)); // child#1 is used
-        // Add second cell to list
-        debug_assert!(size_class < Self::NUM_SIZE_CLASS);
-        self.push(unit2, size_class);
-        debug_assert!(!self.is_free(parent, size_class + 1)); // parent is used
-        debug_assert!(!self.is_free(unit1, size_class)); // child#0 is used
-        debug_assert!(self.is_free(unit2, size_class)); // child#1 is free
-        Some(unit1)
+        self.allocate_aligned_units_slow(size_class)
     }
 
     fn is_not_free_slow(&self, unit: Unit) -> bool {
@@ -189,24 +203,28 @@ pub(super) trait InternalAbstractFreeList: Sized + AbstractFreeList {
     }
 
     #[inline(always)]
-    fn release_aligned_units(&mut self, unit: Unit, size_class: usize) {
-        debug_assert!(unit.is_aligned(size_class));
-        debug_assert!(size_class < Self::NUM_SIZE_CLASS);
-        let sibling = unit.sibling(size_class);
-        debug_assert!(!self.is_free(unit, size_class));
-        if (size_class < Self::NUM_SIZE_CLASS - 1) && self.is_free(sibling, size_class) {
-            let parent = unit.parent(size_class);
-            debug_assert!(!self.is_free(parent, size_class + 1), "{:?} {}", parent, size_class); // parent is used
-            // Remove sibling from list
-            self.remove(sibling, size_class);
-            debug_assert!(!self.is_free(unit, size_class)); // unit is used
-            debug_assert!(!self.is_free(sibling, size_class)); // sibling is used
-            // Merge unit and sibling
-            self.release_aligned_units(parent, size_class + 1);
-        } else {
+    fn release_aligned_units(&mut self, mut unit: Unit, mut size_class: usize) {
+        loop {
+            debug_assert!(unit.is_aligned(size_class));
             debug_assert!(size_class < Self::NUM_SIZE_CLASS);
-            self.push(unit, size_class);
-            debug_assert!(self.is_free(unit, size_class)); // unit is free
+            let sibling = unit.sibling(size_class);
+            debug_assert!(!self.is_free(unit, size_class));
+            if unlikely(size_class < Self::NON_COALESCEABLE_SIZE_CLASS_THRESHOLD && self.is_free(sibling, size_class)) {
+                let parent = unit.parent(size_class);
+                debug_assert!(!self.is_free(parent, size_class + 1), "{:?} {}", parent, size_class); // parent is used
+                // Remove sibling from list
+                self.remove(sibling, size_class);
+                debug_assert!(!self.is_free(unit, size_class)); // unit is used
+                debug_assert!(!self.is_free(sibling, size_class)); // sibling is used
+                // Merge unit and sibling
+                unit = parent;
+                size_class += 1;
+            } else {
+                debug_assert!(size_class < Self::NUM_SIZE_CLASS);
+                self.push(unit, size_class);
+                debug_assert!(self.is_free(unit, size_class)); // unit is free
+                return
+            }
         }
     }
 

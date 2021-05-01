@@ -10,6 +10,7 @@ struct AddressSpace;
 impl AddressSpaceConfig for AddressSpace {
     const LOG_MIN_ALIGNMENT: usize = 3;
     const LOG_COVERAGE: usize = SpaceId::LOG_MAX_SPACE_SIZE;
+    const LOG_MAX_CELL_SIZE: usize = Size2M::LOG_BYTES;
 }
 
 pub struct FreeListSpace {
@@ -136,8 +137,5 @@ impl Allocator for FreeListAllocator {
         debug_assert!(bytes.is_power_of_two(), "{:x?} {:?} {:?}", bytes, cell as *mut _, ptr);
         let size_class = FreeListSpace::size_class(bytes);
         self.dealloc_cell(cell.start(), size_class);
-        // while let Some(start) = self.freelist.allocate_cell_aligned(1 << FreeListSpace::size_class(Size2M::BYTES)).map(|x| x.start) {
-        //     self.space.release(Page::<Size2M>::new(self.base + start));
-        // }
     }
 }

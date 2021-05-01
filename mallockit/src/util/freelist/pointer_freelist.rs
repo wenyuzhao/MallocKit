@@ -24,6 +24,7 @@ type CellPtr = NonNull<Cell>;
 pub trait AddressSpaceConfig: Sized {
     const LOG_MIN_ALIGNMENT: usize;
     const LOG_COVERAGE: usize;
+    const LOG_MAX_CELL_SIZE: usize = Self::LOG_COVERAGE;
     const NUM_SIZE_CLASS: usize = Self::LOG_COVERAGE + 1 - Self::LOG_MIN_ALIGNMENT;
 }
 
@@ -38,6 +39,7 @@ pub struct PointerFreeList<Config: AddressSpaceConfig> where [Option<CellPtr>; C
 impl<Config: AddressSpaceConfig> InternalAbstractFreeList for PointerFreeList<Config> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
     const MIN_SIZE_CLASS: usize = 1;
     const NUM_SIZE_CLASS: usize = Config::NUM_SIZE_CLASS;
+    const NON_COALESCEABLE_SIZE_CLASS_THRESHOLD: usize = Config::LOG_MAX_CELL_SIZE - Config::LOG_MIN_ALIGNMENT;
 
     #[inline(always)]
     fn bst(&self) -> &LazyBst {
