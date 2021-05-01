@@ -1,6 +1,6 @@
 use std::intrinsics::unlikely;
 use crate::util::*;
-use crate::util::freelist::FreeList;
+use crate::util::freelist::{FreeList, AbstractFreeList};
 use super::{Allocator, Space, SpaceId, page_resource::PageResource};
 
 
@@ -37,7 +37,8 @@ impl Space for FreeListSpace {
 
 
 impl FreeListSpace {
-    pub const fn size_class(size: usize) -> usize {
+    #[inline(always)]
+    pub fn size_class(size: usize) -> usize {
         debug_assert!(size <= Size2M::BYTES);
         FreeList::<{NUM_SIZE_CLASS}>::size_class(size)
     }
