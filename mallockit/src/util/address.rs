@@ -7,7 +7,7 @@ use std::iter::Step;
 
 
 #[repr(transparent)]
-pub struct Address(usize);
+pub struct Address(pub(crate) usize);
 
 impl Address {
     pub const LOG_BYTES: usize = mem::size_of::<usize>().trailing_zeros() as usize;

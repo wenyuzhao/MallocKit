@@ -75,7 +75,8 @@ def execute(cmd, cwd=None, perf=False, verbose=True):
         post_report = 'echo === perf stat results end ==='
         cmd = f"perf stat --no-scale --post '{pre_report}' {e} {cmd}; {post_report}"
     if cwd is not None: cmd = f'cd {cwd}; ' + cmd
-    return subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True).decode("utf-8")
+    os.system(cmd)
+    # return subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=True).decode("utf-8")
 
 def run_once(test, algorithm, program, debug=False):
     assert test in ALL_BENCHMARKS and algorithm in ALL_ALGORITHMS

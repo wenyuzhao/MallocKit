@@ -174,9 +174,16 @@ impl<const NUM_SIZE_CLASS: usize> PageFreeList<{NUM_SIZE_CLASS}> {
         self.page_table.insert_pages::<Size4K>(Page::new(self.base + (unit2 << 12)), 1);
         self.page_table.set_pointer_meta(self.base + (unit2 << 12), cell_ptr.into());
         // update bitmap
-        debug_assert!(!self.index_is_free(Self::get_unit_index(unit1, size_class)));
+        debug_assert!(!self.index_is_free(Self::get_unit_index(unit1, size_class + 1)));
+        self.mark_index_as_allocated(Self::get_unit_index(unit1, size_class));
         self.mark_index_as_free(Self::get_unit_index(unit2, size_class));
         Some(unit1)
+    }
+
+    const fn index_to_unit(index: usize, size_class: usize) -> usize {
+        let start = 1 << (NUM_SIZE_CLASS - size_class - 1);
+        let off = index - start;
+        off << size_class
     }
 
     #[inline]
@@ -188,7 +195,7 @@ impl<const NUM_SIZE_CLASS: usize> PageFreeList<{NUM_SIZE_CLASS}> {
         if unit_index > 1 && self.index_is_free(sibling_index) {
             self.mark_index_as_allocated(sibling_index);
             let parent = Self::get_parent_index(sibling_index);
-            debug_assert_eq!(sibling_index, Self::get_parent_index(unit_index));
+            debug_assert_eq!(parent, Self::get_parent_index(unit_index));
             debug_assert!(!self.index_is_free(parent));
             // Remove sibling from list
             {
@@ -196,7 +203,7 @@ impl<const NUM_SIZE_CLASS: usize> PageFreeList<{NUM_SIZE_CLASS}> {
                 self.remove(sibling_cell.as_mut_ptr(), size_class);
                 self.page_table.delete_pages::<Size4K>(Page::new(self.base + (unit << 12)), 1);
             }
-            self.release_aligned_units(unit, size_class)
+            self.release_aligned_units(Self::index_to_unit(parent, size_class), size_class + 1)
         } else {
             let cell_ptr = self.push(unit, size_class);
             self.page_table.insert_pages::<Size4K>(Page::new(self.base + (unit << 12)), 1);

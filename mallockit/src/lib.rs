@@ -24,6 +24,9 @@
 #![feature(const_maybe_uninit_as_ptr)]
 #![feature(const_generics)]
 #![feature(const_evaluatable_checked)]
+#![feature(trivial_bounds)]
+
+#[macro_use] extern crate derive_more;
 
 #[macro_use]
 pub mod log;

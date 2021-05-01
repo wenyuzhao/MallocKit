@@ -76,11 +76,11 @@ pub struct FreeListAllocator {
 }
 
 impl FreeListAllocator {
-    pub const fn new(space: Lazy<&'static FreeListSpace, Local>) -> Self {
+    pub const fn new(space: Lazy<&'static FreeListSpace, Local>, space_id: SpaceId) -> Self {
         Self {
             space,
             base: Address::ZERO,
-            freelist: FreeList::new(),
+            freelist: FreeList::new(space_id.address_space().start),
         }
     }
 
@@ -132,11 +132,11 @@ impl Allocator for FreeListAllocator {
     fn dealloc(&mut self, ptr: Address) {
         let cell = Cell::from(ptr);
         let bytes = cell.size();
-        debug_assert!(bytes.is_power_of_two());
+        debug_assert!(bytes.is_power_of_two(), "{:x?} {:?} {:?}", bytes, cell as *mut _, ptr);
         let size_class = FreeListSpace::size_class(bytes);
         self.dealloc_cell(cell.start(), size_class);
-        while let Some(start) = self.freelist.allocate_cell_aligned(1 << FreeListSpace::size_class(Size2M::BYTES)).map(|x| x.start) {
-            self.space.release(Page::<Size2M>::new(self.base + start));
-        }
+        // while let Some(start) = self.freelist.allocate_cell_aligned(1 << FreeListSpace::size_class(Size2M::BYTES)).map(|x| x.start) {
+        //     self.space.release(Page::<Size2M>::new(self.base + start));
+        // }
     }
 }

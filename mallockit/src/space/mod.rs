@@ -16,7 +16,7 @@ pub static PAGE_REGISTRY: PageRegistry = PageRegistry::new();
 pub struct SpaceId(u8);
 
 impl SpaceId {
-    pub(crate) const HEAP_START: Address = Address::from(1usize << 45);
+    pub(crate) const HEAP_START: Address = Address(1usize << 45);
     pub const LOG_MAX_SPACE_SIZE: usize = 41;
     pub(crate) const SHIFT: usize = Self::LOG_MAX_SPACE_SIZE;
     pub(crate) const MASK: usize = 0b1111 << Self::SHIFT;
@@ -39,8 +39,8 @@ impl SpaceId {
     }
 
     pub const fn address_space(&self) -> Range<Address> {
-        let start = Self::HEAP_START + ((self.0 as usize) << Self::LOG_MAX_SPACE_SIZE);
-        let end = start + (1usize << Self::LOG_MAX_SPACE_SIZE);
+        let start = Address(Self::HEAP_START.0 + ((self.0 as usize) << Self::LOG_MAX_SPACE_SIZE));
+        let end = Address(start.0 + (1usize << Self::LOG_MAX_SPACE_SIZE));
         start..end
     }
 }

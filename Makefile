@@ -45,7 +45,15 @@ bench: build
 	perf stat -e '$(perf)' $(program)
 
 # GDB to LLDB command map: https://lldb.llvm.org/use/map.html
+lldb: p=0
 lldb: build
+ifeq ($(p),0)
 	rust-lldb -b -o "settings set auto-confirm true" -o "env $(dylib_env)" -o "run" -- $(program)
+else
+	rust-lldb -o "attach -p $(p)"
+endif
+
+lldb-a: build
+	rust-lldb -o "settings set auto-confirm true" -o "env $(dylib_env)" -o "run" -- /home/wenyu/mallockit/bench/mimalloc-bench/out/bench/alloc-test 1
 
 FORCE:

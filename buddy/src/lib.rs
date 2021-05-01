@@ -52,7 +52,7 @@ struct BuddyMutator {
 impl BuddyMutator {
     const fn new() -> Self {
         Self {
-            freelist: FreeListAllocator::new(Lazy::new(|| &PLAN.freelist_space)),
+            freelist: FreeListAllocator::new(Lazy::new(|| &PLAN.freelist_space), FREELIST_SPACE),
             los: LargeObjectAllocator(Lazy::new(|| &PLAN.large_object_space)),
         }
     }
