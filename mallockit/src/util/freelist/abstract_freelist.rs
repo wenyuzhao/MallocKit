@@ -4,6 +4,7 @@ use crate::util::*;
 
 
 #[derive(Deref, Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(C)]
 pub(super) struct Unit(pub(super) usize);
 
 impl Unit {
@@ -87,10 +88,11 @@ impl LazyBst {
 }
 
 #[derive(Deref, Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(C)]
 pub(super) struct BstIndex(usize);
 
 /// Manage allocation of 0..(1 << NUM_SIZE_CLASS) units
-pub(super) trait InternalAbstractFreeList: Sized {
+pub(super) trait InternalAbstractFreeList: Sized + AbstractFreeList {
     const MIN_SIZE_CLASS: usize;
     const NUM_SIZE_CLASS: usize;
 
@@ -221,7 +223,7 @@ pub(super) trait InternalAbstractFreeList: Sized {
     #[inline(always)]
     fn allocate_cell_aligned(&mut self, units: usize) -> Option<Range<usize>> {
         debug_assert!(units.is_power_of_two());
-        let size_class = Self::size_class(units);
+        let size_class = <Self as InternalAbstractFreeList>::size_class(units);
         let start = self.allocate_aligned_units(size_class)?;
         self.delta_free_units(-(units as isize));
         Some(*start..(*start + units))
@@ -232,44 +234,9 @@ pub(super) trait InternalAbstractFreeList: Sized {
         debug_assert!(units.is_power_of_two());
         debug_assert!(start & (units - 1) == 0);
         self.delta_free_units(units as _);
-        let size_class = Self::size_class(units);
+        let size_class = <Self as InternalAbstractFreeList>::size_class(units);
         self.release_aligned_units(Unit(start), size_class);
     }
-
-    // /// Allocate a cell with a power-of-two alignment.
-    // #[inline(always)]
-    // fn allocate_cell(&mut self, units: usize) -> Option<Range<usize>> {
-    //     let size_class = Self::size_class(units);
-    //     let start = self.allocate_aligned_units(size_class)?;
-    //     let free_units = (1 << size_class) - units;
-    //     if free_units != 0 {
-    //         let free_start = start + units;
-    //         self.release_cell(free_start, free_units);
-    //     }
-    //     self.delta_free_units(-(units as isize));
-    //     Some(start..(start + units))
-    // }
-
-    // #[inline(always)]
-    // pub fn release_cell(&mut self, mut start: usize, mut units: usize) {
-    //     unreachable!();
-    //     self.free_units += units;
-    //     let limit = start + units;
-    //     while start < limit {
-    //         let max_size_class = Self::size_class(units);
-    //         for size_class in (0..=max_size_class).rev() {
-    //             let size = 1usize << size_class;
-    //             let end = start + size;
-    //             if (start & (size - 1)) == 0 && end <= limit {
-    //                 self.release_aligned_units(start, size_class, false);
-    //                 start = end;
-    //                 units = limit - end;
-    //                 break
-    //             }
-    //         }
-    //     }
-    //     debug_assert_eq!(start, limit);
-    // }
 }
 
 pub trait AbstractFreeList: Sized {

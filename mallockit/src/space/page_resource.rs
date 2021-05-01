@@ -2,6 +2,7 @@ use std::{ops::Range, sync::atomic::{AtomicUsize, Ordering}};
 use std::iter::Step;
 use crate::util::*;
 use crate::util::freelist::PageFreeList;
+use freelist::AbstractFreeList;
 use spin::Mutex;
 use super::{PAGE_REGISTRY, SpaceId};
 
@@ -20,7 +21,7 @@ impl PageResource {
         debug_assert!(id.0 < 0b0000_1111);
         let base = SpaceId::HEAP_START + ((id.0 as usize) << SpaceId::LOG_MAX_SPACE_SIZE);
         let mut freelist = PageFreeList::new(base);
-        freelist.release_cell(0, 1 << (NUM_SIZE_CLASS - 1));
+        freelist.release_cell_aligned(0, 1 << (NUM_SIZE_CLASS - 1));
         Self {
             id,
             base,
@@ -63,7 +64,7 @@ impl PageResource {
 
     pub fn acquire_pages<S: PageSize>(&self, pages: usize) -> Option<Range<Page<S>>> {
         let units = pages << (S::LOG_BYTES - Size4K::LOG_BYTES);
-        let start_unit = self.freelist.lock().allocate_cell(units)?.start;
+        let start_unit = self.freelist.lock().allocate_cell_aligned(units)?.start;
         let start = self.unit_to_page(start_unit);
         if !self.map_pages(start, pages) {
             return self.acquire_pages(pages); // Retry
@@ -78,7 +79,7 @@ impl PageResource {
         debug_assert!(pages.is_power_of_two());
         self.unmap_pages(start, pages);
         let start_unit = self.page_to_unit(start);
-        self.freelist.lock().release_cell(start_unit, pages);
+        self.freelist.lock().release_cell_aligned(start_unit, pages);
     }
 
     pub fn get_contiguous_pages<S: PageSize>(&self, start: Page<S>) -> usize {
