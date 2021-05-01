@@ -173,11 +173,28 @@ impl<Config: AddressSpaceConfig> AbstractFreeList for PointerFreeList<Config> wh
     }
 
     /// Allocate a cell with a power-of-two size, and aligned to the size.
+    fn allocate_aligned_cell(&mut self, bytes: usize) -> Option<Range<Address>> {
+        debug_assert!(bytes & ((1 << Config::LOG_MIN_ALIGNMENT) - 1) == 0);
+        let units = bytes >> Config::LOG_MIN_ALIGNMENT;
+        let Range { start, end } = self.allocate_cell_aligned(units)?;
+        let start = Address::from(self.unit_to_cell(start).as_ptr());
+        let end = Address::from(self.unit_to_cell(end).as_ptr());
+        Some(start..end)
+    }
+
+    fn release_aligned_cell(&mut self, start: Address, bytes: usize) {
+        debug_assert!(bytes & ((1 << Config::LOG_MIN_ALIGNMENT) - 1) == 0);
+        let units = bytes >> Config::LOG_MIN_ALIGNMENT;
+        let unit = self.cell_to_unit(unsafe { NonNull::new_unchecked(start.as_mut_ptr()) });
+        self.release_cell_aligned(unit, units);
+    }
+
+    /// Allocate a cell with a power-of-two size, and aligned to the size.
     #[inline(always)]
     fn allocate_cell(&mut self, bytes: usize) -> Option<Range<Address>> {
         debug_assert!(bytes & ((1 << Config::LOG_MIN_ALIGNMENT) - 1) == 0);
         let units = bytes >> Config::LOG_MIN_ALIGNMENT;
-        let Range { start, end } = Self::allocate_cell_aligned(self, units)?;
+        let Range { start, end } = self.allocate_cell_unaligned(units)?;
         let start = Address::from(self.unit_to_cell(start).as_ptr());
         let end = Address::from(self.unit_to_cell(end).as_ptr());
         Some(start..end)
@@ -188,6 +205,6 @@ impl<Config: AddressSpaceConfig> AbstractFreeList for PointerFreeList<Config> wh
         debug_assert!(bytes & ((1 << Config::LOG_MIN_ALIGNMENT) - 1) == 0);
         let units = bytes >> Config::LOG_MIN_ALIGNMENT;
         let unit = self.cell_to_unit(unsafe { NonNull::new_unchecked(start.as_mut_ptr()) });
-        Self::release_cell_aligned(self, unit, units);
+        self.release_cell_unaligned(unit, units);
     }
 }

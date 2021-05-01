@@ -146,9 +146,22 @@ impl<const NUM_SIZE_CLASS: usize> AbstractFreeList for PageFreeList<{NUM_SIZE_CL
     }
 
     /// Allocate a cell with a power-of-two size, and aligned to the size.
+    fn allocate_aligned_cell(&mut self, units: usize) -> Option<Range<Address>> {
+        let Range { start, end } = self.allocate_cell_aligned(units)?;
+        let start = self.unit_to_address(start);
+        let end = self.unit_to_address(end);
+        Some(start..end)
+    }
+
+    fn release_aligned_cell(&mut self, start: Address, units: usize) {
+        let unit = self.address_to_unit(start);
+        self.release_cell_aligned(unit, units);
+    }
+
+    /// Allocate a cell with a power-of-two size, and aligned to the size.
     #[inline(always)]
     fn allocate_cell(&mut self, units: usize) -> Option<Range<Address>> {
-        let Range { start, end } = self.allocate_cell_aligned(units)?;
+        let Range { start, end } = self.allocate_cell_unaligned(units)?;
         let start = self.unit_to_address(start);
         let end = self.unit_to_address(end);
         Some(start..end)
@@ -157,6 +170,6 @@ impl<const NUM_SIZE_CLASS: usize> AbstractFreeList for PageFreeList<{NUM_SIZE_CL
     #[inline(always)]
     fn release_cell(&mut self, start: Address, units: usize) {
         let unit = self.address_to_unit(start);
-        self.release_cell_aligned(unit, units);
+        self.release_cell_unaligned(unit, units);
     }
 }

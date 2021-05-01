@@ -1,9 +1,9 @@
-use std::intrinsics::unlikely;
+use std::ops::Range;
 use crate::util::*;
 use crate::util::freelist::{PointerFreeList, AbstractFreeList, AddressSpaceConfig};
 use super::{Allocator, Space, SpaceId, page_resource::PageResource};
 
-
+const ALLOC_ALIGNED_CELL: bool = true;
 
 struct AddressSpace;
 
@@ -15,7 +15,6 @@ impl AddressSpaceConfig for AddressSpace {
 
 pub struct FreeListSpace {
     id: SpaceId,
-    base: Address,
     pr: PageResource,
 }
 
@@ -25,7 +24,6 @@ impl Space for FreeListSpace {
     fn new(id: SpaceId) -> Self {
         Self {
             id,
-            base: id.address_space().start,
             pr: PageResource::new(id),
         }
     }
@@ -43,12 +41,6 @@ impl Space for FreeListSpace {
 
 
 impl FreeListSpace {
-    #[inline(always)]
-    pub fn size_class(size: usize) -> usize {
-        debug_assert!(size <= Size2M::BYTES);
-        PointerFreeList::<AddressSpace>::size_class(size)
-    }
-
     pub fn can_allocate(layout: Layout) -> bool {
         let (extended_layout, _) = Layout::new::<Cell>().extend(layout).unwrap();
         extended_layout.size() < FreeListSpace::MAX_ALLOCATION_SIZE
@@ -78,7 +70,6 @@ impl Cell {
 
 pub struct FreeListAllocator {
     space: Lazy<&'static FreeListSpace, Local>,
-    base: Address,
     freelist: PointerFreeList<AddressSpace>,
 }
 
@@ -86,27 +77,39 @@ impl FreeListAllocator {
     pub const fn new(space: Lazy<&'static FreeListSpace, Local>, space_id: SpaceId) -> Self {
         Self {
             space,
-            base: Address::ZERO,
             freelist: PointerFreeList::new(space_id.address_space().start),
         }
     }
 
-    #[inline(always)]
-    fn alloc_cell(&mut self, size_class: usize) -> Option<Address> {
-        if unlikely(self.base.is_zero()) {
-            self.base = self.space.base;
-        }
-        if let Some(start) = self.freelist.allocate_cell(1 << size_class).map(|x| x.start) {
-            return Some(start)
-        }
+    #[cold]
+    fn alloc_cell_slow(&mut self, bytes: usize) -> Option<Range<Address>> {
         let page = self.space.acquire::<Size2M>(1)?.start.start();
-        self.freelist.release_cell(page, Size2M::BYTES);
-        self.alloc_cell(size_class)
+        self.freelist.release_aligned_cell(page, Size2M::BYTES);
+        self.alloc_cell(bytes)
     }
 
     #[inline(always)]
-    fn dealloc_cell(&mut self, ptr: Address, size_class: usize) {
-        self.freelist.release_cell(ptr, 1 << size_class);
+    fn alloc_cell(&mut self, bytes: usize) -> Option<Range<Address>> {
+        if ALLOC_ALIGNED_CELL {
+            let bytes = 1 << PointerFreeList::<AddressSpace>::size_class(bytes);
+            if let Some(range) = self.freelist.allocate_aligned_cell(bytes) {
+                return Some(range)
+            }
+        } else {
+            if let Some(range) = self.freelist.allocate_cell(bytes) {
+                return Some(range)
+            }
+        }
+        self.alloc_cell_slow(bytes)
+    }
+
+    #[inline(always)]
+    fn dealloc_cell(&mut self, ptr: Address, bytes: usize) {
+        if ALLOC_ALIGNED_CELL {
+            self.freelist.release_aligned_cell(ptr, bytes);
+        } else {
+            self.freelist.release_cell(ptr, bytes);
+        }
     }
 }
 
@@ -115,17 +118,15 @@ impl Allocator for FreeListAllocator {
     fn get_layout(&self, ptr: Address) -> Layout {
         let bytes = Cell::from(ptr).size();
         debug_assert_ne!(bytes, 0);
-        debug_assert!(bytes.is_power_of_two(), "{:?}", bytes);
-        unsafe { Layout::from_size_align_unchecked(bytes, bytes) }
+        unsafe { Layout::from_size_align_unchecked(bytes, bytes.next_power_of_two()) }
     }
 
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let (extended_layout, offset) = Layout::new::<Cell>().extend(layout).unwrap();
-        let size_class = FreeListSpace::size_class(extended_layout.size());
-        let start = self.alloc_cell(size_class)?;
+        let Range { start, end } = self.alloc_cell(extended_layout.size())?;
         let data_start = start + offset;
-        Cell::from(data_start).set(start, 1 << size_class);
+        Cell::from(data_start).set(start, end - start);
         debug_assert_eq!(usize::from(data_start) & (layout.align() - 1), 0);
         Some(data_start)
     }
@@ -134,8 +135,6 @@ impl Allocator for FreeListAllocator {
     fn dealloc(&mut self, ptr: Address) {
         let cell = Cell::from(ptr);
         let bytes = cell.size();
-        debug_assert!(bytes.is_power_of_two(), "{:x?} {:?} {:?}", bytes, cell as *mut _, ptr);
-        let size_class = FreeListSpace::size_class(bytes);
-        self.dealloc_cell(cell.start(), size_class);
+        self.dealloc_cell(cell.start(), bytes);
     }
 }

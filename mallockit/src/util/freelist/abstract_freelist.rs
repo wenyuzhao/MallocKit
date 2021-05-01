@@ -92,7 +92,7 @@ impl LazyBst {
 pub(super) struct BstIndex(usize);
 
 /// Manage allocation of 0..(1 << NUM_SIZE_CLASS) units
-pub(super) trait InternalAbstractFreeList: Sized + AbstractFreeList {
+pub(super) trait InternalAbstractFreeList: Sized {
     const MIN_SIZE_CLASS: usize;
     const NUM_SIZE_CLASS: usize;
     const NON_COALESCEABLE_SIZE_CLASS_THRESHOLD: usize = Self::NUM_SIZE_CLASS - 1;
@@ -203,13 +203,13 @@ pub(super) trait InternalAbstractFreeList: Sized + AbstractFreeList {
     }
 
     #[inline(always)]
-    fn release_aligned_units(&mut self, mut unit: Unit, mut size_class: usize) {
+    fn release_aligned_units(&mut self, mut unit: Unit, mut size_class: usize, force_no_coalesce: bool) {
         loop {
             debug_assert!(unit.is_aligned(size_class));
             debug_assert!(size_class < Self::NUM_SIZE_CLASS);
             let sibling = unit.sibling(size_class);
             debug_assert!(!self.is_free(unit, size_class));
-            if unlikely(size_class < Self::NON_COALESCEABLE_SIZE_CLASS_THRESHOLD && self.is_free(sibling, size_class)) {
+            if unlikely(!force_no_coalesce && size_class < Self::NON_COALESCEABLE_SIZE_CLASS_THRESHOLD && self.is_free(sibling, size_class)) {
                 let parent = unit.parent(size_class);
                 debug_assert!(!self.is_free(parent, size_class + 1), "{:?} {}", parent, size_class); // parent is used
                 // Remove sibling from list
@@ -232,7 +232,7 @@ pub(super) trait InternalAbstractFreeList: Sized + AbstractFreeList {
     fn size_class(units: usize) -> usize {
         let a = units.next_power_of_two().trailing_zeros() as _;
         let b = Self::MIN_SIZE_CLASS;
-        if a > b { a } else { b }
+        usize::max(a, b)
     }
 
     /// Allocate a cell with a power-of-two size, and aligned to the size.
@@ -249,7 +249,39 @@ pub(super) trait InternalAbstractFreeList: Sized + AbstractFreeList {
         debug_assert!(units.is_power_of_two());
         debug_assert!(*start & (units - 1) == 0);
         let size_class = <Self as InternalAbstractFreeList>::size_class(units);
-        self.release_aligned_units(start, size_class);
+        self.release_aligned_units(start, size_class, false);
+    }
+
+    /// Allocate a cell with a power-of-two alignment.
+    #[inline(always)]
+    fn allocate_cell_unaligned(&mut self, units: usize) -> Option<Range<Unit>> {
+        let units = (units + ((1 << Self::MIN_SIZE_CLASS) - 1)) & !((1 << Self::MIN_SIZE_CLASS) - 1);
+        let size_class = Self::size_class(units);
+        let start = self.allocate_aligned_units(size_class)?;
+        if unlikely(units == (1 << size_class)) {
+            let free_units = (1 << size_class) - units;
+            let free_start = Unit(*start + units);
+            self.release_cell_unaligned(free_start, free_units);
+        }
+        Some(start..Unit(*start + units))
+    }
+
+    #[inline(always)]
+    fn release_cell_unaligned(&mut self, mut start: Unit, mut units: usize) {
+        let limit = Unit(*start + units);
+        while *start < *limit {
+            let curr_size_class = Self::size_class(units);
+            let prev_size_class = if units == (1 << curr_size_class) { curr_size_class } else { curr_size_class - 1 };
+            let size_class = usize::min(prev_size_class, (*start).trailing_zeros() as usize);
+            let size = 1usize << size_class;
+            let end = Unit(*start + size);
+            debug_assert_eq!((*start & (size - 1)), 0);
+            debug_assert!(*end <= *limit);
+            self.release_aligned_units(start, size_class, false);
+            start = end;
+            units = *limit - *end;
+        }
+        debug_assert_eq!(start, limit);
     }
 }
 
@@ -258,6 +290,11 @@ pub trait AbstractFreeList: Sized {
     fn size_class(units: usize) -> usize;
 
     /// Allocate a cell with a power-of-two size, and aligned to the size.
+    fn allocate_aligned_cell(&mut self, units: usize) -> Option<Range<Self::Value>>;
+
+    fn release_aligned_cell(&mut self, start: Self::Value, units: usize);
+
+    /// Allocate a cell with a power-of-two size.
     fn allocate_cell(&mut self, units: usize) -> Option<Range<Self::Value>>;
 
     fn release_cell(&mut self, start: Self::Value, units: usize);
