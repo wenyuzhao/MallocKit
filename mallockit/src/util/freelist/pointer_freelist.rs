@@ -1,7 +1,7 @@
-use std::{intrinsics::unlikely, marker::PhantomData, ops::Range, ptr::NonNull};
+use std::{intrinsics::unlikely, marker::PhantomData, ptr::NonNull};
 use crate::util::*;
 
-use super::abstract_freelist::{AbstractFreeList, InternalAbstractFreeList, LazyBst, Unit};
+use super::abstract_freelist::*;
 
 
 
@@ -36,7 +36,7 @@ pub struct PointerFreeList<Config: AddressSpaceConfig> where [Option<CellPtr>; C
     phantom: PhantomData<Config>
 }
 
-impl<Config: AddressSpaceConfig> InternalAbstractFreeList for PointerFreeList<Config> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
+impl<Config: AddressSpaceConfig>  InternalAbstractFreeList for PointerFreeList<Config> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
     const MIN_SIZE_CLASS: usize = 1;
     const NUM_SIZE_CLASS: usize = Config::NUM_SIZE_CLASS;
     const NON_COALESCEABLE_SIZE_CLASS_THRESHOLD: usize = Config::LOG_MAX_CELL_SIZE - Config::LOG_MIN_ALIGNMENT;
@@ -168,43 +168,17 @@ impl<Config: AddressSpaceConfig> PointerFreeList<Config> where [Option<CellPtr>;
 
 impl<Config: AddressSpaceConfig> AbstractFreeList for PointerFreeList<Config> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
     #[inline(always)]
-    fn size_class(units: usize) -> usize {
-        <Self as InternalAbstractFreeList>::size_class(units)
-    }
-
-    /// Allocate a cell with a power-of-two size, and aligned to the size.
-    fn allocate_aligned_cell(&mut self, bytes: usize) -> Option<Range<Address>> {
-        debug_assert!(bytes & ((1 << Config::LOG_MIN_ALIGNMENT) - 1) == 0);
-        let units = bytes >> Config::LOG_MIN_ALIGNMENT;
-        let Range { start, end } = self.allocate_cell_aligned(units)?;
-        let start = Address::from(self.unit_to_cell(start).as_ptr());
-        let end = Address::from(self.unit_to_cell(end).as_ptr());
-        Some(start..end)
-    }
-
-    fn release_aligned_cell(&mut self, start: Address, bytes: usize) {
-        debug_assert!(bytes & ((1 << Config::LOG_MIN_ALIGNMENT) - 1) == 0);
-        let units = bytes >> Config::LOG_MIN_ALIGNMENT;
-        let unit = self.cell_to_unit(unsafe { NonNull::new_unchecked(start.as_mut_ptr()) });
-        self.release_cell_aligned(unit, units);
-    }
-
-    /// Allocate a cell with a power-of-two size, and aligned to the size.
-    #[inline(always)]
-    fn allocate_cell(&mut self, bytes: usize) -> Option<Range<Address>> {
-        debug_assert!(bytes & ((1 << Config::LOG_MIN_ALIGNMENT) - 1) == 0);
-        let units = bytes >> Config::LOG_MIN_ALIGNMENT;
-        let Range { start, end } = self.allocate_cell_unaligned(units)?;
-        let start = Address::from(self.unit_to_cell(start).as_ptr());
-        let end = Address::from(self.unit_to_cell(end).as_ptr());
-        Some(start..end)
+    fn unit_to_value(&self, unit: Unit) -> Address {
+        Address::from(self.unit_to_cell(unit).as_ptr())
     }
 
     #[inline(always)]
-    fn release_cell(&mut self, start: Address, bytes: usize) {
-        debug_assert!(bytes & ((1 << Config::LOG_MIN_ALIGNMENT) - 1) == 0);
-        let units = bytes >> Config::LOG_MIN_ALIGNMENT;
-        let unit = self.cell_to_unit(unsafe { NonNull::new_unchecked(start.as_mut_ptr()) });
-        self.release_cell_unaligned(unit, units);
+    fn value_to_unit(&self, value: Address) -> Unit {
+        self.cell_to_unit(unsafe { NonNull::new_unchecked(value.as_mut_ptr()) })
+    }
+
+    #[inline(always)]
+    fn process_input_units(&self, units: usize) -> usize {
+        units >> Config::LOG_MIN_ALIGNMENT
     }
 }

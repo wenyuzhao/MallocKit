@@ -1,4 +1,4 @@
-use std::{ops::Range, ptr::NonNull};
+use std::ptr::NonNull;
 use crate::{space::page_table::PageTable, util::*};
 
 use super::abstract_freelist::*;
@@ -141,35 +141,12 @@ impl<const NUM_SIZE_CLASS: usize> PageFreeList<{NUM_SIZE_CLASS}> {
 
 impl<const NUM_SIZE_CLASS: usize> AbstractFreeList for PageFreeList<{NUM_SIZE_CLASS}> {
     #[inline(always)]
-    fn size_class(units: usize) -> usize {
-        <Self as InternalAbstractFreeList>::size_class(units)
-    }
-
-    /// Allocate a cell with a power-of-two size, and aligned to the size.
-    fn allocate_aligned_cell(&mut self, units: usize) -> Option<Range<Address>> {
-        let Range { start, end } = self.allocate_cell_aligned(units)?;
-        let start = self.unit_to_address(start);
-        let end = self.unit_to_address(end);
-        Some(start..end)
-    }
-
-    fn release_aligned_cell(&mut self, start: Address, units: usize) {
-        let unit = self.address_to_unit(start);
-        self.release_cell_aligned(unit, units);
-    }
-
-    /// Allocate a cell with a power-of-two size, and aligned to the size.
-    #[inline(always)]
-    fn allocate_cell(&mut self, units: usize) -> Option<Range<Address>> {
-        let Range { start, end } = self.allocate_cell_unaligned(units)?;
-        let start = self.unit_to_address(start);
-        let end = self.unit_to_address(end);
-        Some(start..end)
+    fn unit_to_value(&self, unit: Unit) -> Self::Value {
+        self.unit_to_address(unit)
     }
 
     #[inline(always)]
-    fn release_cell(&mut self, start: Address, units: usize) {
-        let unit = self.address_to_unit(start);
-        self.release_cell_unaligned(unit, units);
+    fn value_to_unit(&self, value: Self::Value) -> Unit {
+        self.address_to_unit(value)
     }
 }

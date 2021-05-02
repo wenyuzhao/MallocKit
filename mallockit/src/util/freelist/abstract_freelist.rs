@@ -5,7 +5,7 @@ use crate::util::*;
 
 #[derive(Deref, Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C)]
-pub(super) struct Unit(pub(super) usize);
+pub struct Unit(pub(super) usize);
 
 impl Unit {
     fn parent(&self, size_class: usize) -> Self {
@@ -19,7 +19,7 @@ impl Unit {
     }
 }
 
-pub(super) struct LazyBst {
+pub struct LazyBst {
     bits: Vec<Option<Page>, System>,
 }
 
@@ -89,10 +89,12 @@ impl LazyBst {
 
 #[derive(Deref, Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C)]
-pub(super) struct BstIndex(usize);
+pub struct BstIndex(usize);
+
+
 
 /// Manage allocation of 0..(1 << NUM_SIZE_CLASS) units
-pub(super) trait InternalAbstractFreeList: Sized {
+pub trait InternalAbstractFreeList: Sized {
     const MIN_SIZE_CLASS: usize;
     const NUM_SIZE_CLASS: usize;
     const NON_COALESCEABLE_SIZE_CLASS_THRESHOLD: usize = Self::NUM_SIZE_CLASS - 1;
@@ -285,17 +287,55 @@ pub(super) trait InternalAbstractFreeList: Sized {
     }
 }
 
-pub trait AbstractFreeList: Sized {
+
+
+pub trait AbstractFreeList: Sized + InternalAbstractFreeList {
     type Value: Copy + Add = Address;
-    fn size_class(units: usize) -> usize;
+
+    fn unit_to_value(&self, unit: Unit) -> Self::Value;
+    fn value_to_unit(&self, value: Self::Value) -> Unit;
+
+    #[inline(always)]
+    fn process_input_units(&self, units: usize) -> usize {
+        units
+    }
+
+    #[inline(always)]
+    fn size_class(units: usize) -> usize {
+        <Self as InternalAbstractFreeList>::size_class(units)
+    }
 
     /// Allocate a cell with a power-of-two size, and aligned to the size.
-    fn allocate_aligned_cell(&mut self, units: usize) -> Option<Range<Self::Value>>;
+    #[inline(always)]
+    fn allocate_aligned_cell(&mut self, units: usize) -> Option<Range<Self::Value>> {
+        let units = self.process_input_units(units);
+        let Range { start, end } = self.allocate_cell_aligned(units)?;
+        let start = self.unit_to_value(start);
+        let end = self.unit_to_value(end);
+        Some(start..end)
+    }
 
-    fn release_aligned_cell(&mut self, start: Self::Value, units: usize);
+    #[inline(always)]
+    fn release_aligned_cell(&mut self, start: Self::Value, units: usize) {
+        let units = self.process_input_units(units);
+        let unit = self.value_to_unit(start);
+        self.release_cell_aligned(unit, units);
+    }
 
-    /// Allocate a cell with a power-of-two size.
-    fn allocate_cell(&mut self, units: usize) -> Option<Range<Self::Value>>;
+    /// Allocate a cell with a power-of-two size, and aligned to the size.
+    #[inline(always)]
+    fn allocate_cell(&mut self, units: usize) -> Option<Range<Self::Value>> {
+        let units = self.process_input_units(units);
+        let Range { start, end } = self.allocate_cell_unaligned(units)?;
+        let start = self.unit_to_value(start);
+        let end = self.unit_to_value(end);
+        Some(start..end)
+    }
 
-    fn release_cell(&mut self, start: Self::Value, units: usize);
+    #[inline(always)]
+    fn release_cell(&mut self, start: Self::Value, units: usize) {
+        let units = self.process_input_units(units);
+        let unit = self.value_to_unit(start);
+        self.release_cell_unaligned(unit, units);
+    }
 }
