@@ -30,6 +30,7 @@
 
 #[macro_use]
 pub mod log;
+#[macro_use]
 pub mod util;
 pub mod space;
 pub mod malloc;

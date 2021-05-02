@@ -123,6 +123,7 @@ impl Allocator for FreeListAllocator {
 
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
+        log!("Alloc {:?}", layout);
         let (extended_layout, offset) = Layout::new::<Cell>().extend(layout).unwrap();
         let Range { start, end } = self.alloc_cell(extended_layout.size())?;
         let data_start = start + offset;
