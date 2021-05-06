@@ -2,7 +2,7 @@ use std::{ops::Range, sync::atomic::{AtomicUsize, Ordering}};
 use std::iter::Step;
 use crate::util::*;
 use crate::util::freelist::PageFreeList;
-use freelist::AbstractFreeList;
+use freelist::AlignedFreeList;
 use spin::Mutex;
 use super::{PAGE_REGISTRY, SpaceId};
 

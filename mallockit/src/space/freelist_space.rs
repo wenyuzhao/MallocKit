@@ -1,6 +1,6 @@
 use std::ops::Range;
 use crate::util::*;
-use crate::util::freelist::{PointerFreeList, UnalignedFreeList, AddressSpaceConfig};
+use crate::util::freelist::{FreeList, UnalignedFreeList, AddressSpaceConfig};
 use super::{Allocator, Space, SpaceId, page_resource::PageResource};
 
 
@@ -70,14 +70,14 @@ impl Cell {
 
 pub struct FreeListAllocator {
     space: Lazy<&'static FreeListSpace, Local>,
-    freelist: PointerFreeList<AddressSpace>,
+    freelist: FreeList<AddressSpace>,
 }
 
 impl FreeListAllocator {
     pub const fn new(space: Lazy<&'static FreeListSpace, Local>, space_id: SpaceId) -> Self {
         Self {
             space,
-            freelist: PointerFreeList::new(false, space_id.address_space().start),
+            freelist: FreeList::new(false, space_id.address_space().start),
         }
     }
 

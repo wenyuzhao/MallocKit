@@ -35,7 +35,7 @@ pub trait AddressSpaceConfig: Sized {
 }
 
 /// Manage allocation of 0..(1 << NUM_SIZE_CLASS) units
-pub struct PointerFreeList<Config: AddressSpaceConfig> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
+pub struct FreeList<Config: AddressSpaceConfig> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
     #[allow(unused)]
     shared: bool,
     base: Address,
@@ -43,7 +43,7 @@ pub struct PointerFreeList<Config: AddressSpaceConfig> where [Option<CellPtr>; C
     phantom: PhantomData<Config>,
 }
 
-impl<Config: AddressSpaceConfig>  InternalAbstractFreeList for PointerFreeList<Config> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
+impl<Config: AddressSpaceConfig>  InternalAbstractFreeList for FreeList<Config> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
     const MIN_SIZE_CLASS: usize = 2;
     const NUM_SIZE_CLASS: usize = Config::NUM_SIZE_CLASS;
     const NON_COALESCEABLE_SIZE_CLASS_THRESHOLD: usize = Config::LOG_MAX_CELL_SIZE - Config::LOG_MIN_ALIGNMENT;
@@ -152,7 +152,7 @@ impl<Config: AddressSpaceConfig>  InternalAbstractFreeList for PointerFreeList<C
     }
 }
 
-impl<Config: AddressSpaceConfig> PointerFreeList<Config> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
+impl<Config: AddressSpaceConfig> FreeList<Config> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
     pub const fn new(shared: bool, base: Address) -> Self {
         debug_assert!(std::mem::size_of::<Cell>() == 32);
         Self {
@@ -207,7 +207,7 @@ impl<Config: AddressSpaceConfig> PointerFreeList<Config> where [Option<CellPtr>;
     }
 }
 
-impl<Config: AddressSpaceConfig> UnalignedFreeList for PointerFreeList<Config> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
+impl<Config: AddressSpaceConfig> UnalignedFreeList for FreeList<Config> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
     #[inline(always)]
     fn unit_to_value(&self, unit: Unit) -> Address {
         Address::from(self.unit_to_cell(unit).as_ptr())

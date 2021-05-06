@@ -154,7 +154,7 @@ impl<const NUM_SIZE_CLASS: usize> PageFreeList<{NUM_SIZE_CLASS}> {
 }
 
 
-impl<const NUM_SIZE_CLASS: usize> AbstractFreeList for PageFreeList<{NUM_SIZE_CLASS}> {
+impl<const NUM_SIZE_CLASS: usize> AlignedFreeList for PageFreeList<{NUM_SIZE_CLASS}> {
     #[inline(always)]
     fn unit_to_value(&self, unit: Unit) -> Self::Value {
         self.unit_to_address(unit)

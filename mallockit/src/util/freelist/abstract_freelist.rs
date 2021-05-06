@@ -276,7 +276,9 @@ pub trait InternalAbstractFreeList: Sized {
 
 
 
-pub trait AbstractFreeList: Sized + InternalAbstractFreeList {
+
+/// Mange cells with aligned (i.e. 2^N) start unit.
+pub trait AlignedFreeList: Sized + InternalAbstractFreeList {
     type Value: Copy + Add = Address;
 
     fn unit_to_value(&self, unit: Unit) -> Self::Value;
@@ -309,7 +311,7 @@ pub trait AbstractFreeList: Sized + InternalAbstractFreeList {
         self.release_cell_aligned(unit, units);
     }
 
-    /// Allocate a cell with a power-of-two size, and aligned to the size.
+    /// Allocate a cell which start unit is aligned to next power-of-two of the given units.
     #[inline(always)]
     fn allocate_cell(&mut self, units: usize) -> Option<Range<Self::Value>> {
         let units = self.process_input_units(units);
@@ -329,6 +331,7 @@ pub trait AbstractFreeList: Sized + InternalAbstractFreeList {
 
 
 
+/// Mange cells with unaligned start unit and unaligned size
 pub trait UnalignedFreeList: Sized + InternalAbstractFreeList {
     type Value: Copy + Add = Address;
 
@@ -343,7 +346,7 @@ pub trait UnalignedFreeList: Sized + InternalAbstractFreeList {
     /// Allocate a 1-unit (i.e. word) aligned cell
     fn allocate_cell(&mut self, units: usize) -> Option<Range<Self::Value>>;
 
-    fn add_units(&mut self, start: Self::Value, units: usize);
-
     fn release_cell(&mut self, start: Self::Value, units: usize);
+
+    fn add_units(&mut self, start: Self::Value, units: usize);
 }
