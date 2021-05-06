@@ -14,7 +14,8 @@ pub struct Cell {
 }
 
 impl Cell {
-    const HEADER_UNITS: usize = 4;
+    const HEADER_UNITS: usize = 1;
+    const HEADER_BYTES: usize = Self::HEADER_UNITS << 3;
 }
 
 impl PartialEq for Cell {
@@ -131,20 +132,19 @@ impl<Config: AddressSpaceConfig>  InternalAbstractFreeList for PointerFreeList<C
     fn remove_cell(&mut self, unit: Unit, size_class: usize) {
         let mut cell_ptr = self.unit_to_cell(unit);
         let cell = unsafe { cell_ptr.as_mut() };
-        let next = cell.next.take();
-        let prev = cell.prev.take();
+        let next = cell.next;
+        let prev = cell.prev;
         if let Some(mut prev) = prev {
             unsafe {
-                debug_assert_eq!(prev.as_ref().next, Some(cell_ptr));
+                debug_assert!(prev.as_ref().next == Some(cell_ptr));
                 prev.as_mut().next = next;
             }
-        } else {
-            debug_assert_eq!(self.table[size_class], Some(cell_ptr));
+        } else if self.table[size_class] == Some(cell_ptr) {
             self.table[size_class] = next;
         }
         if let Some(mut next) = next {
             unsafe {
-                debug_assert_eq!(next.as_ref().prev, Some(cell_ptr));
+                debug_assert!(next.as_ref().prev == Some(cell_ptr));
                 next.as_mut().prev = prev;
             }
         }
@@ -228,7 +228,7 @@ impl<Config: AddressSpaceConfig> UnalignedFreeList for PointerFreeList<Config> w
     fn allocate_cell(&mut self, units: usize) -> Option<Range<Address>> {
         let units = (self.process_input_units(units) + Cell::HEADER_UNITS).next_power_of_two();
         let Range { start, end } = self.allocate_cell_aligned(units)?;
-        let start = self.unit_to_value(start) + std::mem::size_of::<Cell>();
+        let start = self.unit_to_value(start) + Cell::HEADER_BYTES;
         let end = self.unit_to_value(end);
         Some(start..end)
     }
@@ -236,7 +236,7 @@ impl<Config: AddressSpaceConfig> UnalignedFreeList for PointerFreeList<Config> w
     #[inline(always)]
     fn release_cell(&mut self, start: Address, units: usize) {
         let units = (self.process_input_units(units) + Cell::HEADER_UNITS).next_power_of_two();
-        let unit = self.value_to_unit(start - std::mem::size_of::<Cell>());
+        let unit = self.value_to_unit(start - Cell::HEADER_BYTES);
         self.release_cell_aligned(unit, units);
     }
 
