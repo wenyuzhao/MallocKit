@@ -53,7 +53,7 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{NUM
 
     #[inline(always)]
     fn push_cell(&mut self, unit: Unit, size_class: usize) {
-        let head = self.table[size_class].take();
+        let head = self.table[size_class];
         let mut cell = Box::leak(Box::new_in(Cell { prev: None, next: None, unit }, System));
         let cell_ptr = unsafe { NonNull::new_unchecked(cell) };
         if let Some(mut head) = head {
@@ -69,13 +69,13 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{NUM
 
     #[inline(always)]
     fn pop_cell(&mut self, size_class: usize) -> Option<Unit> {
-        let head = self.table[size_class].take();
+        let head = self.table[size_class];
         if head.is_none() {
             return None;
         } else {
             let mut head_ptr = head.unwrap();
-            let mut head = unsafe { Box::<Cell, System>::from_raw_in(head_ptr.as_mut(), System) };
-            let next = head.next.take();
+            let head = unsafe { Box::<Cell, System>::from_raw_in(head_ptr.as_mut(), System) };
+            let next = head.next;
             if let Some(mut next) = next {
                 unsafe {
                     debug_assert_eq!(next.as_ref().prev, Some(head_ptr));
@@ -92,9 +92,9 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{NUM
     #[inline(always)]
     fn remove_cell(&mut self, unit: Unit, size_class: usize) {
         let mut cell_ptr = self.unit_to_cell(unit);
-        let mut cell = unsafe { Box::<Cell, System>::from_raw_in(cell_ptr.as_mut(), System) };
-        let next = cell.next.take();
-        let prev = cell.prev.take();
+        let cell = unsafe { Box::<Cell, System>::from_raw_in(cell_ptr.as_mut(), System) };
+        let next = cell.next;
+        let prev = cell.prev;
         if let Some(mut prev) = prev {
             unsafe {
                 debug_assert_eq!(prev.as_ref().next, Some(cell_ptr));
@@ -154,7 +154,7 @@ impl<const NUM_SIZE_CLASS: usize> PageFreeList<{NUM_SIZE_CLASS}> {
 }
 
 
-impl<const NUM_SIZE_CLASS: usize> AlignedFreeList for PageFreeList<{NUM_SIZE_CLASS}> {
+impl<const NUM_SIZE_CLASS: usize> AlignedAbstractFreeList for PageFreeList<{NUM_SIZE_CLASS}> {
     #[inline(always)]
     fn unit_to_value(&self, unit: Unit) -> Self::Value {
         self.unit_to_address(unit)

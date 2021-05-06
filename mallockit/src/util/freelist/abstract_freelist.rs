@@ -278,7 +278,7 @@ pub trait InternalAbstractFreeList: Sized {
 
 
 /// Mange cells with aligned (i.e. 2^N) start unit.
-pub trait AlignedFreeList: Sized + InternalAbstractFreeList {
+pub trait AlignedAbstractFreeList: Sized + InternalAbstractFreeList {
     type Value: Copy + Add = Address;
 
     fn unit_to_value(&self, unit: Unit) -> Self::Value;
@@ -332,7 +332,7 @@ pub trait AlignedFreeList: Sized + InternalAbstractFreeList {
 
 
 /// Mange cells with unaligned start unit and unaligned size
-pub trait UnalignedFreeList: Sized + InternalAbstractFreeList {
+pub trait UnalignedAbstractFreeList: Sized + InternalAbstractFreeList {
     type Value: Copy + Add = Address;
 
     fn unit_to_value(&self, unit: Unit) -> Self::Value;
