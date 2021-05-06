@@ -83,7 +83,7 @@ impl<Config: AddressSpaceConfig>  InternalAbstractFreeList for PointerFreeList<C
         if cfg!(feature="slow_assert") {
             debug_assert!(!self.is_on_current_list_slow(unit, None));
         }
-        let head = self.table[size_class].take();
+        let head = self.table[size_class];
         let mut cell_ptr = self.unit_to_cell(unit);
         let cell = unsafe { cell_ptr.as_mut() };
         cell.prev = None;
@@ -105,13 +105,13 @@ impl<Config: AddressSpaceConfig>  InternalAbstractFreeList for PointerFreeList<C
 
     #[inline(always)]
     fn pop_cell(&mut self, size_class: usize) -> Option<Unit> {
-        let head_opt = self.table[size_class].take();
+        let head_opt = self.table[size_class];
         if unlikely(head_opt.is_none()) {
             return None;
         } else {
             let mut head_ptr = head_opt.unwrap();
             let head = unsafe { head_ptr.as_mut() };
-            let next = head.next.take();
+            let next = head.next;
             if let Some(mut next) = next {
                 unsafe {
                     debug_assert_eq!(next.as_ref().prev, head_opt);
@@ -120,7 +120,6 @@ impl<Config: AddressSpaceConfig>  InternalAbstractFreeList for PointerFreeList<C
             }
             self.table[size_class] = next;
             debug_assert!(head.prev.is_none());
-            debug_assert!(head.next.is_none());
             head.is_free = (0, 0);
             head.owner = 0 as _;
             let unit = self.cell_to_unit(head_ptr);
