@@ -3,7 +3,7 @@ use std::panic::PanicInfo;
 use crate::Plan;
 
 fn panic_handler(panic_info: &PanicInfo<'_>) {
-    log!("{}", panic_info);
+    println!("{}", panic_info);
     std::intrinsics::abort();
 }
 
@@ -19,4 +19,6 @@ pub extern fn process_start(plan: &impl Plan) {
     plan.init();
 }
 
-pub extern fn process_exit() {}
+pub extern fn process_exit() {
+    crate::stat::report();
+}

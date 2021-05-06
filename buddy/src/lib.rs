@@ -82,18 +82,22 @@ impl Mutator for BuddyMutator {
 
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
+        mallockit::stat::TOTAL_ALLOCATIONS.inc(1);
         if likely(FreeListSpace::can_allocate(layout)) {
             self.freelist.alloc(layout)
         } else {
+            mallockit::stat::LARGE_ALLOCATIONS.inc(1);
             self.los.alloc(layout)
         }
     }
 
     #[inline(always)]
     fn dealloc(&mut self, ptr: Address) {
+        mallockit::stat::TOTAL_DEALLOCATIONS.inc(1);
         if likely(FREELIST_SPACE.contains(ptr)) {
             self.freelist.dealloc(ptr)
         } else {
+            mallockit::stat::LARGE_DEALLOCATIONS.inc(1);
             self.los.dealloc(ptr)
         }
     }

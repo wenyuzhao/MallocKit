@@ -36,6 +36,7 @@ pub mod space;
 pub mod malloc;
 #[doc(hidden)]
 pub mod hooks;
+pub mod stat;
 
 use core::alloc::Layout;
 use std::ptr;

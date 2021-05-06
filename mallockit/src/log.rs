@@ -6,17 +6,24 @@ use spin::Mutex;
 
 #[doc(hidden)]
 #[inline(never)]
-pub fn _print_nl(args: fmt::Arguments<'_>) {
+pub fn _print(args: fmt::Arguments<'_>, new_line: bool) {
     let mut log = LOG.lock();
     log.write_fmt(args).unwrap();
-    log.put_char('\n' as _);
+    if new_line { log.put_char('\n' as _); }
     log.flush();
 }
 
 #[macro_export]
-macro_rules! log {
+macro_rules! print {
     ($($arg:tt)*) => {{
-        $crate::log::_print_nl(format_args!($($arg)*));
+        $crate::log::_print(format_args!($($arg)*), false);
+    }};
+}
+
+#[macro_export]
+macro_rules! println {
+    ($($arg:tt)*) => {{
+        $crate::log::_print(format_args!($($arg)*), true);
     }};
 }
 
