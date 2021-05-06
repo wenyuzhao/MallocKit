@@ -66,7 +66,6 @@ impl PageResource {
 
     pub fn release_pages<S: PageSize>(&self, start: Page<S>) {
         let pages = PAGE_REGISTRY.delete_pages(start);
-        debug_assert!(pages.is_power_of_two());
         self.unmap_pages(start, pages);
         self.freelist.lock().release_cell(start.start(), pages);
     }

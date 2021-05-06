@@ -43,7 +43,7 @@ impl Space for FreeListSpace {
 impl FreeListSpace {
     pub fn can_allocate(layout: Layout) -> bool {
         let (extended_layout, _) = Layout::new::<Cell>().extend(layout).unwrap();
-        extended_layout.size() < FreeListSpace::MAX_ALLOCATION_SIZE
+        extended_layout.size() < FreeListSpace::MAX_ALLOCATION_SIZE && extended_layout.align() == 8
     }
 }
 
@@ -77,7 +77,7 @@ impl FreeListAllocator {
     pub const fn new(space: Lazy<&'static FreeListSpace, Local>, space_id: SpaceId) -> Self {
         Self {
             space,
-            freelist: PointerFreeList::new(true, space_id.address_space().start),
+            freelist: PointerFreeList::new(false, space_id.address_space().start),
         }
     }
 
@@ -126,5 +126,8 @@ impl Allocator for FreeListAllocator {
         let cell = Cell::from(ptr);
         let bytes = cell.size();
         self.dealloc_cell(cell.start(), bytes);
+        while let Some(page) = self.freelist.pop_raw_cell(Size2M::LOG_BYTES) {
+            self.space.release::<Size2M>(Page::new(page))
+        }
     }
 }

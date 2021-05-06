@@ -80,7 +80,7 @@ impl<P: Plan> MallocAPI<P> {
 
     #[inline(always)]
     pub unsafe fn posix_memalign(&self, result: *mut *mut u8, alignment: usize, size: usize) -> i32 {
-        if unlikely(alignment <= std::mem::size_of::<usize>() || !alignment.is_power_of_two()) { return libc::EINVAL; }
+        if unlikely(alignment < std::mem::size_of::<usize>() || !alignment.is_power_of_two()) { return libc::EINVAL; }
         match self.alloc(size, alignment) {
             Ok(ptr) => {
                 *result = ptr.unwrap_or(0 as _);

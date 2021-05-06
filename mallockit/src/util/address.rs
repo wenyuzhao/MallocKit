@@ -19,6 +19,10 @@ impl Address {
         self.0 == 0
     }
 
+    pub const fn is_aligned_to(&self, align: usize) -> bool {
+        (self.0 & (align - 1)) == 0
+    }
+
     pub const fn as_ptr<T>(&self) -> *const T {
         self.0 as _
     }

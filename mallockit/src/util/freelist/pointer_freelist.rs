@@ -8,7 +8,7 @@ use super::abstract_freelist::*;
 #[repr(C)]
 pub struct Cell {
     is_free: (u32, u32),
-    owner: usize,
+    owner: *mut u8,
     prev: Option<CellPtr>,
     next: Option<CellPtr>,
 }
@@ -35,6 +35,7 @@ pub trait AddressSpaceConfig: Sized {
 
 /// Manage allocation of 0..(1 << NUM_SIZE_CLASS) units
 pub struct PointerFreeList<Config: AddressSpaceConfig> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
+    #[allow(unused)]
     shared: bool,
     base: Address,
     table: [Option<CellPtr>; Config::NUM_SIZE_CLASS],
@@ -49,7 +50,7 @@ impl<Config: AddressSpaceConfig>  InternalAbstractFreeList for PointerFreeList<C
     #[inline(always)]
     fn is_free(&self, unit: Unit, size_class: usize) -> bool {
         let cell = unsafe { self.unit_to_cell(unit).as_ref() };
-        cell.is_free == (1, size_class as u32) && (self.shared || cell.owner == self as *const _ as usize)
+        cell.is_free == (1, size_class as u32) && cell.owner == self as *const _ as _
     }
 
     #[inline(always)]
@@ -85,7 +86,7 @@ impl<Config: AddressSpaceConfig>  InternalAbstractFreeList for PointerFreeList<C
         let mut cell_ptr = self.unit_to_cell(unit);
         let cell = unsafe { cell_ptr.as_mut() };
         cell.prev = None;
-        cell.owner = self as *const _ as usize;
+        cell.owner = self as *const _ as _;
         cell.is_free = (1, size_class as _);
         if let Some(mut head) = head {
             unsafe {
@@ -120,7 +121,7 @@ impl<Config: AddressSpaceConfig>  InternalAbstractFreeList for PointerFreeList<C
             debug_assert!(head.prev.is_none());
             debug_assert!(head.next.is_none());
             head.is_free = (0, 0);
-            head.owner = 0;
+            head.owner = 0 as _;
             let unit = self.cell_to_unit(head_ptr);
             return Some(unit);
         }
@@ -148,7 +149,7 @@ impl<Config: AddressSpaceConfig>  InternalAbstractFreeList for PointerFreeList<C
             }
         }
         cell.is_free = (0, 0);
-        cell.owner = 0;
+        cell.owner = 0 as _;
     }
 }
 
@@ -197,6 +198,13 @@ impl<Config: AddressSpaceConfig> PointerFreeList<Config> where [Option<CellPtr>;
             debug_assert!(count <= 1, "{}", count);
             count != 0
         }
+    }
+
+    #[inline(always)]
+    pub fn pop_raw_cell(&mut self, log_size: usize) -> Option<Address> {
+        let size_class = Self::size_class(self.process_input_units(1 << log_size));
+        let unit = self.pop(size_class)?;
+        Some(self.unit_to_value(unit))
     }
 }
 
