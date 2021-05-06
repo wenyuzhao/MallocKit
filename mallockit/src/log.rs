@@ -10,6 +10,7 @@ pub fn _print_nl(args: fmt::Arguments<'_>) {
     let mut log = LOG.lock();
     log.write_fmt(args).unwrap();
     log.put_char('\n' as _);
+    log.flush();
 }
 
 #[macro_export]
@@ -57,7 +58,6 @@ impl Write for Log {
         for b in s.bytes() {
             self.put_char(b);
         }
-        self.flush();
         Ok(())
     }
 }

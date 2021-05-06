@@ -1,9 +1,9 @@
 use std::ops::Range;
 use crate::util::*;
-use crate::util::freelist::{PointerFreeList, AbstractFreeList, AddressSpaceConfig};
+use crate::util::freelist::{PointerFreeList, UnalignedFreeList, AddressSpaceConfig};
 use super::{Allocator, Space, SpaceId, page_resource::PageResource};
 
-const ALLOC_ALIGNED_CELL: bool = true;
+
 
 struct AddressSpace;
 
@@ -77,39 +77,28 @@ impl FreeListAllocator {
     pub const fn new(space: Lazy<&'static FreeListSpace, Local>, space_id: SpaceId) -> Self {
         Self {
             space,
-            freelist: PointerFreeList::new(space_id.address_space().start),
+            freelist: PointerFreeList::new(true, space_id.address_space().start),
         }
     }
 
     #[cold]
     fn alloc_cell_slow(&mut self, bytes: usize) -> Option<Range<Address>> {
         let page = self.space.acquire::<Size2M>(1)?.start.start();
-        self.freelist.release_aligned_cell(page, Size2M::BYTES);
+        self.freelist.add_units(page, Size2M::BYTES);
         self.alloc_cell(bytes)
     }
 
     #[inline(always)]
     fn alloc_cell(&mut self, bytes: usize) -> Option<Range<Address>> {
-        if ALLOC_ALIGNED_CELL {
-            let bytes = 1 << PointerFreeList::<AddressSpace>::size_class(bytes);
-            if let Some(range) = self.freelist.allocate_aligned_cell(bytes) {
-                return Some(range)
-            }
-        } else {
-            if let Some(range) = self.freelist.allocate_cell(bytes) {
-                return Some(range)
-            }
+        if let Some(range) = self.freelist.allocate_cell(bytes) {
+            return Some(range)
         }
         self.alloc_cell_slow(bytes)
     }
 
     #[inline(always)]
     fn dealloc_cell(&mut self, ptr: Address, bytes: usize) {
-        if ALLOC_ALIGNED_CELL {
-            self.freelist.release_aligned_cell(ptr, bytes);
-        } else {
-            self.freelist.release_cell(ptr, bytes);
-        }
+        self.freelist.release_cell(ptr, bytes);
     }
 }
 
@@ -124,6 +113,7 @@ impl Allocator for FreeListAllocator {
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let (extended_layout, offset) = Layout::new::<Cell>().extend(layout).unwrap();
+        debug_assert_eq!(extended_layout.align(), 8);
         let Range { start, end } = self.alloc_cell(extended_layout.size())?;
         let data_start = start + offset;
         Cell::from(data_start).set(start, end - start);

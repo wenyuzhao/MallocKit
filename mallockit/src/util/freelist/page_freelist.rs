@@ -28,12 +28,27 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{NUM
     const NUM_SIZE_CLASS: usize = NUM_SIZE_CLASS;
 
     #[inline(always)]
-    fn bst(&self) -> &LazyBst {
-        &self.bst
+    fn is_free(&self, unit: Unit, size_class: usize) -> bool {
+        self.bst.get(self.unit_to_index(unit, size_class)).unwrap_or(false)
     }
+
     #[inline(always)]
-    fn bst_mut(&mut self) -> &mut LazyBst {
-        &mut self.bst
+    fn set_as_free(&mut self, unit: Unit, size_class: usize) {
+        if cfg!(feature="slow_assert") {
+            debug_assert!(self.is_not_free_slow(unit));
+        }
+        let index = self.unit_to_index(unit, size_class);
+        self.bst.set(index, true);
+    }
+
+    #[inline(always)]
+    fn set_as_used(&mut self, unit: Unit, size_class: usize) {
+        debug_assert!(self.is_free(unit, size_class));
+        let index = self.unit_to_index(unit, size_class);
+        self.bst.set(index, false);
+        if cfg!(feature="slow_assert") {
+            debug_assert!(self.is_not_free_slow(unit));
+        }
     }
 
     #[inline(always)]

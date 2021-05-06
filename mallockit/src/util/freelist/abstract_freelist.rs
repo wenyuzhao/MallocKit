@@ -8,14 +8,16 @@ use crate::util::*;
 pub struct Unit(pub(super) usize);
 
 impl Unit {
-    fn parent(&self, size_class: usize) -> Self {
+    const fn parent(&self, size_class: usize) -> Self {
         Self(self.0 & !(1 << size_class))
     }
-    fn sibling(&self, size_class: usize) -> Self {
-        Self(self.0 ^ (1 << size_class))
-    }
-    fn is_aligned(&self, size_class: usize) -> bool {
+
+    const fn is_aligned(&self, size_class: usize) -> bool {
         (self.0 & ((1usize << size_class) - 1)) == 0
+    }
+
+    pub(crate) const fn sibling(&self, size_class: usize) -> Self {
+        Self(self.0 ^ (1 << size_class))
     }
 }
 
@@ -68,13 +70,13 @@ impl LazyBst {
     }
 
     #[inline(always)]
-    fn get(&self, index: BstIndex) -> Option<bool> {
+    pub(crate) fn get(&self, index: BstIndex) -> Option<bool> {
         let (addr, bit_index) = self.get_bit_location(index)?;
         Some(unsafe { (addr.load::<u8>() & (1 << bit_index)) != 0 })
     }
 
     #[inline(always)]
-    fn set(&mut self, index: BstIndex, value: bool) {
+    pub(crate) fn set(&mut self, index: BstIndex, value: bool) {
         if unlikely(self.needs_resize(index)) {
             self.resize(index);
         }
@@ -99,9 +101,6 @@ pub trait InternalAbstractFreeList: Sized {
     const NUM_SIZE_CLASS: usize;
     const NON_COALESCEABLE_SIZE_CLASS_THRESHOLD: usize = Self::NUM_SIZE_CLASS - 1;
 
-    fn bst(&self) -> &LazyBst;
-    fn bst_mut(&mut self) -> &mut LazyBst;
-
     fn pop_cell(&mut self, size_class: usize) -> Option<Unit>;
     fn push_cell(&mut self, unit: Unit, size_class: usize);
     fn remove_cell(&mut self, unit: Unit, size_class: usize);
@@ -114,29 +113,11 @@ pub trait InternalAbstractFreeList: Sized {
         BstIndex(start + index)
     }
 
-    #[inline(always)]
-    fn is_free(&self, unit: Unit, size_class: usize) -> bool {
-        self.bst().get(self.unit_to_index(unit, size_class)).unwrap_or(false)
-    }
+    fn is_free(&self, unit: Unit, size_class: usize) -> bool;
 
-    #[inline(always)]
-    fn set_as_free(&mut self, unit: Unit, size_class: usize) {
-        if cfg!(feature="slow_assert") {
-            debug_assert!(self.is_not_free_slow(unit));
-        }
-        let index = self.unit_to_index(unit, size_class);
-        self.bst_mut().set(index, true);
-    }
+    fn set_as_free(&mut self, unit: Unit, size_class: usize);
 
-    #[inline(always)]
-    fn set_as_used(&mut self, unit: Unit, size_class: usize) {
-        debug_assert!(self.is_free(unit, size_class));
-        let index = self.unit_to_index(unit, size_class);
-        self.bst_mut().set(index, false);
-        if cfg!(feature="slow_assert") {
-            debug_assert!(self.is_not_free_slow(unit));
-        }
-    }
+    fn set_as_used(&mut self, unit: Unit, size_class: usize);
 
     #[inline(always)]
     fn push(&mut self, unit: Unit, size_class: usize) {
@@ -157,6 +138,15 @@ pub trait InternalAbstractFreeList: Sized {
         self.set_as_used(unit, size_class);
     }
 
+    fn split_cell(&mut self, parent: Unit, parent_size_class: usize) -> (Unit, Unit) {
+        let child_size_class = parent_size_class - 1;
+        let unit1 = parent;
+        let unit2 = unit1.sibling(child_size_class);
+        debug_assert!(!self.is_free(unit1, child_size_class)); // child#0 is used
+        debug_assert!(!self.is_free(unit2, child_size_class)); // child#1 is used
+        (unit1, unit2)
+    }
+
     #[cold]
     fn allocate_aligned_units_slow(&mut self, request_size_class: usize) -> Option<Unit> {
         for size_class in request_size_class..=Self::NON_COALESCEABLE_SIZE_CLASS_THRESHOLD {
@@ -164,17 +154,14 @@ pub trait InternalAbstractFreeList: Sized {
                 debug_assert!(!self.is_free(unit, size_class));
                 let parent = unit;
                 for parent_size_class in ((request_size_class+1)..=size_class).rev() {
-                    let child_size_class = parent_size_class - 1;
-                    debug_assert!(!self.is_free(parent, child_size_class + 1)); // parent is used
+                    debug_assert!(!self.is_free(parent, parent_size_class)); // parent is used
                     // Split into two
-                    let unit1 = parent;
-                    let unit2 = unit1.sibling(child_size_class);
-                    debug_assert!(!self.is_free(unit1, child_size_class)); // child#0 is used
-                    debug_assert!(!self.is_free(unit2, child_size_class)); // child#1 is used
+                    let (unit1, unit2) = self.split_cell(parent, parent_size_class);
+                    let child_size_class = parent_size_class - 1;
                     // Add second cell to list
                     debug_assert!(child_size_class < Self::NUM_SIZE_CLASS);
                     self.push(unit2, child_size_class);
-                    debug_assert!(!self.is_free(parent, child_size_class + 1)); // parent is used
+                    debug_assert!(!self.is_free(parent, parent_size_class)); // parent is used
                     debug_assert!(!self.is_free(unit1, child_size_class)); // child#0 is used
                     debug_assert!(self.is_free(unit2, child_size_class)); // child#1 is free
                 }
@@ -338,4 +325,25 @@ pub trait AbstractFreeList: Sized + InternalAbstractFreeList {
         let unit = self.value_to_unit(start);
         self.release_cell_unaligned(unit, units);
     }
+}
+
+
+
+pub trait UnalignedFreeList: Sized + InternalAbstractFreeList {
+    type Value: Copy + Add = Address;
+
+    fn unit_to_value(&self, unit: Unit) -> Self::Value;
+    fn value_to_unit(&self, value: Self::Value) -> Unit;
+
+    #[inline(always)]
+    fn process_input_units(&self, units: usize) -> usize {
+        units
+    }
+
+    /// Allocate a 1-unit (i.e. word) aligned cell
+    fn allocate_cell(&mut self, units: usize) -> Option<Range<Self::Value>>;
+
+    fn add_units(&mut self, start: Self::Value, units: usize);
+
+    fn release_cell(&mut self, start: Self::Value, units: usize);
 }
