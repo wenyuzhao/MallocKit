@@ -71,10 +71,6 @@ impl<Config: AddressSpaceConfig>  InternalAbstractFreeList for UnalignedFreeList
         let unit2 = unit1.sibling(child_size_class);
         self.set_as_used(unit1, child_size_class);
         self.set_as_used(unit2, child_size_class);
-        unsafe {
-            debug_assert!(self.unit_to_cell(unit1).as_ref().prev.is_none());
-            debug_assert!(self.unit_to_cell(unit1).as_ref().next.is_none());
-        }
         (unit1, unit2)
     }
 

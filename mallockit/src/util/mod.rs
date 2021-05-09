@@ -5,6 +5,7 @@ mod lab;
 mod page;
 pub(crate) mod sys_alloc;
 pub mod freelist;
+pub mod bits;
 
 pub use core::alloc::Layout;
 pub use address::*;
