@@ -1,12 +1,10 @@
-use std::{ops::Range, sync::atomic::AtomicUsize};
-use spin::Mutex;
-use crate::util::*;
+use super::{page_resource::PageResource, Allocator, Space, SpaceId};
 use crate::util::bits::{BitField, BitFieldSlot};
-use crate::util::freelist::{UnalignedFreeList, UnalignedAbstractFreeList};
-use crate::util::freelist::{AlignedFreeList, AlignedAbstractFreeList, AddressSpaceConfig};
-use super::{Allocator, Space, SpaceId, page_resource::PageResource};
-
-
+use crate::util::freelist::{AddressSpaceConfig, AlignedAbstractFreeList, AlignedFreeList};
+use crate::util::freelist::{UnalignedAbstractFreeList, UnalignedFreeList};
+use crate::util::*;
+use spin::Mutex;
+use std::{ops::Range, sync::atomic::AtomicUsize};
 
 pub trait FreeList {
     type FreeList;
@@ -33,7 +31,11 @@ impl FreeList for HeaderFreeList {
     #[inline(always)]
     fn can_allocate(layout: Layout) -> bool {
         let (extended_layout, _) = Layout::new::<Cell>().extend(layout).unwrap();
-        let unaligned_size = if extended_layout.align() != 8 { extended_layout.size() + extended_layout.align() } else { extended_layout.size() };
+        let unaligned_size = if extended_layout.align() != 8 {
+            extended_layout.size() + extended_layout.align()
+        } else {
+            extended_layout.size()
+        };
         unaligned_size <= FreeListSpace::MAX_ALLOCATION_SIZE
     }
 }
@@ -74,7 +76,6 @@ impl Space for FreeListSpace {
     }
 }
 
-
 impl FreeListSpace {
     #[inline(always)]
     pub fn can_allocate<FL: FreeList>(layout: Layout) -> bool {
@@ -94,12 +95,14 @@ impl FreeListSpace {
         let mut pages = self.pages.lock();
         let page = (*pages)?;
         let next = unsafe { page.start().load::<Address>() };
-        *pages = if next.is_zero() { None } else { Some(Page::new(next)) };
+        *pages = if next.is_zero() {
+            None
+        } else {
+            Some(Page::new(next))
+        };
         Some(page)
     }
 }
-
-
 
 #[repr(C)]
 struct Cell {
@@ -108,7 +111,10 @@ struct Cell {
 
 impl Cell {
     const START_OFFSET: BitField = BitField { bits: 21, shift: 0 };
-    const SIZE: BitField = BitField { bits: 21, shift: 21 };
+    const SIZE: BitField = BitField {
+        bits: 21,
+        shift: 21,
+    };
     const LOG_ALIGN: BitField = BitField { bits: 8, shift: 42 };
 
     const fn from(ptr: Address) -> &'static mut Self {
@@ -120,21 +126,21 @@ impl Cell {
         let log_align = align.trailing_zeros() as usize;
         debug_assert!(log_align <= 21);
         let start_offset = (Address::from(self as *const _) - start) as usize;
-        self.word.set::<{Self::START_OFFSET}>(start_offset);
-        self.word.set::<{Self::SIZE}>(size);
-        self.word.set::<{Self::LOG_ALIGN}>(log_align);
+        self.word.set::<{ Self::START_OFFSET }>(start_offset);
+        self.word.set::<{ Self::SIZE }>(size);
+        self.word.set::<{ Self::LOG_ALIGN }>(log_align);
     }
     #[inline(always)]
     fn start(&self) -> Address {
-        Address::from(self) - self.word.get::<{Self::START_OFFSET}>()
+        Address::from(self) - self.word.get::<{ Self::START_OFFSET }>()
     }
     #[inline(always)]
     fn size(&self) -> usize {
-        self.word.get::<{Self::SIZE}>()
+        self.word.get::<{ Self::SIZE }>()
     }
     #[inline(always)]
     fn align(&self) -> usize {
-        1 << self.word.get::<{Self::LOG_ALIGN}>()
+        1 << self.word.get::<{ Self::LOG_ALIGN }>()
     }
 }
 
@@ -159,7 +165,8 @@ impl FreeListAllocator<BitMapFreeList> {
             Some(page) => page,
             _ => self.space.acquire::<Size2M>(1)?.start,
         };
-        self.freelist.release_aligned_cell(page.start(), Size2M::BYTES);
+        self.freelist
+            .release_aligned_cell(page.start(), Size2M::BYTES);
         self.alloc_cell(bytes)
     }
 
@@ -168,11 +175,11 @@ impl FreeListAllocator<BitMapFreeList> {
         if Self::ALLOC_ALIGNED_CELL {
             let bytes = 1 << AlignedFreeList::<AddressSpace>::size_class(bytes);
             if let Some(range) = self.freelist.allocate_aligned_cell(bytes) {
-                return Some(range)
+                return Some(range);
             }
         } else {
             if let Some(range) = self.freelist.allocate_cell(bytes) {
-                return Some(range)
+                return Some(range);
             }
         }
         self.alloc_cell_slow(bytes)
@@ -242,7 +249,7 @@ impl FreeListAllocator<HeaderFreeList> {
     #[inline(always)]
     fn alloc_cell(&mut self, bytes: usize) -> Option<Range<Address>> {
         if let Some(range) = self.freelist.allocate_cell(bytes) {
-            return Some(range)
+            return Some(range);
         }
         self.alloc_cell_slow(bytes)
     }
@@ -269,12 +276,16 @@ impl Allocator for FreeListAllocator<HeaderFreeList> {
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let (extended_layout, offset) = Layout::new::<Cell>().extend(layout).unwrap();
-        let unaligned_size = if extended_layout.align() > 8 { extended_layout.size() + extended_layout.align() } else { extended_layout.size() };
+        let unaligned_size = if extended_layout.align() > 8 {
+            extended_layout.size() + extended_layout.align()
+        } else {
+            extended_layout.size()
+        };
         let align = extended_layout.align();
         let Range { start, end } = self.alloc_cell(unaligned_size)?;
         let mask = align - 1;
         let aligned_start = Address::from((*start + mask) & !mask);
-        let data_start =  aligned_start + offset;
+        let data_start = aligned_start + offset;
         Cell::from(data_start).set(start, end - start, layout.align());
         debug_assert_eq!(usize::from(data_start) & (layout.align() - 1), 0);
         Some(data_start)

@@ -14,11 +14,17 @@
 #![feature(const_trait_impl)]
 #![feature(const_fn_fn_ptr_basics)]
 
-#[macro_use] extern crate mallockit;
+#[macro_use]
+extern crate mallockit;
 
 use core::alloc::Layout;
+use mallockit::{
+    space::*,
+    space::{freelist_space::*, large_object_space::*},
+    util::*,
+    Mutator, Plan,
+};
 use std::intrinsics::likely;
-use mallockit::{Mutator, Plan, space::*, space::{freelist_space::*, large_object_space::*}, util::*};
 
 const FREELIST_SPACE: SpaceId = SpaceId::DEFAULT;
 const LARGE_OBJECT_SPACE: SpaceId = SpaceId::LARGE_OBJECT_SPACE;
@@ -55,7 +61,10 @@ struct BuddyMutator {
 impl BuddyMutator {
     const fn new() -> Self {
         Self {
-            freelist: FreeListAllocator::<FreeListKind>::new(Lazy::new(|| &PLAN.freelist_space), FREELIST_SPACE),
+            freelist: FreeListAllocator::<FreeListKind>::new(
+                Lazy::new(|| &PLAN.freelist_space),
+                FREELIST_SPACE,
+            ),
             los: LargeObjectAllocator(Lazy::new(|| &PLAN.large_object_space)),
         }
     }

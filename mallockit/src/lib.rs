@@ -26,28 +26,28 @@
 #![feature(const_evaluatable_checked)]
 #![feature(associated_type_defaults)]
 
-#[macro_use] extern crate derive_more;
+#[macro_use]
+extern crate derive_more;
 
 #[macro_use]
 pub mod log;
 #[macro_use]
 pub mod util;
-pub mod space;
-pub mod malloc;
 #[doc(hidden)]
 pub mod hooks;
+pub mod malloc;
+pub mod space;
 pub mod stat;
 
 use core::alloc::Layout;
-use std::ptr;
-use std::cmp;
-use util::Address;
 pub use ctor::ctor;
 pub use libc;
-
+use std::cmp;
+use std::ptr;
+use util::Address;
 
 pub trait Plan: Sized + 'static {
-    type Mutator: Mutator<Plan=Self>;
+    type Mutator: Mutator<Plan = Self>;
 
     fn new() -> Self;
     fn init(&self) {}
@@ -55,7 +55,7 @@ pub trait Plan: Sized + 'static {
 }
 
 pub trait Mutator: Sized + 'static {
-    type Plan: Plan<Mutator=Self>;
+    type Plan: Plan<Mutator = Self>;
 
     fn current() -> &'static mut Self;
     fn plan(&self) -> &'static Self::Plan;
@@ -86,7 +86,11 @@ pub trait Mutator: Sized + 'static {
         let new_ptr = self.alloc(new_layout);
         if let Some(new_ptr) = new_ptr {
             unsafe {
-                ptr::copy_nonoverlapping(ptr.as_ptr::<u8>(), new_ptr.as_mut_ptr::<u8>(), cmp::min(layout.size(), new_size));
+                ptr::copy_nonoverlapping(
+                    ptr.as_ptr::<u8>(),
+                    new_ptr.as_mut_ptr::<u8>(),
+                    cmp::min(layout.size(), new_size),
+                );
             }
             self.dealloc(ptr);
         }

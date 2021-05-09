@@ -1,11 +1,12 @@
-use std::{ops::{Add, AddAssign, Deref, Sub, SubAssign}, ptr::NonNull};
-use std::mem;
-use std::ptr;
+use super::address::Address;
 use std::cmp::Ordering;
 use std::fmt;
-use super::address::Address;
-
-
+use std::mem;
+use std::ptr;
+use std::{
+    ops::{Add, AddAssign, Deref, Sub, SubAssign},
+    ptr::NonNull,
+};
 
 #[repr(transparent)]
 pub struct AddressNonNull(NonNull<u8>);
@@ -144,7 +145,6 @@ impl const Ord for AddressNonNull {
     }
 }
 
-
 impl const Add<usize> for AddressNonNull {
     type Output = Self;
     fn add(self, other: usize) -> Self::Output {
@@ -153,7 +153,9 @@ impl const Add<usize> for AddressNonNull {
 }
 
 impl const AddAssign<usize> for AddressNonNull {
-    fn add_assign(&mut self, other: usize) { *self = *self + other }
+    fn add_assign(&mut self, other: usize) {
+        *self = *self + other
+    }
 }
 
 impl const Add<Self> for AddressNonNull {
@@ -164,7 +166,9 @@ impl const Add<Self> for AddressNonNull {
 }
 
 impl const AddAssign<Self> for AddressNonNull {
-    fn add_assign(&mut self, other: Self) { *self = *self + other }
+    fn add_assign(&mut self, other: Self) {
+        *self = *self + other
+    }
 }
 
 impl const Add<isize> for AddressNonNull {
@@ -176,7 +180,9 @@ impl const Add<isize> for AddressNonNull {
 }
 
 impl const AddAssign<isize> for AddressNonNull {
-    fn add_assign(&mut self, other: isize) { *self = *self + other }
+    fn add_assign(&mut self, other: isize) {
+        *self = *self + other
+    }
 }
 
 impl const Add<i32> for AddressNonNull {
@@ -187,13 +193,17 @@ impl const Add<i32> for AddressNonNull {
 }
 
 impl const AddAssign<i32> for AddressNonNull {
-    fn add_assign(&mut self, other: i32) { *self = *self + other }
+    fn add_assign(&mut self, other: i32) {
+        *self = *self + other
+    }
 }
 
 impl const Sub<Self> for AddressNonNull {
     type Output = usize;
     fn sub(self, other: Self) -> Self::Output {
-        unsafe { debug_assert!(self.0.as_ptr() as usize >= other.0.as_ptr() as usize); }
+        unsafe {
+            debug_assert!(self.0.as_ptr() as usize >= other.0.as_ptr() as usize);
+        }
         *self - *other
     }
 }
@@ -207,7 +217,9 @@ impl const Sub<usize> for AddressNonNull {
 }
 
 impl const SubAssign<usize> for AddressNonNull {
-    fn sub_assign(&mut self, other: usize) { *self = *self - other; }
+    fn sub_assign(&mut self, other: usize) {
+        *self = *self - other;
+    }
 }
 
 impl fmt::Debug for AddressNonNull {

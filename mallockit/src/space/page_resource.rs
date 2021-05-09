@@ -1,17 +1,19 @@
-use std::{ops::Range, sync::atomic::{AtomicUsize, Ordering}};
-use std::iter::Step;
-use crate::util::*;
+use super::{SpaceId, PAGE_REGISTRY};
 use crate::util::freelist::PageFreeList;
+use crate::util::*;
 use freelist::AlignedAbstractFreeList;
 use spin::Mutex;
-use super::{PAGE_REGISTRY, SpaceId};
-
+use std::iter::Step;
+use std::{
+    ops::Range,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 const NUM_SIZE_CLASS: usize = SpaceId::LOG_MAX_SPACE_SIZE - Page::<Size4K>::LOG_BYTES;
 
 pub struct PageResource {
     pub id: SpaceId,
-    freelist: Mutex<PageFreeList<{NUM_SIZE_CLASS}>>,
+    freelist: Mutex<PageFreeList<{ NUM_SIZE_CLASS }>>,
     committed_size: AtomicUsize,
 }
 
@@ -35,21 +37,36 @@ impl PageResource {
 
     fn map_pages<S: PageSize>(&self, start: Page<S>, pages: usize) -> bool {
         let size = pages << S::LOG_BYTES;
-        let addr = unsafe { libc::mmap(start.start().as_mut_ptr(), size, libc::PROT_READ | libc::PROT_WRITE, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_FIXED_NOREPLACE, -1, 0) };
-        if cfg!(feature="transparent_huge_page") && S::LOG_BYTES != Size4K::LOG_BYTES {
-            unsafe { libc::madvise(start.start().as_mut_ptr(), size, libc::MADV_HUGEPAGE); }
+        let addr = unsafe {
+            libc::mmap(
+                start.start().as_mut_ptr(),
+                size,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_FIXED_NOREPLACE,
+                -1,
+                0,
+            )
+        };
+        if cfg!(feature = "transparent_huge_page") && S::LOG_BYTES != Size4K::LOG_BYTES {
+            unsafe {
+                libc::madvise(start.start().as_mut_ptr(), size, libc::MADV_HUGEPAGE);
+            }
         }
         if addr == libc::MAP_FAILED {
             false
         } else {
-            self.committed_size.fetch_add(pages << S::LOG_BYTES, Ordering::SeqCst);
+            self.committed_size
+                .fetch_add(pages << S::LOG_BYTES, Ordering::SeqCst);
             true
         }
     }
 
     fn unmap_pages<S: PageSize>(&self, start: Page<S>, pages: usize) {
-        unsafe { libc::munmap(start.start().as_mut_ptr(), pages << S::LOG_BYTES); }
-        self.committed_size.fetch_sub(pages << S::LOG_BYTES, Ordering::SeqCst);
+        unsafe {
+            libc::munmap(start.start().as_mut_ptr(), pages << S::LOG_BYTES);
+        }
+        self.committed_size
+            .fetch_sub(pages << S::LOG_BYTES, Ordering::SeqCst);
     }
 
     pub fn acquire_pages<S: PageSize>(&self, pages: usize) -> Option<Range<Page<S>>> {

@@ -1,9 +1,7 @@
-use std::ptr::NonNull;
 use crate::{space::page_table::PageTable, util::*};
+use std::ptr::NonNull;
 
 use super::abstract_freelist::*;
-
-
 
 #[derive(Debug)]
 struct Cell {
@@ -22,19 +20,20 @@ pub struct PageFreeList<const NUM_SIZE_CLASS: usize> {
     page_table: PageTable,
 }
 
-
-impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{NUM_SIZE_CLASS}> {
+impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{ NUM_SIZE_CLASS }> {
     const MIN_SIZE_CLASS: usize = 0;
     const NUM_SIZE_CLASS: usize = NUM_SIZE_CLASS;
 
     #[inline(always)]
     fn is_free(&self, unit: Unit, size_class: usize) -> bool {
-        self.bst.get(self.unit_to_index(unit, size_class)).unwrap_or(false)
+        self.bst
+            .get(self.unit_to_index(unit, size_class))
+            .unwrap_or(false)
     }
 
     #[inline(always)]
     fn set_as_free(&mut self, unit: Unit, size_class: usize) {
-        if cfg!(feature="slow_assert") {
+        if cfg!(feature = "slow_assert") {
             debug_assert!(self.is_not_free_slow(unit));
         }
         let index = self.unit_to_index(unit, size_class);
@@ -46,7 +45,7 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{NUM
         debug_assert!(self.is_free(unit, size_class));
         let index = self.unit_to_index(unit, size_class);
         self.bst.set(index, false);
-        if cfg!(feature="slow_assert") {
+        if cfg!(feature = "slow_assert") {
             debug_assert!(self.is_not_free_slow(unit));
         }
     }
@@ -54,7 +53,14 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{NUM
     #[inline(always)]
     fn push_cell(&mut self, unit: Unit, size_class: usize) {
         let head = self.table[size_class];
-        let mut cell = Box::leak(Box::new_in(Cell { prev: None, next: None, unit }, System));
+        let mut cell = Box::leak(Box::new_in(
+            Cell {
+                prev: None,
+                next: None,
+                unit,
+            },
+            System,
+        ));
         let cell_ptr = unsafe { NonNull::new_unchecked(cell) };
         if let Some(mut head) = head {
             unsafe {
@@ -114,7 +120,7 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{NUM
     }
 }
 
-impl<const NUM_SIZE_CLASS: usize> PageFreeList<{NUM_SIZE_CLASS}> {
+impl<const NUM_SIZE_CLASS: usize> PageFreeList<{ NUM_SIZE_CLASS }> {
     pub fn new(base: Address) -> Self {
         Self {
             base,
@@ -142,7 +148,8 @@ impl<const NUM_SIZE_CLASS: usize> PageFreeList<{NUM_SIZE_CLASS}> {
 
     #[inline(always)]
     fn delete_pages(&mut self, unit: Unit) {
-        self.page_table.delete_pages::<Size4K>(Page::new(self.unit_to_address(unit)), 1);
+        self.page_table
+            .delete_pages::<Size4K>(Page::new(self.unit_to_address(unit)), 1);
     }
 
     #[inline(always)]
@@ -153,8 +160,7 @@ impl<const NUM_SIZE_CLASS: usize> PageFreeList<{NUM_SIZE_CLASS}> {
     }
 }
 
-
-impl<const NUM_SIZE_CLASS: usize> AlignedAbstractFreeList for PageFreeList<{NUM_SIZE_CLASS}> {
+impl<const NUM_SIZE_CLASS: usize> AlignedAbstractFreeList for PageFreeList<{ NUM_SIZE_CLASS }> {
     #[inline(always)]
     fn unit_to_value(&self, unit: Unit) -> Self::Value {
         self.unit_to_address(unit)

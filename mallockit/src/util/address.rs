@@ -1,10 +1,9 @@
-use std::ops::{Add, AddAssign, Deref, Sub, SubAssign};
-use std::mem;
+use super::address_non_null::AddressNonNull;
 use std::cmp::Ordering;
 use std::fmt;
-use super::address_non_null::AddressNonNull;
 use std::iter::Step;
-
+use std::mem;
+use std::ops::{Add, AddAssign, Deref, Sub, SubAssign};
 
 #[repr(transparent)]
 pub struct Address(pub(crate) usize);
@@ -150,7 +149,6 @@ impl const Ord for Address {
     }
 }
 
-
 impl const Add<usize> for Address {
     type Output = Self;
     fn add(self, other: usize) -> Self::Output {
@@ -159,7 +157,9 @@ impl const Add<usize> for Address {
 }
 
 impl const AddAssign<usize> for Address {
-    fn add_assign(&mut self, other: usize) { *self = *self + other }
+    fn add_assign(&mut self, other: usize) {
+        *self = *self + other
+    }
 }
 
 impl const Add<Self> for Address {
@@ -170,7 +170,9 @@ impl const Add<Self> for Address {
 }
 
 impl const AddAssign<Self> for Address {
-    fn add_assign(&mut self, other: Self) { *self = *self + other }
+    fn add_assign(&mut self, other: Self) {
+        *self = *self + other
+    }
 }
 
 impl const Add<isize> for Address {
@@ -181,7 +183,9 @@ impl const Add<isize> for Address {
 }
 
 impl const AddAssign<isize> for Address {
-    fn add_assign(&mut self, other: isize) { *self = *self + other }
+    fn add_assign(&mut self, other: isize) {
+        *self = *self + other
+    }
 }
 
 impl const Add<i32> for Address {
@@ -192,7 +196,9 @@ impl const Add<i32> for Address {
 }
 
 impl const AddAssign<i32> for Address {
-    fn add_assign(&mut self, other: i32) { *self = *self + other }
+    fn add_assign(&mut self, other: i32) {
+        *self = *self + other
+    }
 }
 
 impl const Sub<Self> for Address {
@@ -211,7 +217,9 @@ impl const Sub<usize> for Address {
 }
 
 impl const SubAssign<usize> for Address {
-    fn sub_assign(&mut self, other: usize) { *self = *self - other }
+    fn sub_assign(&mut self, other: usize) {
+        *self = *self - other
+    }
 }
 
 impl fmt::Debug for Address {

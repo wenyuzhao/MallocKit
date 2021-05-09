@@ -1,17 +1,22 @@
-use core::{alloc::Layout,  ptr};
-use std::intrinsics::unlikely;
-use crate::util::Lazy;
 use super::Plan;
+use crate::util::Lazy;
 use crate::Mutator;
-
+use core::{alloc::Layout, ptr};
+use std::intrinsics::unlikely;
 
 pub struct MallocAPI<GA: Plan>(pub &'static Lazy<GA>);
 
 #[allow(unused)]
 impl<P: Plan> MallocAPI<P> {
-    #[cfg(not(any(target_os = "macos", all(target_os = "windows", target_pointer_width = "64"))))]
+    #[cfg(not(any(
+        target_os = "macos",
+        all(target_os = "windows", target_pointer_width = "64")
+    )))]
     pub const MIN_ALIGNMENT: usize = 8;
-    #[cfg(any(target_os = "macos", all(target_os = "windows", target_pointer_width = "64")))]
+    #[cfg(any(
+        target_os = "macos",
+        all(target_os = "windows", target_pointer_width = "64")
+    ))]
     pub const MIN_ALIGNMENT: usize = 16;
     pub const PAGE_SIZE: usize = 4096;
 
@@ -32,7 +37,9 @@ impl<P: Plan> MallocAPI<P> {
 
     #[inline(always)]
     pub unsafe fn alloc(&self, size: usize, align: usize) -> Result<Option<*mut u8>, i32> {
-        if cfg!(target_os = "linux") && unlikely(size == 0) { return Ok(None); }
+        if cfg!(target_os = "linux") && unlikely(size == 0) {
+            return Ok(None);
+        }
         let size = Self::align_up(size, align);
         let layout = Layout::from_size_align_unchecked(size, align);
         match self.mutator().alloc(layout) {
@@ -54,13 +61,23 @@ impl<P: Plan> MallocAPI<P> {
 
     #[inline(always)]
     pub unsafe fn free(&self, ptr: *mut u8) {
-        if unlikely(ptr.is_null()) { return; }
+        if unlikely(ptr.is_null()) {
+            return;
+        }
         self.mutator().dealloc(ptr.into());
     }
 
     #[inline(always)]
-    pub unsafe fn reallocate_or_enomem(&self, ptr: *mut u8, new_size: usize, free_if_new_size_is_zero: bool, free_if_fail: bool) -> *mut u8 {
-        if ptr.is_null() { return self.alloc_or_enomem(new_size, Self::MIN_ALIGNMENT); }
+    pub unsafe fn reallocate_or_enomem(
+        &self,
+        ptr: *mut u8,
+        new_size: usize,
+        free_if_new_size_is_zero: bool,
+        free_if_fail: bool,
+    ) -> *mut u8 {
+        if ptr.is_null() {
+            return self.alloc_or_enomem(new_size, Self::MIN_ALIGNMENT);
+        }
         if unlikely(free_if_new_size_is_zero && new_size == 0) {
             self.free(ptr);
             return ptr::null_mut();
@@ -79,14 +96,21 @@ impl<P: Plan> MallocAPI<P> {
     }
 
     #[inline(always)]
-    pub unsafe fn posix_memalign(&self, result: *mut *mut u8, alignment: usize, size: usize) -> i32 {
-        if unlikely(alignment < std::mem::size_of::<usize>() || !alignment.is_power_of_two()) { return libc::EINVAL; }
+    pub unsafe fn posix_memalign(
+        &self,
+        result: *mut *mut u8,
+        alignment: usize,
+        size: usize,
+    ) -> i32 {
+        if unlikely(alignment < std::mem::size_of::<usize>() || !alignment.is_power_of_two()) {
+            return libc::EINVAL;
+        }
         match self.alloc(size, alignment) {
             Ok(ptr) => {
                 *result = ptr.unwrap_or(0 as _);
                 0
-            },
-            Err(e) => e
+            }
+            Err(e) => e,
         }
     }
 
@@ -94,13 +118,25 @@ impl<P: Plan> MallocAPI<P> {
     pub unsafe fn memalign(&self, alignment: usize, size: usize) -> *mut u8 {
         let mut result = ptr::null_mut();
         let errno = self.posix_memalign(&mut result, alignment, size);
-        if unlikely(result.is_null()) { Self::set_error(errno) }
+        if unlikely(result.is_null()) {
+            Self::set_error(errno)
+        }
         result
     }
 
     #[inline(always)]
-    pub unsafe fn aligned_alloc(&self, size: usize, alignment: usize, einval_if_size_is_not_aligned: bool, einval_if_size_is_zero: bool) -> *mut u8 {
-        if unlikely(!alignment.is_power_of_two() || (einval_if_size_is_not_aligned && (size & (alignment - 1)) != 0) || (einval_if_size_is_zero && size == 0)) {
+    pub unsafe fn aligned_alloc(
+        &self,
+        size: usize,
+        alignment: usize,
+        einval_if_size_is_not_aligned: bool,
+        einval_if_size_is_zero: bool,
+    ) -> *mut u8 {
+        if unlikely(
+            !alignment.is_power_of_two()
+                || (einval_if_size_is_not_aligned && (size & (alignment - 1)) != 0)
+                || (einval_if_size_is_zero && size == 0),
+        ) {
             Self::set_error(libc::EINVAL);
             return ptr::null_mut();
         }
@@ -173,7 +209,12 @@ macro_rules! export_malloc_api {
 
             #[no_mangle]
             pub unsafe extern "C" fn realloc(ptr: *mut u8, size: usize) -> *mut u8 {
-                MALLOC_IMPL.reallocate_or_enomem(ptr, size, cfg!(any(target_os = "linux", target_os = "windows")), false)
+                MALLOC_IMPL.reallocate_or_enomem(
+                    ptr,
+                    size,
+                    cfg!(any(target_os = "linux", target_os = "windows")),
+                    false,
+                )
             }
 
             #[cfg(target_os = "macos")]
@@ -184,7 +225,11 @@ macro_rules! export_malloc_api {
 
             #[cfg(any(target_os = "linux", target_os = "macos"))]
             #[no_mangle]
-            pub unsafe extern "C" fn posix_memalign(ptr: *mut *mut u8, alignment: usize, size: usize) -> i32 {
+            pub unsafe extern "C" fn posix_memalign(
+                ptr: *mut *mut u8,
+                alignment: usize,
+                size: usize,
+            ) -> i32 {
                 MALLOC_IMPL.posix_memalign(ptr, alignment, size)
             }
 

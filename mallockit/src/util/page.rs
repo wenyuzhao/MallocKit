@@ -2,8 +2,6 @@ use std::{cmp::Ordering, fmt, iter::Step, marker::PhantomData, num::NonZeroUsize
 
 use super::Address;
 
-
-
 pub trait PageSize {
     const NAME: &'static str;
     const LOG_BYTES: usize;
@@ -42,7 +40,10 @@ impl<S: PageSize> Page<S> {
     pub const fn new(address: Address) -> Self {
         debug_assert!(!address.is_zero());
         debug_assert!(Self::is_aligned(address));
-        Self(unsafe { NonZeroUsize::new_unchecked(usize::from(address)) }, PhantomData)
+        Self(
+            unsafe { NonZeroUsize::new_unchecked(usize::from(address)) },
+            PhantomData,
+        )
     }
 
     pub const fn containing(address: Address) -> Self {
@@ -98,7 +99,6 @@ impl<S: PageSize> const Clone for Page<S> {
 }
 
 impl<S: PageSize> const Copy for Page<S> {}
-
 
 impl<S: PageSize> const PartialEq for Page<S> {
     fn eq(&self, other: &Self) -> bool {

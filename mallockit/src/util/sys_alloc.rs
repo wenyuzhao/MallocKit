@@ -1,15 +1,17 @@
-use std::{alloc::{AllocError, Allocator, Layout}, intrinsics::unlikely, ptr::NonNull, slice};
-
-
+use std::{
+    alloc::{AllocError, Allocator, Layout},
+    intrinsics::unlikely,
+    ptr::NonNull,
+    slice,
+};
 
 pub struct System;
 
 unsafe impl Allocator for System {
     #[inline(always)]
     fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
-        let ptr = unsafe {
-            libmimalloc_sys::mi_malloc_aligned(layout.size(), layout.align()) as *mut u8
-        };
+        let ptr =
+            unsafe { libmimalloc_sys::mi_malloc_aligned(layout.size(), layout.align()) as *mut u8 };
         if unlikely(ptr.is_null()) {
             Err(AllocError)
         } else {

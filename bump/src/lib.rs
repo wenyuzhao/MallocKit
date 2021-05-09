@@ -11,10 +11,11 @@
 #![feature(const_mut_refs)]
 #![feature(const_fn_fn_ptr_basics)]
 
-#[macro_use] extern crate mallockit;
+#[macro_use]
+extern crate mallockit;
 
 use core::alloc::Layout;
-use mallockit::{Mutator, Plan, space::*, space::immortal_space::*, util::*};
+use mallockit::{space::immortal_space::*, space::*, util::*, Mutator, Plan};
 
 const IMMORTAL_SPACE: SpaceId = SpaceId::DEFAULT;
 

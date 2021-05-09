@@ -1,10 +1,16 @@
-use spin::RwLock;
 use crate::util::*;
-use std::{marker::PhantomData, mem, sync::atomic::{AtomicUsize, Ordering}};
+use spin::RwLock;
 use std::iter::Step;
+use std::{
+    marker::PhantomData,
+    mem,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
-
-struct BitField { bits: usize, shift: usize }
+struct BitField {
+    bits: usize,
+    shift: usize,
+}
 
 impl BitField {
     const fn get(&self, value: usize) -> usize {
@@ -22,7 +28,11 @@ impl BitField {
 
     const fn delta(&self, slot: &mut usize, delta: isize) -> usize {
         let old = self.get(*slot);
-        let new = if delta > 0 { old + (delta as usize) } else { old - ((-delta) as usize) };
+        let new = if delta > 0 {
+            old + (delta as usize)
+        } else {
+            old - ((-delta) as usize)
+        };
         self.set(slot, new);
         new
     }
@@ -32,8 +42,13 @@ impl BitField {
 struct PageTableEntry<L: PageTableLevel>(usize, PhantomData<L>);
 
 enum PageTableEntryData<L: PageTableLevel> {
-    NextLevelPageTable { table: &'static mut PageTable<L> },
-    Page { contiguous_pages: Option<usize>, pointer_meta: Address },
+    NextLevelPageTable {
+        table: &'static mut PageTable<L>,
+    },
+    Page {
+        contiguous_pages: Option<usize>,
+        pointer_meta: Address,
+    },
 }
 
 impl<L: PageTableLevel> PageTableEntry<L> {
@@ -45,12 +60,16 @@ impl<L: PageTableLevel> PageTableEntry<L> {
     const PAGE_TABLE_USED_ENTRIES: BitField = BitField { bits: 10, shift: 0 };
     // Page fields
     const PAGE_POINTER_META: BitField = BitField { bits: 45, shift: 0 };
-    const PAGE_CONTIGUOUS_PAGES: BitField = BitField { bits: 16, shift: 45 };
+    const PAGE_CONTIGUOUS_PAGES: BitField = BitField {
+        bits: 16,
+        shift: 45,
+    };
 
     fn clear(&mut self) {
         let value = self.0;
         if Self::PRESENT.get(value) != 0 && Self::IS_PAGE_TABLE.get(value) != 0 {
-            let table: &'static mut PageTable<L::NextLevel> = unsafe { mem::transmute(value & Self::PAGE_TABLE_POINTER_MASK) };
+            let table: &'static mut PageTable<L::NextLevel> =
+                unsafe { mem::transmute(value & Self::PAGE_TABLE_POINTER_MASK) };
             let _ = unsafe { Box::from_raw_in(table, System) };
         }
         self.0 = 0;
@@ -58,14 +77,24 @@ impl<L: PageTableLevel> PageTableEntry<L> {
 
     const fn get(&self) -> Option<PageTableEntryData<L::NextLevel>> {
         let value = self.0;
-        if Self::PRESENT.get(value) == 0 { return None }
+        if Self::PRESENT.get(value) == 0 {
+            return None;
+        }
         if Self::IS_PAGE_TABLE.get(value) != 0 {
-            let table: &'static mut PageTable<L::NextLevel> = unsafe { mem::transmute(value & Self::PAGE_TABLE_POINTER_MASK) };
+            let table: &'static mut PageTable<L::NextLevel> =
+                unsafe { mem::transmute(value & Self::PAGE_TABLE_POINTER_MASK) };
             Some(PageTableEntryData::NextLevelPageTable { table })
         } else {
             let contiguous_pages = Self::PAGE_CONTIGUOUS_PAGES.get(value);
             let pointer_meta = Address::from(Self::PAGE_POINTER_META.get(value) << 3);
-            Some(PageTableEntryData::Page { contiguous_pages: if contiguous_pages == 0 { None } else { Some(contiguous_pages) }, pointer_meta })
+            Some(PageTableEntryData::Page {
+                contiguous_pages: if contiguous_pages == 0 {
+                    None
+                } else {
+                    Some(contiguous_pages)
+                },
+                pointer_meta,
+            })
         }
     }
 
@@ -146,7 +175,7 @@ struct PageMeta {
 }
 
 pub(crate) struct PageTable<L: PageTableLevel = L4> {
-    table: [PageTableEntry::<L>; 512],
+    table: [PageTableEntry<L>; 512],
     phantom: PhantomData<L>,
 }
 
@@ -156,23 +185,30 @@ impl<L: PageTableLevel> PageTable<L> {
         self.table[L::get_index(address)].get()
     }
 
-    fn get_next_page_table(&self, address: Address) -> &'static mut PageTable::<L::NextLevel> {
+    fn get_next_page_table(&self, address: Address) -> &'static mut PageTable<L::NextLevel> {
         match self.table[L::get_index(address)].get() {
             Some(PageTableEntryData::NextLevelPageTable { table, .. }) => table,
             _ => unreachable!(),
         }
     }
 
-    fn get_or_allocate_next_page_table(&mut self, address: Address, mut on_create: impl FnMut()) -> &'static mut PageTable::<L::NextLevel> {
+    fn get_or_allocate_next_page_table(
+        &mut self,
+        address: Address,
+        mut on_create: impl FnMut(),
+    ) -> &'static mut PageTable<L::NextLevel> {
         let index = L::get_index(address);
         match self.table[index].get() {
             Some(PageTableEntryData::NextLevelPageTable { table, .. }) => table,
             Some(_) => unreachable!(),
             _ => {
-                let table = Box::leak(Box::new_in(PageTable::<L::NextLevel> {
-                    table: unsafe { mem::transmute([0usize; 512]) },
-                    phantom: PhantomData
-                }, System));
+                let table = Box::leak(Box::new_in(
+                    PageTable::<L::NextLevel> {
+                        table: unsafe { mem::transmute([0usize; 512]) },
+                        phantom: PhantomData,
+                    },
+                    System,
+                ));
                 self.table[index].set_next_page_table(table);
                 on_create();
                 self.get_next_page_table(address)
@@ -192,7 +228,7 @@ impl PageTable<L4> {
     pub(crate) const fn new() -> Self {
         Self {
             table: unsafe { mem::transmute([0usize; 512]) },
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 
@@ -204,19 +240,35 @@ impl PageTable<L4> {
         };
         let l2 = match l3.get_entry(address)? {
             PageTableEntryData::NextLevelPageTable { table, .. } => table,
-            PageTableEntryData::Page { contiguous_pages, pointer_meta } => return Some(PageMeta {
-                contiguous_pages, pointer_meta,
-            }),
+            PageTableEntryData::Page {
+                contiguous_pages,
+                pointer_meta,
+            } => {
+                return Some(PageMeta {
+                    contiguous_pages,
+                    pointer_meta,
+                })
+            }
         };
         let l1 = match l2.get_entry(address)? {
             PageTableEntryData::NextLevelPageTable { table, .. } => table,
-            PageTableEntryData::Page { contiguous_pages, pointer_meta } => return Some(PageMeta {
-                contiguous_pages, pointer_meta,
-            }),
+            PageTableEntryData::Page {
+                contiguous_pages,
+                pointer_meta,
+            } => {
+                return Some(PageMeta {
+                    contiguous_pages,
+                    pointer_meta,
+                })
+            }
         };
         match l1.get_entry(address)? {
-            PageTableEntryData::Page { contiguous_pages, pointer_meta } => Some(PageMeta {
-                contiguous_pages, pointer_meta,
+            PageTableEntryData::Page {
+                contiguous_pages,
+                pointer_meta,
+            } => Some(PageMeta {
+                contiguous_pages,
+                pointer_meta,
             }),
             _ => unreachable!(),
         }
@@ -230,16 +282,20 @@ impl PageTable<L4> {
             debug_assert!(l3.get_entry(start).is_none());
             l3.table[L3::get_index(start)].set_next_page(num_pages);
             l4.table[L4::get_index(start)].delta_entries(1);
-            return
+            return;
         }
-        let l2 = l3.get_or_allocate_next_page_table(start, || { l4.table[L4::get_index(start)].delta_entries(1); });
+        let l2 = l3.get_or_allocate_next_page_table(start, || {
+            l4.table[L4::get_index(start)].delta_entries(1);
+        });
         if S::BYTES == Size2M::BYTES {
             debug_assert!(l2.get_entry(start).is_none());
             l2.table[L2::get_index(start)].set_next_page(num_pages);
             l3.table[L3::get_index(start)].delta_entries(1);
-            return
+            return;
         }
-        let l1 = l2.get_or_allocate_next_page_table(start, || { l3.table[L3::get_index(start)].delta_entries(1); });
+        let l1 = l2.get_or_allocate_next_page_table(start, || {
+            l3.table[L3::get_index(start)].delta_entries(1);
+        });
         debug_assert!(l1.get_entry(start).is_none());
         l1.table[L1::get_index(start)].set_next_page(num_pages);
         l2.table[L2::get_index(start)].delta_entries(1);
@@ -252,7 +308,10 @@ impl PageTable<L4> {
         }
     }
 
-    fn decrease_used_entries<S: PageSize, L: PageTableLevel>(parent_table: &mut PageTable<L>, page: Page<S>) -> usize {
+    fn decrease_used_entries<S: PageSize, L: PageTableLevel>(
+        parent_table: &mut PageTable<L>,
+        page: Page<S>,
+    ) -> usize {
         let index = L::get_index(page.start());
         let entries = parent_table.table[index].delta_entries(-1);
         if entries == 0 {
@@ -269,22 +328,26 @@ impl PageTable<L4> {
             debug_assert!(l3.get_entry(start).is_some());
             l3.table[L3::get_index(start)].clear();
             Self::decrease_used_entries(l4, start_page);
-            return
+            return;
         }
         let l2 = l3.get_next_page_table(start);
         if S::BYTES == Size2M::BYTES {
             debug_assert!(l2.get_entry(start).is_some());
             l2.table[L2::get_index(start)].clear();
             let dead = Self::decrease_used_entries(l3, start_page) == 0;
-            if dead { Self::decrease_used_entries(l4, start_page); }
-            return
+            if dead {
+                Self::decrease_used_entries(l4, start_page);
+            }
+            return;
         }
         let l1 = l2.get_next_page_table(start);
         debug_assert!(l1.get_entry(start).is_some());
         l1.table[L1::get_index(start)].clear();
         let dead = Self::decrease_used_entries(l2, start_page) == 0;
         let dead = dead && Self::decrease_used_entries(l3, start_page) == 0;
-        if dead { Self::decrease_used_entries(l4, start_page); }
+        if dead {
+            Self::decrease_used_entries(l4, start_page);
+        }
     }
 
     pub(crate) fn delete_pages<S: PageSize>(&mut self, start: Page<S>, num_pages: usize) {
@@ -357,7 +420,8 @@ impl PageRegistry {
     }
 
     pub(crate) fn insert_pages<S: PageSize>(&self, start: Page<S>, num_pages: usize) {
-        self.committed_size.fetch_add(num_pages << 12, Ordering::SeqCst);
+        self.committed_size
+            .fetch_add(num_pages << 12, Ordering::SeqCst);
         self.p4.write().insert_pages(start, num_pages)
     }
 

@@ -1,7 +1,6 @@
-use std::{alloc::Layout, intrinsics::likely};
-use std::mem;
 use super::Address;
-
+use std::mem;
+use std::{alloc::Layout, intrinsics::likely};
 
 #[derive(Debug)]
 pub struct AllocationArea {
@@ -45,7 +44,9 @@ impl AllocationArea {
 
     pub const fn alloc_with_layout(&mut self, layout: Layout) -> Option<Address> {
         debug_assert!(layout.align() >= std::mem::size_of::<usize>());
-        let new_layout = unsafe { Layout::from_size_align_unchecked(layout.size() + layout.align(), layout.align()) };
+        let new_layout = unsafe {
+            Layout::from_size_align_unchecked(layout.size() + layout.align(), layout.align())
+        };
         let top = self.top;
         let start = Self::align_allocation(top, new_layout.align());
         let end = start + new_layout.size();
@@ -64,4 +65,3 @@ impl AllocationArea {
         unsafe { Layout::from_size_align_unchecked(size as _, align as _) }
     }
 }
-

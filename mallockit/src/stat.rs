@@ -1,12 +1,12 @@
-use std::{alloc::Layout, sync::atomic::{AtomicUsize, Ordering}};
-
-
+use std::{
+    alloc::Layout,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 static TOTAL_ALLOCATIONS: Counter = Counter::new();
 static LARGE_ALLOCATIONS: Counter = Counter::new();
 static TOTAL_DEALLOCATIONS: Counter = Counter::new();
 static LARGE_DEALLOCATIONS: Counter = Counter::new();
-
 
 static ALIGNMENTS: [Counter; 11] = [
     Counter::new(), // 1
@@ -51,7 +51,9 @@ static OTHER_SIZE: Counter = Counter::new();
 
 #[inline(always)]
 pub fn run(block: impl Fn()) {
-    if cfg!(not(feature="stat")) { return }
+    if cfg!(not(feature = "stat")) {
+        return;
+    }
     block()
 }
 
@@ -95,24 +97,35 @@ impl Counter {
     }
     #[inline(always)]
     pub fn get(&self) -> usize {
-        if cfg!(not(feature="stat")) { return 0 }
+        if cfg!(not(feature = "stat")) {
+            return 0;
+        }
         self.0.load(Ordering::SeqCst)
     }
     #[inline(always)]
     pub fn inc(&self, delta: usize) {
-        if cfg!(not(feature="stat")) { return }
+        if cfg!(not(feature = "stat")) {
+            return;
+        }
         self.0.fetch_add(delta, Ordering::SeqCst);
     }
 }
 
-#[cfg(not(feature="stat"))]
-pub(crate) fn report() {
-}
+#[cfg(not(feature = "stat"))]
+pub(crate) fn report() {}
 
-#[cfg(feature="stat")]
+#[cfg(feature = "stat")]
 pub(crate) fn report() {
-    println!("alloc: {} / {}", LARGE_ALLOCATIONS.get(), TOTAL_ALLOCATIONS.get());
-    println!("dealloc: {} / {}", LARGE_DEALLOCATIONS.get(), TOTAL_DEALLOCATIONS.get());
+    println!(
+        "alloc: {} / {}",
+        LARGE_ALLOCATIONS.get(),
+        TOTAL_ALLOCATIONS.get()
+    );
+    println!(
+        "dealloc: {} / {}",
+        LARGE_DEALLOCATIONS.get(),
+        TOTAL_DEALLOCATIONS.get()
+    );
     println!("alignment:");
     for i in 0..ALIGNMENTS.len() {
         println!(" - {} = {}", i, ALIGNMENTS[i].get());

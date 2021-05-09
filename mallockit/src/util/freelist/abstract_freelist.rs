@@ -1,7 +1,8 @@
-use std::{intrinsics::unlikely, ops::{Add, Range}};
 use crate::util::*;
-
-
+use std::{
+    intrinsics::unlikely,
+    ops::{Add, Range},
+};
 
 #[derive(Deref, Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C)]
@@ -27,7 +28,9 @@ pub struct LazyBst {
 
 impl LazyBst {
     pub const fn new() -> Self {
-        Self { bits: Vec::new_in(System) }
+        Self {
+            bits: Vec::new_in(System),
+        }
     }
 
     #[inline(always)]
@@ -48,7 +51,14 @@ impl LazyBst {
         }
         if self.bits[page_index].is_none() {
             let page = unsafe {
-                let addr = libc::mmap(0 as _, Size2M::BYTES, libc::PROT_READ | libc::PROT_WRITE, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS, -1, 0);
+                let addr = libc::mmap(
+                    0 as _,
+                    Size2M::BYTES,
+                    libc::PROT_READ | libc::PROT_WRITE,
+                    libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+                    -1,
+                    0,
+                );
                 let addr = Address::from(addr);
                 Page::new(addr)
             };
@@ -62,7 +72,9 @@ impl LazyBst {
         let index = *index;
         let byte_index = index >> 3;
         let page_index = byte_index >> Size2M::LOG_BYTES;
-        if page_index >= self.bits.len() { return None }
+        if page_index >= self.bits.len() {
+            return None;
+        }
         let byte_offset_in_page = byte_index & Page::<Size2M>::MASK;
         let bit_offset_in_byte = index & 0b111;
         let addr = self.bits[page_index]?.start() + byte_offset_in_page;
@@ -82,9 +94,13 @@ impl LazyBst {
         }
         let (addr, bit_index) = self.get_bit_location(index).unwrap();
         if value {
-            unsafe { addr.store::<u8>(addr.load::<u8>() | (1 << bit_index)); }
+            unsafe {
+                addr.store::<u8>(addr.load::<u8>() | (1 << bit_index));
+            }
         } else {
-            unsafe { addr.store::<u8>(addr.load::<u8>() & !(1 << bit_index)); }
+            unsafe {
+                addr.store::<u8>(addr.load::<u8>() & !(1 << bit_index));
+            }
         }
     }
 }
@@ -92,8 +108,6 @@ impl LazyBst {
 #[derive(Deref, Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C)]
 pub struct BstIndex(usize);
-
-
 
 /// Manage allocation of 0..(1 << NUM_SIZE_CLASS) units
 pub trait InternalAbstractFreeList: Sized {
@@ -153,9 +167,9 @@ pub trait InternalAbstractFreeList: Sized {
             if let Some(unit) = self.pop(size_class) {
                 debug_assert!(!self.is_free(unit, size_class));
                 let parent = unit;
-                for parent_size_class in ((request_size_class+1)..=size_class).rev() {
+                for parent_size_class in ((request_size_class + 1)..=size_class).rev() {
                     debug_assert!(!self.is_free(parent, parent_size_class)); // parent is used
-                    // Split into two
+                                                                             // Split into two
                     let (unit1, unit2) = self.split_cell(parent, parent_size_class);
                     let child_size_class = parent_size_class - 1;
                     // Add second cell to list
@@ -174,7 +188,7 @@ pub trait InternalAbstractFreeList: Sized {
     #[inline(always)]
     fn allocate_aligned_units(&mut self, size_class: usize) -> Option<Unit> {
         if size_class > Self::NON_COALESCEABLE_SIZE_CLASS_THRESHOLD {
-            return None
+            return None;
         }
         if let Some(unit) = self.pop(size_class) {
             debug_assert!(!self.is_free(unit, size_class));
@@ -184,35 +198,51 @@ pub trait InternalAbstractFreeList: Sized {
     }
 
     fn is_not_free_slow(&self, unit: Unit) -> bool {
-        assert!(cfg!(feature="slow_assert"));
+        assert!(cfg!(feature = "slow_assert"));
         for sz in 0..Self::NUM_SIZE_CLASS {
-            if self.is_free(unit, sz) { return true }
+            if self.is_free(unit, sz) {
+                return true;
+            }
         }
         false
     }
 
     #[inline(always)]
-    fn release_aligned_units(&mut self, mut unit: Unit, mut size_class: usize, force_no_coalesce: bool) {
+    fn release_aligned_units(
+        &mut self,
+        mut unit: Unit,
+        mut size_class: usize,
+        force_no_coalesce: bool,
+    ) {
         loop {
             debug_assert!(unit.is_aligned(size_class));
             debug_assert!(size_class < Self::NUM_SIZE_CLASS);
             let sibling = unit.sibling(size_class);
             debug_assert!(!self.is_free(unit, size_class));
-            if unlikely(!force_no_coalesce && size_class < Self::NON_COALESCEABLE_SIZE_CLASS_THRESHOLD && self.is_free(sibling, size_class)) {
+            if unlikely(
+                !force_no_coalesce
+                    && size_class < Self::NON_COALESCEABLE_SIZE_CLASS_THRESHOLD
+                    && self.is_free(sibling, size_class),
+            ) {
                 let parent = unit.parent(size_class);
-                debug_assert!(!self.is_free(parent, size_class + 1), "{:?} {}", parent, size_class); // parent is used
-                // Remove sibling from list
+                debug_assert!(
+                    !self.is_free(parent, size_class + 1),
+                    "{:?} {}",
+                    parent,
+                    size_class
+                ); // parent is used
+                   // Remove sibling from list
                 self.remove(sibling, size_class);
                 debug_assert!(!self.is_free(unit, size_class)); // unit is used
                 debug_assert!(!self.is_free(sibling, size_class)); // sibling is used
-                // Merge unit and sibling
+                                                                   // Merge unit and sibling
                 unit = parent;
                 size_class += 1;
             } else {
                 debug_assert!(size_class < Self::NUM_SIZE_CLASS);
                 self.push(unit, size_class);
                 debug_assert!(self.is_free(unit, size_class)); // unit is free
-                return
+                return;
             }
         }
     }
@@ -244,7 +274,8 @@ pub trait InternalAbstractFreeList: Sized {
     /// Allocate a cell with a power-of-two alignment.
     #[inline(always)]
     fn allocate_cell_unaligned(&mut self, units: usize) -> Option<Range<Unit>> {
-        let units = (units + ((1 << Self::MIN_SIZE_CLASS) - 1)) & !((1 << Self::MIN_SIZE_CLASS) - 1);
+        let units =
+            (units + ((1 << Self::MIN_SIZE_CLASS) - 1)) & !((1 << Self::MIN_SIZE_CLASS) - 1);
         let size_class = Self::size_class(units);
         let start = self.allocate_aligned_units(size_class)?;
         if unlikely(units == (1 << size_class)) {
@@ -260,7 +291,11 @@ pub trait InternalAbstractFreeList: Sized {
         let limit = Unit(*start + units);
         while *start < *limit {
             let curr_size_class = Self::size_class(units);
-            let prev_size_class = if units == (1 << curr_size_class) { curr_size_class } else { curr_size_class - 1 };
+            let prev_size_class = if units == (1 << curr_size_class) {
+                curr_size_class
+            } else {
+                curr_size_class - 1
+            };
             let size_class = usize::min(prev_size_class, (*start).trailing_zeros() as usize);
             let size = 1usize << size_class;
             let end = Unit(*start + size);
@@ -273,9 +308,6 @@ pub trait InternalAbstractFreeList: Sized {
         debug_assert_eq!(start, limit);
     }
 }
-
-
-
 
 /// Mange cells with aligned (i.e. 2^N) start unit.
 pub trait AlignedAbstractFreeList: Sized + InternalAbstractFreeList {
@@ -328,8 +360,6 @@ pub trait AlignedAbstractFreeList: Sized + InternalAbstractFreeList {
         self.release_cell_unaligned(unit, units);
     }
 }
-
-
 
 /// Mange cells with unaligned start unit and unaligned size
 pub trait UnalignedAbstractFreeList: Sized + InternalAbstractFreeList {

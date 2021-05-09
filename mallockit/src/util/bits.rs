@@ -10,9 +10,13 @@ pub trait BitFieldSlot {
     fn get<const BITS: BitField>(&self) -> usize;
     fn set<const BITS: BitField>(&self, value: usize);
     fn delta<const BITS: BitField>(&self, delta: isize) -> usize {
-        let old = self.get::<{BITS}>();
-        let new = if delta > 0 { old + (delta as usize) } else { old - ((-delta) as usize) };
-        self.set::<{BITS}>(new);
+        let old = self.get::<{ BITS }>();
+        let new = if delta > 0 {
+            old + (delta as usize)
+        } else {
+            old - ((-delta) as usize)
+        };
+        self.set::<{ BITS }>(new);
         new
     }
 }

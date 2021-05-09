@@ -1,13 +1,12 @@
+use self::{page_resource::PageResource, page_table::PageRegistry};
+use crate::util::*;
 use std::ops::Range;
 use std::ptr;
-use crate::util::*;
-use self::{page_resource::PageResource, page_table::PageRegistry};
-pub(crate) mod page_table;
-pub mod page_resource;
-pub mod immortal_space;
 pub mod freelist_space;
+pub mod immortal_space;
 pub mod large_object_space;
-
+pub mod page_resource;
+pub(crate) mod page_table;
 
 pub static PAGE_REGISTRY: PageRegistry = PageRegistry::new();
 

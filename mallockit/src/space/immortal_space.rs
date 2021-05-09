@@ -1,7 +1,5 @@
-use super::{Allocator, Space, SpaceId, page_resource::PageResource};
+use super::{page_resource::PageResource, Allocator, Space, SpaceId};
 use crate::util::*;
-
-
 
 pub struct ImmortalSpace {
     id: SpaceId,
@@ -12,7 +10,7 @@ impl Space for ImmortalSpace {
     fn new(id: SpaceId) -> Self {
         Self {
             id,
-            pr: PageResource::new(id)
+            pr: PageResource::new(id),
         }
     }
 
@@ -46,7 +44,10 @@ impl BumpAllocator {
     fn alloc_slow(&mut self, layout: Layout) -> Option<Address> {
         assert!(!self.retry);
         let block_size = Size2M::BYTES;
-        let alloc_size = AllocationArea::align_up(usize::max(layout.size(), block_size) + std::mem::size_of::<Layout>(), Size2M::BYTES);
+        let alloc_size = AllocationArea::align_up(
+            usize::max(layout.size(), block_size) + std::mem::size_of::<Layout>(),
+            Size2M::BYTES,
+        );
         let alloc_pages = alloc_size >> Size2M::LOG_BYTES;
         let pages = self.space.acquire::<Size2M>(alloc_pages)?;
         let top = pages.start.start();
@@ -68,7 +69,7 @@ impl Allocator for BumpAllocator {
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         if let Some(ptr) = self.allocation_area.alloc_with_layout(layout) {
-            return Some(ptr)
+            return Some(ptr);
         }
         self.alloc_slow(layout)
     }

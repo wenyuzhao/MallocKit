@@ -1,8 +1,6 @@
-use std::{intrinsics::unlikely, marker::PhantomData, ops::Range, ptr::NonNull};
-use crate::util::*;
 use super::abstract_freelist::*;
-
-
+use crate::util::*;
+use std::{intrinsics::unlikely, marker::PhantomData, ops::Range, ptr::NonNull};
 
 #[derive(Debug)]
 #[repr(C)]
@@ -35,7 +33,10 @@ pub trait AddressSpaceConfig: Sized {
 }
 
 /// Manage allocation of 0..(1 << NUM_SIZE_CLASS) units
-pub struct UnalignedFreeList<Config: AddressSpaceConfig> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
+pub struct UnalignedFreeList<Config: AddressSpaceConfig>
+where
+    [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized,
+{
     #[allow(unused)]
     shared: bool,
     base: Address,
@@ -43,10 +44,14 @@ pub struct UnalignedFreeList<Config: AddressSpaceConfig> where [Option<CellPtr>;
     phantom: PhantomData<Config>,
 }
 
-impl<Config: AddressSpaceConfig>  InternalAbstractFreeList for UnalignedFreeList<Config> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
+impl<Config: AddressSpaceConfig> InternalAbstractFreeList for UnalignedFreeList<Config>
+where
+    [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized,
+{
     const MIN_SIZE_CLASS: usize = 2;
     const NUM_SIZE_CLASS: usize = Config::NUM_SIZE_CLASS;
-    const NON_COALESCEABLE_SIZE_CLASS_THRESHOLD: usize = Config::LOG_MAX_CELL_SIZE - Config::LOG_MIN_ALIGNMENT;
+    const NON_COALESCEABLE_SIZE_CLASS_THRESHOLD: usize =
+        Config::LOG_MAX_CELL_SIZE - Config::LOG_MIN_ALIGNMENT;
 
     #[inline(always)]
     fn is_free(&self, unit: Unit, size_class: usize) -> bool {
@@ -76,7 +81,7 @@ impl<Config: AddressSpaceConfig>  InternalAbstractFreeList for UnalignedFreeList
 
     #[inline(always)]
     fn push_cell(&mut self, unit: Unit, size_class: usize) {
-        if cfg!(feature="slow_assert") {
+        if cfg!(feature = "slow_assert") {
             debug_assert!(!self.is_on_current_list_slow(unit, None));
         }
         let head = self.table[size_class];
@@ -94,7 +99,7 @@ impl<Config: AddressSpaceConfig>  InternalAbstractFreeList for UnalignedFreeList
         cell.next = head;
         self.table[size_class] = Some(cell_ptr);
         debug_assert!(self.cell_to_unit(cell_ptr) == unit);
-        if cfg!(feature="slow_assert") {
+        if cfg!(feature = "slow_assert") {
             debug_assert!(self.is_on_current_list_slow(unit, Some(size_class)));
         }
     }
@@ -148,7 +153,10 @@ impl<Config: AddressSpaceConfig>  InternalAbstractFreeList for UnalignedFreeList
     }
 }
 
-impl<Config: AddressSpaceConfig> UnalignedFreeList<Config> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
+impl<Config: AddressSpaceConfig> UnalignedFreeList<Config>
+where
+    [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized,
+{
     pub const fn new(shared: bool, base: Address) -> Self {
         debug_assert!(std::mem::size_of::<Cell>() == 32);
         Self {
@@ -171,7 +179,7 @@ impl<Config: AddressSpaceConfig> UnalignedFreeList<Config> where [Option<CellPtr
     }
 
     fn is_on_current_list_slow(&self, unit: Unit, size_class: Option<usize>) -> bool {
-        assert!(cfg!(feature="slow_assert"));
+        assert!(cfg!(feature = "slow_assert"));
         if let Some(sz) = size_class {
             let mut head = self.table[sz];
             while let Some(c) = head {
@@ -203,7 +211,10 @@ impl<Config: AddressSpaceConfig> UnalignedFreeList<Config> where [Option<CellPtr
     }
 }
 
-impl<Config: AddressSpaceConfig> UnalignedAbstractFreeList for UnalignedFreeList<Config> where [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized {
+impl<Config: AddressSpaceConfig> UnalignedAbstractFreeList for UnalignedFreeList<Config>
+where
+    [Option<CellPtr>; Config::NUM_SIZE_CLASS]: Sized,
+{
     #[inline(always)]
     fn unit_to_value(&self, unit: Unit) -> Address {
         Address::from(self.unit_to_cell(unit).as_ptr())

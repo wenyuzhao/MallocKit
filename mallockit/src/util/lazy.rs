@@ -1,16 +1,14 @@
-use std::sync::atomic::{AtomicU8, Ordering};
-use std::ops::{Deref, DerefMut};
-use std::mem::MaybeUninit;
 use std::cell::Cell;
-use std::sync::atomic::*;
-use std::marker::PhantomData;
 use std::intrinsics::likely;
+use std::marker::PhantomData;
+use std::mem::MaybeUninit;
+use std::ops::{Deref, DerefMut};
+use std::sync::atomic::*;
+use std::sync::atomic::{AtomicU8, Ordering};
 
 const UNINITIALIZED: u8 = 0;
 const INITIALIZING: u8 = 1;
 const INITIALIZED: u8 = 2;
-
-
 
 pub trait ThreadLocality: Sized {
     const THREAD_LOCAL: bool;
@@ -42,7 +40,7 @@ pub struct Lazy<T, TL: ThreadLocality = Shared, F: FnOnce() -> T = fn() -> T> {
     phantom: PhantomData<TL>,
 }
 
-impl <T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
+impl<T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
     pub const fn new(f: F) -> Self {
         Self {
             state: AtomicU8::new(UNINITIALIZED),
@@ -65,25 +63,23 @@ impl <T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
 
     #[inline(never)]
     fn force_slow(lazy: &Self) {
-        let result = lazy.state.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |state| match state {
-            UNINITIALIZED => Some(INITIALIZING),
-            _ => None,
-        });
+        let result =
+            lazy.state
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |state| match state {
+                    UNINITIALIZED => Some(INITIALIZING),
+                    _ => None,
+                });
         match result {
             Ok(UNINITIALIZED) => {
                 lazy.force_initialize();
             }
-            Err(INITIALIZING) => {
-                loop {
-                    std::hint::spin_loop();
-                    if INITIALIZED == lazy.state.load(Ordering::SeqCst) {
-                        break;
-                    }
+            Err(INITIALIZING) => loop {
+                std::hint::spin_loop();
+                if INITIALIZED == lazy.state.load(Ordering::SeqCst) {
+                    break;
                 }
-            }
-            Err(INITIALIZED) => {
-                Self::force(lazy)
             },
+            Err(INITIALIZED) => Self::force(lazy),
             s => unreachable!("Broken state {:?}", s),
         }
     }
@@ -97,7 +93,7 @@ impl <T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
     #[inline(always)]
     pub fn force(lazy: &Self) {
         if likely(INITIALIZED == lazy.state.load(Ordering::Relaxed)) {
-            return
+            return;
         }
         TL::force_slow(lazy);
     }
@@ -108,7 +104,7 @@ impl <T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
     }
 }
 
-impl <T, TL: ThreadLocality, F: FnOnce() -> T> Deref for Lazy<T, TL, F> {
+impl<T, TL: ThreadLocality, F: FnOnce() -> T> Deref for Lazy<T, TL, F> {
     type Target = T;
     #[inline(always)]
     fn deref(&self) -> &T {
@@ -117,7 +113,7 @@ impl <T, TL: ThreadLocality, F: FnOnce() -> T> Deref for Lazy<T, TL, F> {
     }
 }
 
-impl <T, TL: ThreadLocality, F: FnOnce() -> T> DerefMut for Lazy<T, TL, F> {
+impl<T, TL: ThreadLocality, F: FnOnce() -> T> DerefMut for Lazy<T, TL, F> {
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut T {
         Lazy::force(self);
@@ -125,19 +121,19 @@ impl <T, TL: ThreadLocality, F: FnOnce() -> T> DerefMut for Lazy<T, TL, F> {
     }
 }
 
-impl <T, TL: ThreadLocality, F: FnOnce() -> T> AsRef<T> for Lazy<T, TL, F> {
+impl<T, TL: ThreadLocality, F: FnOnce() -> T> AsRef<T> for Lazy<T, TL, F> {
     #[inline(always)]
     fn as_ref(&self) -> &T {
         self.deref()
     }
 }
 
-impl <T: Default, TL: ThreadLocality> Default for Lazy<T, TL, fn() -> T> {
+impl<T: Default, TL: ThreadLocality> Default for Lazy<T, TL, fn() -> T> {
     #[inline]
     fn default() -> Self {
         Lazy::new(T::default)
     }
 }
 
-unsafe impl <T, TL: ThreadLocality, F: FnOnce() -> T> Send for Lazy<T, TL, F> {}
-unsafe impl <T, TL: ThreadLocality, F: FnOnce() -> T> Sync for Lazy<T, TL, F> {}
+unsafe impl<T, TL: ThreadLocality, F: FnOnce() -> T> Send for Lazy<T, TL, F> {}
+unsafe impl<T, TL: ThreadLocality, F: FnOnce() -> T> Sync for Lazy<T, TL, F> {}

@@ -1,6 +1,5 @@
-use super::{Allocator, Space, SpaceId, page_resource::PageResource};
+use super::{page_resource::PageResource, Allocator, Space, SpaceId};
 use crate::util::*;
-
 
 pub struct LargeObjectSpace {
     id: SpaceId,
@@ -11,7 +10,7 @@ impl Space for LargeObjectSpace {
     fn new(id: SpaceId) -> Self {
         Self {
             id,
-            pr: PageResource::new(id)
+            pr: PageResource::new(id),
         }
     }
 
@@ -26,8 +25,6 @@ impl Space for LargeObjectSpace {
     }
 }
 
-
-
 pub struct LargeObjectAllocator(pub Lazy<&'static LargeObjectSpace, Local>);
 
 impl LargeObjectAllocator {
@@ -40,7 +37,10 @@ impl LargeObjectAllocator {
 impl Allocator for LargeObjectAllocator {
     #[inline(always)]
     fn get_layout(&self, ptr: Address) -> Layout {
-        let pages = self.space().page_resource().get_contiguous_pages(Page::<Size2M>::new(ptr));
+        let pages = self
+            .space()
+            .page_resource()
+            .get_contiguous_pages(Page::<Size2M>::new(ptr));
         let bytes = pages << Size2M::LOG_BYTES;
         debug_assert!(bytes.is_power_of_two());
         unsafe { Layout::from_size_align_unchecked(bytes, bytes) }

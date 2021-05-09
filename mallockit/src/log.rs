@@ -1,15 +1,17 @@
 use libc;
-use std::intrinsics::unlikely;
+use spin::Mutex;
 use std::fmt;
 use std::fmt::Write;
-use spin::Mutex;
+use std::intrinsics::unlikely;
 
 #[doc(hidden)]
 #[inline(never)]
 pub fn _print(args: fmt::Arguments<'_>, new_line: bool) {
     let mut log = LOG.lock();
     log.write_fmt(args).unwrap();
-    if new_line { log.put_char('\n' as _); }
+    if new_line {
+        log.put_char('\n' as _);
+    }
     log.flush();
 }
 
