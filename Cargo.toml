@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "mallockit",
+    "mallockit/proc_macro",
     "bump",
     "buddy",
 ]

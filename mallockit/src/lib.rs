@@ -36,6 +36,9 @@ pub mod malloc;
 pub mod space;
 pub mod stat;
 
+extern crate mallockit_proc_macro;
+pub use mallockit_proc_macro::plan;
+
 use core::alloc::Layout;
 pub use ctor::ctor;
 pub use libc;

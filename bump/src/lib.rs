@@ -1,16 +1,9 @@
 #![allow(incomplete_features)]
 #![feature(impl_trait_in_bindings)]
 #![feature(min_type_alias_impl_trait)]
-#![feature(core_intrinsics)]
-#![feature(const_raw_ptr_to_usize_cast)]
 #![feature(thread_local)]
-#![feature(allocator_api)]
-#![feature(const_ptr_offset)]
-#![feature(const_raw_ptr_deref)]
-#![feature(const_mut_refs)]
 #![feature(const_fn_fn_ptr_basics)]
 
-#[macro_use]
 extern crate mallockit;
 
 use core::alloc::Layout;
@@ -76,9 +69,8 @@ impl Mutator for BumpMutator {
     fn dealloc(&mut self, _: Address) {}
 }
 
+#[mallockit::plan]
 static PLAN: Lazy<Bump> = Lazy::new(|| Bump::new());
 
 #[thread_local]
 static mut MUTATOR: BumpMutator = BumpMutator::new();
-
-export_malloc_api!(PLAN);
