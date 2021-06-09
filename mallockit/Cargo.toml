@@ -12,7 +12,6 @@ errno = "0.2"
 spin = "0.9"
 ctor = "0.1"
 libmimalloc-sys = "0.1"
-derive_more = "0.99"
 
 [features]
 default = [ "transparent_huge_page" ]

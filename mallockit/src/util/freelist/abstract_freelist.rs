@@ -1,12 +1,20 @@
 use crate::util::*;
 use std::{
     intrinsics::unlikely,
-    ops::{Add, Range},
+    ops::{Add, Deref, Range},
 };
 
-#[derive(Deref, Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C)]
 pub struct Unit(pub(super) usize);
+
+impl const Deref for Unit {
+    type Target = usize;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl Unit {
     const fn parent(&self, size_class: usize) -> Self {
@@ -105,9 +113,17 @@ impl LazyBst {
     }
 }
 
-#[derive(Deref, Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C)]
 pub struct BstIndex(usize);
+
+impl const Deref for BstIndex {
+    type Target = usize;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 /// Manage allocation of 0..(1 << NUM_SIZE_CLASS) units
 pub trait InternalAbstractFreeList: Sized {

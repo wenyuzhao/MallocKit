@@ -228,7 +228,7 @@ impl fmt::Debug for Address {
     }
 }
 
-unsafe impl const Step for Address {
+impl const Step for Address {
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
         if start.0 > end.0 {
             None

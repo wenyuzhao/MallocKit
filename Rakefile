@@ -34,7 +34,8 @@ end
 
 task :test => :build do
     if test_program
-        execute test_program, perf:perf_events
+        dylib = BenchmarkSuite::get_malloc_dylib(malloc)
+        execute test_program, perf:perf_events, env:{'LD_PRELOAD' => dylib}
     else
         bench = BenchmarkSuite::get(benchmark)
         bench.run malloc, perf:perf_events

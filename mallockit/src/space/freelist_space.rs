@@ -26,7 +26,7 @@ impl FreeList for BitMapFreeList {
 pub struct HeaderFreeList;
 
 impl FreeList for HeaderFreeList {
-    type FreeList = UnalignedFreeList<AddressSpace>;
+    type FreeList = UnalignedFreeList<AddressSpace, { AddressSpace::NUM_SIZE_CLASS }>;
 
     #[inline(always)]
     fn can_allocate(layout: Layout) -> bool {

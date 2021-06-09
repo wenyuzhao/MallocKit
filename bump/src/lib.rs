@@ -2,7 +2,6 @@
 #![feature(impl_trait_in_bindings)]
 #![feature(min_type_alias_impl_trait)]
 #![feature(core_intrinsics)]
-#![feature(const_fn)]
 #![feature(const_raw_ptr_to_usize_cast)]
 #![feature(thread_local)]
 #![feature(allocator_api)]

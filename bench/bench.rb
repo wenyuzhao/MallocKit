@@ -1,12 +1,17 @@
 
 
-def execute(command, perf: true)
+def execute(command, perf: true, env: {})
     perf_prefix = ""
     if perf != false
         events_arg = perf == "" || perf == true ? "" : "-e #{perf}"
         perf_prefix = "perf stat --no-scale #{events_arg}".strip
     end
-    🔵 "#{perf_prefix} #{command}"
+    env_prefix = ""
+    if env.length > 0
+        env_prefix = "env"
+        env.each {|k, v| env_prefix += " #{k}=#{v}" }
+    end
+    🔵 "#{env_prefix} #{perf_prefix} #{command}"
 end
 
 class Benchmark

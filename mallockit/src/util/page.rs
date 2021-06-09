@@ -124,7 +124,7 @@ impl<S: PageSize> const Ord for Page<S> {
     }
 }
 
-unsafe impl<S: PageSize> const Step for Page<S> {
+impl<S: PageSize> const Step for Page<S> {
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
         if start.0.get() > end.0.get() {
             None

@@ -1,6 +1,5 @@
 #![allow(incomplete_features)]
 #![feature(core_intrinsics)]
-#![feature(const_fn)]
 #![feature(maybe_uninit_extra)]
 #![feature(const_fn_fn_ptr_basics)]
 #![feature(const_trait_impl)]
@@ -12,7 +11,6 @@
 #![feature(const_ptr_is_null)]
 #![feature(type_ascription)]
 #![feature(step_trait)]
-#![feature(step_trait_ext)]
 #![feature(const_likely)]
 #![feature(thread_local)]
 #![feature(allocator_api)]
@@ -25,9 +23,8 @@
 #![feature(const_generics)]
 #![feature(const_evaluatable_checked)]
 #![feature(associated_type_defaults)]
-
-#[macro_use]
-extern crate derive_more;
+#![feature(const_fn_trait_bound)]
+#![feature(const_generics_defaults)]
 
 #[macro_use]
 pub mod log;
