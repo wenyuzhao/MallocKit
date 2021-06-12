@@ -40,7 +40,11 @@ class BenchmarkSuite
     PROCS = `nproc`.to_i
     BENCH_DIR = "./bench/mimalloc-bench/bench"
     EXTERN_DIR = "./bench/mimalloc-bench/extern"
-    DYLIB = "so"
+    if (/darwin/ =~ RUBY_PLATFORM) != nil
+        DYLIB = "dylib"
+    else
+        DYLIB = "so"
+    end
 
     public
     BENCHMARKS = [
@@ -70,7 +74,7 @@ class BenchmarkSuite
     }
 
     def BenchmarkSuite.get_malloc_dylib(malloc)
-        BenchmarkSuite::CONTROL_ALGORITHMS[malloc] || "./target/#{$release ? "release" : "debug"}/lib#{malloc}.so"
+        BenchmarkSuite::CONTROL_ALGORITHMS[malloc] || "./target/#{$release ? "release" : "debug"}/lib#{malloc}.#{DYLIB}"
     end
 
     def BenchmarkSuite.get(benchmark)

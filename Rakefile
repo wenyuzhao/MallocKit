@@ -14,7 +14,7 @@ $release = ENV["profile"] == "release"
 malloc = ENV["malloc"] || "bump"
 stat = ENV["stat"] || false
 perf_events = 'page-faults,instructions,dTLB-loads,dTLB-load-misses,cache-misses,cache-references'
-test_program = ENV["program"] || false
+test_program = ENV["program"] || "cargo"
 benchmark = ENV["bench"] || "alloc-test1"
 
 
@@ -35,7 +35,11 @@ end
 task :test => :build do
     if test_program
         dylib = BenchmarkSuite::get_malloc_dylib(malloc)
-        execute test_program, perf:perf_events, env:{'LD_PRELOAD' => dylib}
+        if (/darwin/ =~ RUBY_PLATFORM) != nil
+            execute test_program, perf:false, env:{'DYLD_INSERT_LIBRARIES' => dylib}
+        else
+            execute test_program, perf:perf_events, env:{'LD_PRELOAD' => dylib}
+        end
     else
         bench = BenchmarkSuite::get(benchmark)
         bench.run malloc, perf:perf_events
