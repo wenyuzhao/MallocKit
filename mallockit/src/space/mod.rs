@@ -5,8 +5,10 @@ use std::ptr;
 pub mod freelist_space;
 pub mod immortal_space;
 pub mod large_object_space;
+pub(crate) mod meta_space;
 pub mod page_resource;
 pub(crate) mod page_table;
+pub use meta_space::META_SPACE;
 
 pub static PAGE_REGISTRY: PageRegistry = PageRegistry::new();
 
@@ -20,8 +22,8 @@ impl SpaceId {
     pub(crate) const SHIFT: usize = Self::LOG_MAX_SPACE_SIZE;
     pub(crate) const MASK: usize = 0b1111 << Self::SHIFT;
 
-    pub const DEFAULT: Self = Self(0);
-    pub const LARGE_OBJECT_SPACE: Self = Self(1);
+    pub const DEFAULT: Self = Self(1);
+    pub const LARGE_OBJECT_SPACE: Self = Self::DEFAULT.next();
 
     pub const fn next(&self) -> Self {
         debug_assert!(self.0 != 0b1111);

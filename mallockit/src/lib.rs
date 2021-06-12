@@ -25,6 +25,7 @@
 #![feature(associated_type_defaults)]
 #![feature(const_fn_trait_bound)]
 #![feature(const_generics_defaults)]
+#![feature(asm)]
 
 #[macro_use]
 pub mod log;
@@ -35,9 +36,11 @@ pub mod hooks;
 pub mod malloc;
 pub mod space;
 pub mod stat;
+pub mod thread_local;
 
 extern crate mallockit_proc_macro;
-pub use mallockit_proc_macro::plan;
+pub use mallockit_proc_macro::*;
+use thread_local::TLS;
 
 use core::alloc::Layout;
 pub use ctor::ctor;
@@ -54,10 +57,15 @@ pub trait Plan: Sized + 'static {
     fn get_layout(&self, ptr: Address) -> Layout;
 }
 
-pub trait Mutator: Sized + 'static {
+pub trait Mutator: Sized + 'static + TLS {
     type Plan: Plan<Mutator = Self>;
+    const NEW: Self;
 
-    fn current() -> &'static mut Self;
+    #[inline(always)]
+    fn current() -> &'static mut Self {
+        <Self as TLS>::current()
+    }
+
     fn plan(&self) -> &'static Self::Plan;
 
     #[inline(always)]

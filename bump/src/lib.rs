@@ -30,6 +30,7 @@ impl Plan for Bump {
     }
 }
 
+#[mallockit::mutator]
 struct BumpMutator {
     bump: BumpAllocator,
 }
@@ -44,11 +45,7 @@ impl BumpMutator {
 
 impl Mutator for BumpMutator {
     type Plan = Bump;
-
-    #[inline(always)]
-    fn current() -> &'static mut Self {
-        unsafe { &mut MUTATOR }
-    }
+    const NEW: Self = Self::new();
 
     #[inline(always)]
     fn plan(&self) -> &'static Self::Plan {
@@ -71,6 +68,3 @@ impl Mutator for BumpMutator {
 
 #[mallockit::plan]
 static PLAN: Lazy<Bump> = Lazy::new(|| Bump::new());
-
-#[thread_local]
-static mut MUTATOR: BumpMutator = BumpMutator::new();
