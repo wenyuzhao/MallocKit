@@ -46,10 +46,11 @@ task :test => :build do
     end
 end
 
-task :gdb => :build do
+task :lldb => :build do
     dylib = BenchmarkSuite::get_malloc_dylib(malloc)
-    command = BenchmarkSuite::get(benchmark).command
-    🔵 "rust-gdb -ex=\"set confirm on\" -ex \"set environment LD_PRELOAD=#{dylib}\" -ex \"run\" -ex \"quit\" --args #{command}"
+    cmd = ARGV[(ARGV.index("--") + 1)..-1].join(" ")
+    🔵 "rust-lldb -b -o 'settings set auto-confirm true' -o 'env LD_PRELOAD=#{dylib}' -o 'r' -- '#{cmd}' "
+    exit 0
 end
 
 task :release do
