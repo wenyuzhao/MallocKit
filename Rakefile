@@ -32,18 +32,11 @@ task :build do
 	`llvm-objdump -d -S #{target_dir}/lib#{malloc}.a > #{target_dir}/lib#{malloc}.s 2>/dev/null`
 end
 
-task :test => :build do
-    if test_program
-        dylib = BenchmarkSuite::get_malloc_dylib(malloc)
-        if (/darwin/ =~ RUBY_PLATFORM) != nil
-            execute test_program, perf:false, env:{'DYLD_INSERT_LIBRARIES' => dylib}
-        else
-            execute test_program, perf:perf_events, env:{'LD_PRELOAD' => dylib}
-        end
-    else
-        bench = BenchmarkSuite::get(benchmark)
-        bench.run malloc, perf:perf_events
-    end
+task :test do
+    args = []
+    $release && args.push("--release")
+    🔵 "cargo build #{args.join(' ')}"
+    🔵 "cargo test"
 end
 
 task :gdb => :build do

@@ -12,6 +12,12 @@ $ env LD_PRELOAD=./target/release/libbump.so cargo # or some other command
 $ env DYLD_INSERT_LIBRARIES=./target/release/libbump.so cargo # or some other command
 ```
 
+## Tests
+
+```console
+$ rake test
+```
+
 ## Benchmarking
 
 ...WIP
