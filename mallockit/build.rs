@@ -23,14 +23,21 @@ fn main() {
         .as_vec()
         .unwrap()
         .iter()
-        .map(|x| x.as_str().unwrap())
+        .map(|x| x.as_str().unwrap().to_owned())
+        .collect::<Vec<_>>()
+        .join(", ");
+    let slow_mallocs = meta["slow-algorithms"]
+        .as_vec()
+        .unwrap()
+        .iter()
+        .map(|x| x.as_str().unwrap().to_owned())
         .collect::<Vec<_>>()
         .join(", ");
     fs::write(
         &dest_path,
         format!(
-            "mallockit::name_list!(malloc_implementations: {});",
-            mallocs
+            "mallockit::name_list!(malloc_implementations: {});\nmallockit::name_list!(slow_malloc_implementations: {});",
+            mallocs, slow_mallocs,
         ),
     )
     .unwrap();

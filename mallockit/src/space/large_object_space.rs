@@ -42,12 +42,12 @@ impl Allocator for LargeObjectAllocator {
             .page_resource()
             .get_contiguous_pages(Page::<Size4K>::new(ptr));
         let bytes = pages << Size4K::LOG_BYTES;
-        debug_assert!(bytes.is_power_of_two());
         unsafe { Layout::from_size_align_unchecked(bytes, bytes) }
     }
 
     #[inline(always)]
-    fn alloc(&mut self, layout: Layout) -> Option<Address> {
+    fn alloc(&mut self, mut layout: Layout) -> Option<Address> {
+        layout = layout.pad_to_align();
         let size = layout.size();
         let pages = (size + Page::<Size4K>::MASK) >> Page::<Size4K>::LOG_BYTES;
         let start_page = self.space().acquire::<Size4K>(pages)?.start;

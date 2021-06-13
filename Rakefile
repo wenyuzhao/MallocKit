@@ -9,13 +9,14 @@ def 🔵(command, cwd: '.', log: true)
 end
 
 
-
+ENV["RUST_BACKTRACE"] = "1"
 $release = ENV["profile"] == "release"
 malloc = ENV["malloc"] || "bump"
 stat = ENV["stat"] || false
 perf_events = 'page-faults,instructions,dTLB-loads,dTLB-load-misses,cache-misses,cache-references'
 test_program = ENV["program"] || "cargo"
 benchmark = ENV["bench"] || "alloc-test1"
+slow_tests = ENV.has_key?("slow_tests")
 
 
 
@@ -33,10 +34,14 @@ task :build do
 end
 
 task :test do
+    features = []
+    stat && features.push("stat")
+    slow_tests && features.push("slow_tests")
     args = []
     $release && args.push("--release")
+    features.length() != 0 && args.push("--features=" + features.join(','))
     🔵 "cargo build #{args.join(' ')}"
-    🔵 "cargo test"
+    🔵 "cargo test #{args.join(' ')}"
 end
 
 task :gdb => :build do

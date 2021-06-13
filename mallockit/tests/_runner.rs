@@ -37,6 +37,8 @@ macro_rules! test_all_malloc {
             };
         }
         malloc_implementations!(__test_all_malloc);
+        #[cfg(feature = "slow_tests")]
+        slow_malloc_implementations!(__test_all_malloc);
     };
 }
 

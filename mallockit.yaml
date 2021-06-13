@@ -1,5 +1,7 @@
 algorithms:
   - bump
   - buddy
-  # Too slow...
-  # - sanity
+
+# Inefficient algorithms. May take too long to run the tests.
+slow-algorithms:
+  - sanity
