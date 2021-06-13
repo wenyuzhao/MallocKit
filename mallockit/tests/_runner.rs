@@ -4,9 +4,7 @@ use std::{
     process::Command,
 };
 
-#[path = "./_malloc-implementations.rs"]
-#[macro_use]
-mod config;
+include!(concat!(env!("OUT_DIR"), "/malloc_implementations.rs"));
 
 #[macro_export]
 macro_rules! tests_dir {

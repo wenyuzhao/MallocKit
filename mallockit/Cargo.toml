@@ -13,6 +13,9 @@ spin = "0.9"
 ctor = "0.1"
 mallockit_proc_macro = { path = "./proc_macro" }
 
+[build-dependencies]
+yaml-rust = "0.4.5"
+
 [dev-dependencies]
 concat-idents = "1.1.2"
 
