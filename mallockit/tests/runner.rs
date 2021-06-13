@@ -1,6 +1,8 @@
 use std::{path::PathBuf, process::Command};
 
-const MALLOC_IMPLEMENTATIONS: &'static [&'static str] = &["bump", "buddy"];
+#[path = "./malloc-implementations.rs"]
+#[macro_use]
+mod config;
 
 #[macro_export]
 macro_rules! tests_dir {
@@ -13,13 +15,27 @@ macro_rules! tests_dir {
 }
 
 #[macro_export]
-macro_rules! for_each_test {
-    ($filename: expr) => {{
-        let mut p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        p.push("tests");
-        p.push($filename);
-        p.to_str().unwrap().to_owned()
-    }};
+macro_rules! test_malloc {
+    ($runner: ident, $malloc: ident) => {
+        concat_idents::concat_idents!(test_name = $runner, _, $malloc {
+            #[test]
+            fn test_name() {
+                $runner(stringify!($malloc));
+            }
+        });
+    };
+}
+
+#[macro_export]
+macro_rules! test_all_malloc {
+    ($runner: ident) => {
+        macro_rules! __test_all_malloc {
+            ($malloc: ident) => {
+                test_malloc!($runner, $malloc);
+            };
+        }
+        malloc_implementations!(__test_all_malloc);
+    };
 }
 
 fn exec_with_malloc_wrapper(malloc: &str, cmd: &str, args: &[&str]) {
@@ -56,34 +72,6 @@ fn exec_with_malloc_wrapper(malloc: &str, cmd: &str, args: &[&str]) {
     assert!(output.status.success());
 }
 
-pub fn test(cmd: &str, args: &[&str]) {
-    for malloc in MALLOC_IMPLEMENTATIONS {
-        exec_with_malloc_wrapper(malloc, cmd, args);
-    }
+pub fn test(malloc: &str, cmd: &str, args: &[&str]) {
+    exec_with_malloc_wrapper(malloc, cmd, args);
 }
-
-// pub fn exec_with_malloc_wrapper<
-//     Cmd: AsRef<OsStr>,
-//     Arg: AsRef<OsStr>,
-//     Args: IntoIterator<Item = Arg>,
-// >(
-//     cmd: Cmd,
-//     args: Args,
-// ) {
-//     let mut dylib = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-//     dylib.push("..");
-//     dylib.push("target");
-//     if cfg!(debug_assertions) {
-//         dylib.push("debug");
-//     } else {
-//         dylib.push("release");
-//     }
-//     dylib.push("libbump.dylib");
-//     let child = Command::new("clang")
-//         .args(args)
-//         .env("DYLD_INSERT_LIBRARIES", dylib)
-//         .spawn()
-//         .unwrap();
-//     let output = child.wait_with_output().unwrap();
-//     assert!(output.status.success());
-// }

@@ -72,3 +72,14 @@ pub fn interpose(_attr: TokenStream, item: TokenStream) -> TokenStream {
     };
     result.into()
 }
+
+#[proc_macro_attribute]
+pub fn malloc_test(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(item as syn::ItemFn);
+    let name = &input.sig.ident;
+    let result = quote! {
+        #input
+        crate::test_all_malloc!(#name);
+    };
+    result.into()
+}

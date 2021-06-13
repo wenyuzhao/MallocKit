@@ -1,7 +1,7 @@
 #[macro_use]
 mod runner;
 
-#[test]
-fn clang() {
-    runner::test("clang", &[&tests_dir!("test.c"), "-o", "/dev/null"]);
+#[mallockit::malloc_test]
+fn clang(malloc: &str) {
+    runner::test(malloc, "clang", &[&tests_dir!("test.c"), "-o", "/dev/null"]);
 }
