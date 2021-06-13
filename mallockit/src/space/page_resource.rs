@@ -38,23 +38,28 @@ impl PageResource {
     fn map_pages<S: PageSize>(&self, start: Page<S>, pages: usize) -> bool {
         let size = pages << S::LOG_BYTES;
         let addr = unsafe {
+            #[cfg(target_os = "linux")]
+            const MAP_FIXED: libc::c_int = libc::MAP_FIXED_NOREPLACE;
+            #[cfg(target_os = "macos")]
+            const MAP_FIXED: libc::c_int = 0; // `libc::MAP_FIXED` may trigger EXC_GUARD.
             libc::mmap(
                 start.start().as_mut_ptr(),
                 size,
                 libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_FIXED_NOREPLACE,
+                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | MAP_FIXED,
                 -1,
                 0,
             )
         };
-        if cfg!(feature = "transparent_huge_page") && S::LOG_BYTES != Size4K::LOG_BYTES {
-            unsafe {
-                libc::madvise(start.start().as_mut_ptr(), size, libc::MADV_HUGEPAGE);
-            }
-        }
-        if addr == libc::MAP_FAILED {
+        if addr == libc::MAP_FAILED || addr != start.start().as_mut_ptr() {
             false
         } else {
+            #[cfg(target_os = "linux")]
+            if cfg!(feature = "transparent_huge_page") && S::LOG_BYTES != Size4K::LOG_BYTES {
+                unsafe {
+                    libc::madvise(start.start().as_mut_ptr(), size, libc::MADV_HUGEPAGE);
+                }
+            }
             self.committed_size
                 .fetch_add(pages << S::LOG_BYTES, Ordering::SeqCst);
             true

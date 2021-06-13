@@ -14,3 +14,15 @@ pub use lab::*;
 pub use lazy::*;
 pub use page::*;
 pub use sys_alloc::*;
+
+#[macro_export]
+macro_rules! name_list {
+    ($name: ident: $($id: ident),* $(,)*) => {
+        #[macro_export]
+        macro_rules! $name {
+            ($__: ident) => {
+                $($__!($id);)*
+            };
+        }
+    };
+}

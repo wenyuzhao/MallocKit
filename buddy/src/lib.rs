@@ -43,6 +43,7 @@ impl Plan for Buddy {
 // type FreeListKind = BitMapFreeList;
 type FreeListKind = HeaderFreeList;
 
+#[mallockit::mutator]
 struct BuddyMutator {
     freelist: FreeListAllocator<FreeListKind>,
     los: LargeObjectAllocator,
@@ -62,11 +63,7 @@ impl BuddyMutator {
 
 impl Mutator for BuddyMutator {
     type Plan = Buddy;
-
-    #[inline(always)]
-    fn current() -> &'static mut Self {
-        unsafe { &mut MUTATOR }
-    }
+    const NEW: Self = Self::new();
 
     #[inline(always)]
     fn plan(&self) -> &'static Self::Plan {
@@ -98,8 +95,8 @@ impl Mutator for BuddyMutator {
         if likely(FREELIST_SPACE.contains(ptr)) {
             mallockit::stat::track_deallocation(false);
             self.freelist.dealloc(ptr)
-        } else {
-            mallockit::stat::track_deallocation(true);
+        } else if LARGE_OBJECT_SPACE.contains(ptr) {
+            mallockit::stat::track_deallocation(false);
             self.los.dealloc(ptr)
         }
     }
@@ -107,6 +104,3 @@ impl Mutator for BuddyMutator {
 
 #[mallockit::plan]
 static PLAN: Lazy<Buddy> = Lazy::new(|| Buddy::new());
-
-#[thread_local]
-static mut MUTATOR: BuddyMutator = BuddyMutator::new();

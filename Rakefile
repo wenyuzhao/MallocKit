@@ -14,7 +14,7 @@ $release = ENV["profile"] == "release"
 malloc = ENV["malloc"] || "bump"
 stat = ENV["stat"] || false
 perf_events = 'page-faults,instructions,dTLB-loads,dTLB-load-misses,cache-misses,cache-references'
-test_program = ENV["program"] || false
+test_program = ENV["program"] || "cargo"
 benchmark = ENV["bench"] || "alloc-test1"
 
 
@@ -32,20 +32,25 @@ task :build do
 	`llvm-objdump -d -S #{target_dir}/lib#{malloc}.a > #{target_dir}/lib#{malloc}.s 2>/dev/null`
 end
 
-task :test => :build do
-    if test_program
-        dylib = BenchmarkSuite::get_malloc_dylib(malloc)
-        execute test_program, perf:perf_events, env:{'LD_PRELOAD' => dylib}
-    else
-        bench = BenchmarkSuite::get(benchmark)
-        bench.run malloc, perf:perf_events
-    end
+task :test do
+    args = []
+    $release && args.push("--release")
+    🔵 "cargo build #{args.join(' ')}"
+    🔵 "cargo test"
 end
 
 task :gdb => :build do
-    dylib = BenchmarkSuite::get_malloc_dylib(malloc)
-    command = BenchmarkSuite::get(benchmark).command
-    🔵 "rust-gdb -ex=\"set confirm on\" -ex \"set environment LD_PRELOAD=#{dylib}\" -ex \"run\" -ex \"quit\" --args #{command}"
+    dylib_env = BenchmarkSuite::get_env(malloc)
+    cmd = ARGV[(ARGV.index("--") + 1)..-1].join(" ")
+    🔵 "rust-gdb -ex='set confirm on' -ex 'set environment #{dylib_env}' -ex 'run' -ex 'quit' --args #{cmd}"
+    exit 0
+end
+
+task :lldb => :build do
+    dylib_env = BenchmarkSuite::get_env(malloc)
+    cmd = ARGV[(ARGV.index("--") + 1)..-1].join(" ")
+    🔵 "rust-lldb -b -o 'settings set auto-confirm true' -o 'env #{dylib_env}' -o 'run' -- #{cmd}"
+    exit 0
 end
 
 task :release do
