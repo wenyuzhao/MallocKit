@@ -1,5 +1,5 @@
 use crate::{space::page_table::PageTable, util::*};
-use std::ptr::NonNull;
+use std::{ops::Range, ptr::NonNull};
 
 use super::abstract_freelist::*;
 
@@ -121,15 +121,6 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{ NU
 }
 
 impl<const NUM_SIZE_CLASS: usize> PageFreeList<{ NUM_SIZE_CLASS }> {
-    pub fn new(base: Address) -> Self {
-        Self {
-            base,
-            table: [None; NUM_SIZE_CLASS],
-            bst: LazyBst::new(),
-            page_table: PageTable::new(),
-        }
-    }
-
     #[inline(always)]
     fn unit_to_address(&self, unit: Unit) -> Address {
         self.base + (*unit << Size4K::LOG_BYTES)
@@ -160,14 +151,27 @@ impl<const NUM_SIZE_CLASS: usize> PageFreeList<{ NUM_SIZE_CLASS }> {
     }
 }
 
-impl<const NUM_SIZE_CLASS: usize> AlignedAbstractFreeList for PageFreeList<{ NUM_SIZE_CLASS }> {
-    #[inline(always)]
-    fn unit_to_value(&self, unit: Unit) -> Self::Value {
-        self.unit_to_address(unit)
+impl<const NUM_SIZE_CLASS: usize> PageFreeList<{ NUM_SIZE_CLASS }> {
+    pub fn new(base: Address) -> Self {
+        Self {
+            base,
+            table: [None; NUM_SIZE_CLASS],
+            bst: LazyBst::new(),
+            page_table: PageTable::new(),
+        }
     }
 
     #[inline(always)]
-    fn value_to_unit(&self, value: Self::Value) -> Unit {
-        self.address_to_unit(value)
+    pub fn allocate_cell(&mut self, units: usize) -> Option<Range<Address>> {
+        let Range { start, end } = self.allocate_cell_unaligned_size(units)?;
+        let start = self.unit_to_address(start);
+        let end = self.unit_to_address(end);
+        Some(start..end)
+    }
+
+    #[inline(always)]
+    pub fn release_cell(&mut self, start: Address, units: usize) {
+        let unit = self.address_to_unit(start);
+        self.release_cell_unaligned_size(unit, units);
     }
 }

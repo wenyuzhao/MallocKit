@@ -1,12 +1,12 @@
 use crate::util::*;
 use std::{
     intrinsics::unlikely,
-    ops::{Add, Deref, Range},
+    ops::{Deref, Range},
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C)]
-pub struct Unit(pub(super) usize);
+pub(super) struct Unit(pub(super) usize);
 
 impl const Deref for Unit {
     type Target = usize;
@@ -30,12 +30,12 @@ impl Unit {
     }
 }
 
-pub struct LazyBst {
+pub(super) struct LazyBst {
     bits: Vec<Option<Page>, System>,
 }
 
 impl LazyBst {
-    pub const fn new() -> Self {
+    pub(super) const fn new() -> Self {
         Self {
             bits: Vec::new_in(System),
         }
@@ -90,13 +90,13 @@ impl LazyBst {
     }
 
     #[inline(always)]
-    pub(crate) fn get(&self, index: BstIndex) -> Option<bool> {
+    pub(super) fn get(&self, index: BstIndex) -> Option<bool> {
         let (addr, bit_index) = self.get_bit_location(index)?;
         Some(unsafe { (addr.load::<u8>() & (1 << bit_index)) != 0 })
     }
 
     #[inline(always)]
-    pub(crate) fn set(&mut self, index: BstIndex, value: bool) {
+    pub(super) fn set(&mut self, index: BstIndex, value: bool) {
         if unlikely(self.needs_resize(index)) {
             self.resize(index);
         }
@@ -115,7 +115,7 @@ impl LazyBst {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C)]
-pub struct BstIndex(usize);
+pub(super) struct BstIndex(usize);
 
 impl const Deref for BstIndex {
     type Target = usize;
@@ -126,11 +126,14 @@ impl const Deref for BstIndex {
 }
 
 /// Manage allocation of 0..(1 << NUM_SIZE_CLASS) units
-pub trait InternalAbstractFreeList: Sized {
+pub(super) trait InternalAbstractFreeList: Sized {
     const MIN_SIZE_CLASS: usize;
     const NUM_SIZE_CLASS: usize;
     const NON_COALESCEABLE_SIZE_CLASS_THRESHOLD: usize = Self::NUM_SIZE_CLASS - 1;
 
+    fn is_free(&self, unit: Unit, size_class: usize) -> bool;
+    fn set_as_free(&mut self, unit: Unit, size_class: usize);
+    fn set_as_used(&mut self, unit: Unit, size_class: usize);
     fn pop_cell(&mut self, size_class: usize) -> Option<Unit>;
     fn push_cell(&mut self, unit: Unit, size_class: usize);
     fn remove_cell(&mut self, unit: Unit, size_class: usize);
@@ -142,12 +145,6 @@ pub trait InternalAbstractFreeList: Sized {
         debug_assert!(start + index < (1 << (Self::NUM_SIZE_CLASS - size_class)));
         BstIndex(start + index)
     }
-
-    fn is_free(&self, unit: Unit, size_class: usize) -> bool;
-
-    fn set_as_free(&mut self, unit: Unit, size_class: usize);
-
-    fn set_as_used(&mut self, unit: Unit, size_class: usize);
 
     #[inline(always)]
     fn push(&mut self, unit: Unit, size_class: usize) {
@@ -272,7 +269,7 @@ pub trait InternalAbstractFreeList: Sized {
 
     /// Allocate a cell with a power-of-two size, and aligned to the size.
     #[inline(always)]
-    fn allocate_cell_aligned(&mut self, units: usize) -> Option<Range<Unit>> {
+    fn allocate_cell_aligned_size(&mut self, units: usize) -> Option<Range<Unit>> {
         debug_assert!(units.is_power_of_two());
         let size_class = <Self as InternalAbstractFreeList>::size_class(units);
         let start = self.allocate_aligned_units(size_class)?;
@@ -280,7 +277,7 @@ pub trait InternalAbstractFreeList: Sized {
     }
 
     #[inline(always)]
-    fn release_cell_aligned(&mut self, start: Unit, units: usize) {
+    fn release_cell_aligned_size(&mut self, start: Unit, units: usize) {
         debug_assert!(units.is_power_of_two());
         debug_assert!(*start & (units - 1) == 0);
         let size_class = <Self as InternalAbstractFreeList>::size_class(units);
@@ -289,7 +286,7 @@ pub trait InternalAbstractFreeList: Sized {
 
     /// Allocate a cell with a power-of-two alignment.
     #[inline(always)]
-    fn allocate_cell_unaligned(&mut self, units: usize) -> Option<Range<Unit>> {
+    fn allocate_cell_unaligned_size(&mut self, units: usize) -> Option<Range<Unit>> {
         let units =
             (units + ((1 << Self::MIN_SIZE_CLASS) - 1)) & !((1 << Self::MIN_SIZE_CLASS) - 1);
         let size_class = Self::size_class(units);
@@ -297,13 +294,13 @@ pub trait InternalAbstractFreeList: Sized {
         if unlikely(units == (1 << size_class)) {
             let free_units = (1 << size_class) - units;
             let free_start = Unit(*start + units);
-            self.release_cell_unaligned(free_start, free_units);
+            self.release_cell_unaligned_size(free_start, free_units);
         }
         Some(start..Unit(*start + units))
     }
 
     #[inline(always)]
-    fn release_cell_unaligned(&mut self, mut start: Unit, mut units: usize) {
+    fn release_cell_unaligned_size(&mut self, mut start: Unit, mut units: usize) {
         let limit = Unit(*start + units);
         while *start < *limit {
             let curr_size_class = Self::size_class(units);
@@ -323,76 +320,4 @@ pub trait InternalAbstractFreeList: Sized {
         }
         debug_assert_eq!(start, limit);
     }
-}
-
-/// Mange cells with aligned (i.e. 2^N) start unit.
-pub trait AlignedAbstractFreeList: Sized + InternalAbstractFreeList {
-    type Value: Copy + Add = Address;
-
-    fn unit_to_value(&self, unit: Unit) -> Self::Value;
-    fn value_to_unit(&self, value: Self::Value) -> Unit;
-
-    #[inline(always)]
-    fn process_input_units(&self, units: usize) -> usize {
-        units
-    }
-
-    #[inline(always)]
-    fn size_class(units: usize) -> usize {
-        <Self as InternalAbstractFreeList>::size_class(units)
-    }
-
-    /// Allocate a cell with a power-of-two size, and aligned to the size.
-    #[inline(always)]
-    fn allocate_aligned_cell(&mut self, units: usize) -> Option<Range<Self::Value>> {
-        let units = self.process_input_units(units);
-        let Range { start, end } = self.allocate_cell_aligned(units)?;
-        let start = self.unit_to_value(start);
-        let end = self.unit_to_value(end);
-        Some(start..end)
-    }
-
-    #[inline(always)]
-    fn release_aligned_cell(&mut self, start: Self::Value, units: usize) {
-        let units = self.process_input_units(units);
-        let unit = self.value_to_unit(start);
-        self.release_cell_aligned(unit, units);
-    }
-
-    /// Allocate a cell which start unit is aligned to next power-of-two of the given units.
-    #[inline(always)]
-    fn allocate_cell(&mut self, units: usize) -> Option<Range<Self::Value>> {
-        let units = self.process_input_units(units);
-        let Range { start, end } = self.allocate_cell_unaligned(units)?;
-        let start = self.unit_to_value(start);
-        let end = self.unit_to_value(end);
-        Some(start..end)
-    }
-
-    #[inline(always)]
-    fn release_cell(&mut self, start: Self::Value, units: usize) {
-        let units = self.process_input_units(units);
-        let unit = self.value_to_unit(start);
-        self.release_cell_unaligned(unit, units);
-    }
-}
-
-/// Mange cells with unaligned start unit and unaligned size
-pub trait UnalignedAbstractFreeList: Sized + InternalAbstractFreeList {
-    type Value: Copy + Add = Address;
-
-    fn unit_to_value(&self, unit: Unit) -> Self::Value;
-    fn value_to_unit(&self, value: Self::Value) -> Unit;
-
-    #[inline(always)]
-    fn process_input_units(&self, units: usize) -> usize {
-        units
-    }
-
-    /// Allocate a 1-unit (i.e. word) aligned cell
-    fn allocate_cell(&mut self, units: usize) -> Option<Range<Self::Value>>;
-
-    fn release_cell(&mut self, start: Self::Value, units: usize);
-
-    fn add_units(&mut self, start: Self::Value, units: usize);
 }

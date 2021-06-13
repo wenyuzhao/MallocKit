@@ -1,7 +1,6 @@
 use super::{SpaceId, PAGE_REGISTRY};
-use crate::util::freelist::PageFreeList;
+use crate::util::freelist::page_freelist::PageFreeList;
 use crate::util::*;
-use freelist::AlignedAbstractFreeList;
 use spin::Mutex;
 use std::iter::Step;
 use std::{
