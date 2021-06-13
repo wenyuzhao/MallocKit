@@ -51,15 +51,15 @@ impl PageResource {
                 0,
             )
         };
-        #[cfg(target_os = "linux")]
-        if cfg!(feature = "transparent_huge_page") && S::LOG_BYTES != Size4K::LOG_BYTES {
-            unsafe {
-                libc::madvise(start.start().as_mut_ptr(), size, libc::MADV_HUGEPAGE);
-            }
-        }
         if addr == libc::MAP_FAILED {
             false
         } else {
+            #[cfg(target_os = "linux")]
+            if cfg!(feature = "transparent_huge_page") && S::LOG_BYTES != Size4K::LOG_BYTES {
+                unsafe {
+                    libc::madvise(start.start().as_mut_ptr(), size, libc::MADV_HUGEPAGE);
+                }
+            }
             self.committed_size
                 .fetch_add(pages << S::LOG_BYTES, Ordering::SeqCst);
             true
