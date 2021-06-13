@@ -4,44 +4,6 @@ use std::{
     process::Command,
 };
 
-include!(concat!(env!("OUT_DIR"), "/malloc_implementations.rs"));
-
-#[macro_export]
-macro_rules! tests_dir {
-    ($filename: expr) => {{
-        let mut p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        p.push("tests");
-        p.push($filename);
-        p.to_str().unwrap().to_owned()
-    }};
-}
-
-#[macro_export]
-macro_rules! test_malloc {
-    ($runner: ident, $malloc: ident) => {
-        concat_idents::concat_idents!(test_name = $runner, _, $malloc {
-            #[test]
-            fn test_name() {
-                $runner(stringify!($malloc));
-            }
-        });
-    };
-}
-
-#[macro_export]
-macro_rules! test_all_malloc {
-    ($runner: ident) => {
-        macro_rules! __test_all_malloc {
-            ($malloc: ident) => {
-                test_malloc!($runner, $malloc);
-            };
-        }
-        malloc_implementations!(__test_all_malloc);
-        #[cfg(feature = "slow_tests")]
-        slow_malloc_implementations!(__test_all_malloc);
-    };
-}
-
 fn exec_with_malloc_wrapper(malloc: &str, cmd: &str, args: &[&str]) {
     let mut dylib = PathBuf::from(".");
     dylib.push("target");
