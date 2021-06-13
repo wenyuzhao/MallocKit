@@ -77,6 +77,15 @@ class BenchmarkSuite
         BenchmarkSuite::CONTROL_ALGORITHMS[malloc] || "./target/#{$release ? "release" : "debug"}/lib#{malloc}.#{DYLIB}"
     end
 
+    def BenchmarkSuite.get_env(malloc)
+        dylib = BenchmarkSuite.get_malloc_dylib(malloc)
+        if (/darwin/ =~ RUBY_PLATFORM) != nil
+            "DYLD_INSERT_LIBRARIES=#{dylib}"
+        else
+            "LD_PRELOAD=#{dylib}"
+        end
+    end
+
     def BenchmarkSuite.get(benchmark)
         BenchmarkSuite::BENCHMARKS.find {|bm| bm.name == benchmark}
     end
