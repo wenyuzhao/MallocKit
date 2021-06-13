@@ -105,3 +105,9 @@ pub trait Mutator: Sized + 'static + TLS {
         new_ptr
     }
 }
+
+#[cfg(not(target_pointer_width = "64"))]
+const ERROR: ! = "32-bit is not supported";
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+const ERROR: ! = "Unsupported OS";

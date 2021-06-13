@@ -24,5 +24,8 @@ $ rake test
 
 ## TODO
 
+- [x] Linux support
+- [x] MacOS support
 - [ ] Performance
 - [ ] Rust allocator interface
+- [ ] Windows support
