@@ -33,16 +33,20 @@ pub trait AddressSpaceConfig: Sized {
 }
 
 /// Manage allocation of 0..(1 << NUM_SIZE_CLASS) units
-pub struct IntrusiveFreeList<Config: AddressSpaceConfig, const NUM_SIZE_CLASS: usize> {
+pub struct IntrusiveFreeList<Config: AddressSpaceConfig>
+where
+    [(); Config::NUM_SIZE_CLASS]: Sized,
+{
     #[allow(unused)]
     shared: bool,
     base: Address,
-    table: [Option<CellPtr>; NUM_SIZE_CLASS],
+    table: [Option<CellPtr>; Config::NUM_SIZE_CLASS],
     phantom: PhantomData<Config>,
 }
 
-impl<Config: AddressSpaceConfig, const NUM_SIZE_CLASS: usize> InternalAbstractFreeList
-    for IntrusiveFreeList<Config, NUM_SIZE_CLASS>
+impl<Config: AddressSpaceConfig> InternalAbstractFreeList for IntrusiveFreeList<Config>
+where
+    [(); Config::NUM_SIZE_CLASS]: Sized,
 {
     const MIN_SIZE_CLASS: usize = 2;
     const NUM_SIZE_CLASS: usize = Config::NUM_SIZE_CLASS;
@@ -143,15 +147,16 @@ impl<Config: AddressSpaceConfig, const NUM_SIZE_CLASS: usize> InternalAbstractFr
     }
 }
 
-impl<Config: AddressSpaceConfig, const NUM_SIZE_CLASS: usize>
-    IntrusiveFreeList<Config, NUM_SIZE_CLASS>
+impl<Config: AddressSpaceConfig> IntrusiveFreeList<Config>
+where
+    [(); Config::NUM_SIZE_CLASS]: Sized,
 {
     pub const fn new(shared: bool, base: Address) -> Self {
         debug_assert!(std::mem::size_of::<Cell>() == 32);
         Self {
             shared,
             base,
-            table: [None; NUM_SIZE_CLASS],
+            table: [None; Config::NUM_SIZE_CLASS],
             phantom: PhantomData,
         }
     }
@@ -174,8 +179,9 @@ impl<Config: AddressSpaceConfig, const NUM_SIZE_CLASS: usize>
     }
 }
 
-impl<Config: AddressSpaceConfig, const NUM_SIZE_CLASS: usize>
-    IntrusiveFreeList<Config, NUM_SIZE_CLASS>
+impl<Config: AddressSpaceConfig> IntrusiveFreeList<Config>
+where
+    [(); Config::NUM_SIZE_CLASS]: Sized,
 {
     #[inline(always)]
     fn unit_to_value(&self, unit: Unit) -> Address {

@@ -114,7 +114,7 @@ impl Cell {
 
 pub struct FreeListAllocator {
     space: Lazy<&'static FreeListSpace, Local>,
-    freelist: IntrusiveFreeList<AddressSpace, { AddressSpace::NUM_SIZE_CLASS }>,
+    freelist: IntrusiveFreeList<AddressSpace>,
 }
 
 impl FreeListAllocator {
