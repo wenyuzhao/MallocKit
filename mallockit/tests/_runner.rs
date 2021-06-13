@@ -1,6 +1,10 @@
-use std::{path::PathBuf, process::Command};
+use std::{
+    io::{self, Write},
+    path::PathBuf,
+    process::Command,
+};
 
-#[path = "./malloc-implementations.rs"]
+#[path = "./_malloc-implementations.rs"]
 #[macro_use]
 mod config;
 
@@ -62,13 +66,17 @@ fn exec_with_malloc_wrapper(malloc: &str, cmd: &str, args: &[&str]) {
         cmd,
         args.join(" ")
     );
-    let child = Command::new("clang")
+    let output = Command::new(cmd)
         .current_dir("..")
         .args(args)
         .env("DYLD_INSERT_LIBRARIES", dylib)
-        .spawn()
+        .output()
         .unwrap();
-    let output = child.wait_with_output().unwrap();
+    println!("status: {}", output.status);
+    if !output.status.success() {
+        io::stdout().write_all(&output.stdout).unwrap();
+        io::stderr().write_all(&output.stderr).unwrap();
+    }
     assert!(output.status.success());
 }
 

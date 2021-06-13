@@ -2,10 +2,10 @@
 mod _runner;
 
 #[mallockit::malloc_test]
-fn clang(malloc: &str) {
+fn gcc(malloc: &str) {
     _runner::test(
         malloc,
-        "clang++",
+        "g++",
         &[
             &tests_dir!("test.cpp"),
             "-std=c++14",
