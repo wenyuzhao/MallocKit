@@ -27,7 +27,16 @@ impl SpaceId {
 
     pub const fn next(&self) -> Self {
         debug_assert!(self.0 != 0b1111);
-        Self(self.0 + 1)
+        let new_id = self.0 + 1;
+        if new_id == 15 {
+            Self(new_id + 1)
+        } else {
+            Self(new_id)
+        }
+    }
+
+    pub const fn is_invalid(&self) -> bool {
+        self.0 == 0 || self.0 == 15
     }
 
     pub const fn from(addr: Address) -> Self {

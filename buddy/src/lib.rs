@@ -66,6 +66,7 @@ impl Mutator for BuddyMutator {
 
     #[inline(always)]
     fn get_layout(&self, ptr: Address) -> Layout {
+        debug_assert!(FREELIST_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
         if likely(FREELIST_SPACE.contains(ptr)) {
             self.freelist.get_layout(ptr)
         } else {
@@ -86,10 +87,11 @@ impl Mutator for BuddyMutator {
 
     #[inline(always)]
     fn dealloc(&mut self, ptr: Address) {
+        debug_assert!(FREELIST_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
         if likely(FREELIST_SPACE.contains(ptr)) {
             mallockit::stat::track_deallocation(false);
             self.freelist.dealloc(ptr)
-        } else if LARGE_OBJECT_SPACE.contains(ptr) {
+        } else {
             mallockit::stat::track_deallocation(false);
             self.los.dealloc(ptr)
         }

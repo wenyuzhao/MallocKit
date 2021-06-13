@@ -25,8 +25,8 @@ impl Plan for Bump {
     }
 
     #[inline(always)]
-    fn get_layout(&self, ptr: Address) -> Layout {
-        AllocationArea::load_layout(ptr)
+    fn get_layout(&self, _ptr: Address) -> Layout {
+        unreachable!()
     }
 }
 
@@ -54,6 +54,7 @@ impl Mutator for BumpMutator {
 
     #[inline(always)]
     fn get_layout(&self, ptr: Address) -> Layout {
+        debug_assert!(IMMORTAL_SPACE.contains(ptr));
         AllocationArea::load_layout(ptr)
     }
 

@@ -1,7 +1,10 @@
 use super::Plan;
+use crate::space::SpaceId;
+use crate::util::Address;
 use crate::util::Lazy;
 use crate::Mutator;
 use core::{alloc::Layout, ptr};
+use std::cmp;
 use std::intrinsics::unlikely;
 
 pub trait GetMutatorType {
@@ -41,6 +44,10 @@ impl<P: Plan> MallocAPI<P> {
         P::Mutator::current()
     }
 
+    pub const fn zero_spaceid(a: Address) -> bool {
+        SpaceId::from(a).is_invalid()
+    }
+
     pub const fn align_up(value: usize, align: usize) -> usize {
         let mask = align - 1;
         (value + mask) & !mask
@@ -49,6 +56,16 @@ impl<P: Plan> MallocAPI<P> {
     #[inline(always)]
     pub fn set_error(e: i32) {
         errno::set_errno(errno::Errno(e));
+    }
+
+    #[inline(always)]
+    pub unsafe fn malloc_size(&self, ptr: Address) -> usize {
+        let ptr = Address::from(ptr);
+        #[cfg(target_os = "macos")]
+        if Self::zero_spaceid(ptr.into()) {
+            return (ptr - std::mem::size_of::<usize>()).load::<usize>();
+        }
+        self.mutator().get_layout(ptr).size()
     }
 
     #[inline(always)]
@@ -80,6 +97,10 @@ impl<P: Plan> MallocAPI<P> {
         if unlikely(ptr.is_null()) {
             return;
         }
+        #[cfg(target_os = "macos")]
+        if unlikely(Self::zero_spaceid(ptr.into())) {
+            return;
+        }
         self.mutator().dealloc(ptr.into());
     }
 
@@ -99,6 +120,30 @@ impl<P: Plan> MallocAPI<P> {
             return ptr::null_mut();
         }
         let new_size = Self::align_up(new_size, Self::MIN_ALIGNMENT);
+
+        #[cfg(target_os = "macos")]
+        if unlikely(Self::zero_spaceid(ptr.into())) {
+            let ptr = Address::from(ptr);
+            let old_size = (ptr - std::mem::size_of::<usize>()).load::<usize>();
+            let new_layout =
+                unsafe { Layout::from_size_align_unchecked(new_size, Self::MIN_ALIGNMENT) };
+            let new_ptr = match self.mutator().alloc(new_layout) {
+                Some(ptr) => ptr,
+                None => {
+                    Self::set_error(libc::ENOMEM);
+                    return 0 as _;
+                }
+            };
+            unsafe {
+                ptr::copy_nonoverlapping(
+                    ptr.as_ptr::<u8>(),
+                    new_ptr.as_mut_ptr::<u8>(),
+                    cmp::min(old_size, new_size),
+                );
+            }
+            return new_ptr.into();
+        }
+
         match self.mutator().realloc(ptr.into(), new_size) {
             Some(ptr) => ptr.into(),
             None => {
@@ -183,13 +228,13 @@ macro_rules! export_malloc_api {
             #[cfg(target_os = "macos")]
             #[$crate::interpose]
             pub unsafe extern "C" fn malloc_size(ptr: *mut u8) -> usize {
-                MALLOC_IMPL.mutator().get_layout(ptr.into()).size()
+                MALLOC_IMPL.malloc_size(ptr.into())
             }
 
             #[cfg(target_os = "linux")]
             #[$crate::interpose]
             pub unsafe extern "C" fn malloc_usable_size(ptr: *mut u8) -> usize {
-                MALLOC_IMPL.mutator().get_layout(ptr.into()).size()
+                MALLOC_IMPL.malloc_size(ptr.into())
             }
 
             #[$crate::interpose]
