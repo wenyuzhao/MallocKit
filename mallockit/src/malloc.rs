@@ -169,31 +169,6 @@ macro_rules! export_malloc_api {
             type Malloc = $crate::malloc::MallocAPI<impl $crate::Plan>;
             static MALLOC_IMPL: Malloc = $crate::malloc::MallocAPI::new(&$plan);
 
-            pub trait GetMutatorType {
-                type Mutator: Mutator;
-            }
-
-            pub struct X<P: Plan>(&'static Lazy<P>);
-            type XP = X<impl $crate::Plan>;
-            static _X: XP = X(&$plan);
-
-            impl<P: Plan> GetMutatorType for X<P> {
-                type Mutator = P::Mutator;
-            }
-
-            // type MutatorType = impl Mutator;
-            // static M: MutatorType = Malloc::new_mutator();
-
-            // impl mallockit::thread_local::TLS for MutatorType {
-            //     const NEW: Self = <Self as mallockit::Mutator>::NEW;
-
-            //     #[cfg(not(target_os = "macos"))]
-            //     #[inline(always)]
-            //     fn current() -> &'static mut Self {
-            //         unsafe { &mut MUTATOR }
-            //     }
-            // }
-
             #[$crate::ctor]
             unsafe fn ctor() {
                 $crate::hooks::process_start(&*$plan);
