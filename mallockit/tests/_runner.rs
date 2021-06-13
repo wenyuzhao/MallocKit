@@ -69,7 +69,7 @@ fn exec_with_malloc_wrapper(malloc: &str, cmd: &str, args: &[&str]) {
     let output = Command::new(cmd)
         .current_dir("..")
         .args(args)
-        .env("DYLD_INSERT_LIBRARIES", dylib)
+        .env(env, dylib)
         .output()
         .unwrap();
     println!("status: {}", output.status);
