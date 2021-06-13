@@ -40,8 +40,8 @@ impl Allocator for LargeObjectAllocator {
         let pages = self
             .space()
             .page_resource()
-            .get_contiguous_pages(Page::<Size2M>::new(ptr));
-        let bytes = pages << Size2M::LOG_BYTES;
+            .get_contiguous_pages(Page::<Size4K>::new(ptr));
+        let bytes = pages << Size4K::LOG_BYTES;
         debug_assert!(bytes.is_power_of_two());
         unsafe { Layout::from_size_align_unchecked(bytes, bytes) }
     }
@@ -49,14 +49,14 @@ impl Allocator for LargeObjectAllocator {
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let size = layout.size();
-        let pages = (size + Page::<Size2M>::MASK) >> Page::<Size2M>::LOG_BYTES;
-        let start_page = self.space().acquire::<Size2M>(pages)?.start;
+        let pages = (size + Page::<Size4K>::MASK) >> Page::<Size4K>::LOG_BYTES;
+        let start_page = self.space().acquire::<Size4K>(pages)?.start;
         debug_assert_eq!(usize::from(start_page.start()) & (layout.align() - 1), 0);
         Some(start_page.start())
     }
 
     #[inline(always)]
     fn dealloc(&mut self, ptr: Address) {
-        self.space().release(Page::<Size2M>::new(ptr))
+        self.space().release(Page::<Size4K>::new(ptr))
     }
 }

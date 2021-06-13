@@ -4,6 +4,7 @@ members = [
     "mallockit/proc_macro",
     "bump",
     "buddy",
+    "sanity",
 ]
 
 [profile.dev]
