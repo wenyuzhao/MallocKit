@@ -1,9 +1,11 @@
 use std::env;
 use std::fs;
-use std::path::Path;
-use std::path::PathBuf;
-use yaml_rust::Yaml;
-use yaml_rust::YamlLoader;
+use std::path::{Path, PathBuf};
+use yaml_rust::{Yaml, YamlLoader};
+
+fn out_dir_file(filename: &str) -> PathBuf {
+    Path::new(&env::var_os("OUT_DIR").unwrap()).join(filename)
+}
 
 fn generate_one_test(malloc: &str, test: &str, command: &str, is_slow: bool) -> String {
     let (mut cmd, args) = command.split_once(" ").unwrap();
@@ -51,32 +53,30 @@ fn generate_tests(meta: &Yaml) {
         })
         .collect::<Vec<_>>();
     let mut code = "".to_owned();
-    for m in &mallocs {
-        for (t, cmd) in &tests {
+    for (t, cmd) in &tests {
+        for m in &mallocs {
             code += &generate_one_test(m, t, cmd, false);
         }
-    }
-    for m in &slow_mallocs {
-        for (t, cmd) in &tests {
+        for m in &slow_mallocs {
             code += &generate_one_test(m, t, cmd, true);
         }
     }
-    let outfile = Path::new(&env::var_os("OUT_DIR").unwrap()).join("generated_tests.rs");
-    fs::write(&outfile, code).unwrap();
+    fs::write(&out_dir_file("generated_tests.rs"), code).unwrap();
 }
 
 fn main() {
-    let metadata_file = {
-        let mut p = PathBuf::from(env::var("OUT_DIR").unwrap());
-        p.push("..");
-        p.push("..");
-        p.push("..");
-        p.push("..");
-        p.push("..");
-        p.push("mallockit.yaml");
-        let p = p.canonicalize().unwrap();
-        p.to_str().unwrap().to_owned()
-    };
+    let metadata_file = PathBuf::from(env::var("OUT_DIR").unwrap())
+        .join("..")
+        .join("..")
+        .join("..")
+        .join("..")
+        .join("..")
+        .join("mallockit.yaml")
+        .canonicalize()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_owned();
     let meta = &YamlLoader::load_from_str(&fs::read_to_string(&metadata_file).unwrap()).unwrap()[0];
     generate_tests(meta);
     println!("cargo:rerun-if-changed=build.rs");

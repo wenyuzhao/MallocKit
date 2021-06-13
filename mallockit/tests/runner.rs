@@ -1,25 +1,24 @@
-use std::{
-    io::{self, Write},
-    path::PathBuf,
-    process::Command,
-};
+use std::{path::PathBuf, process::Command};
 
-fn exec_with_malloc_wrapper(malloc: &str, cmd: &str, args: &[&str]) {
-    let mut dylib = PathBuf::from(".");
-    dylib.push("target");
-    if cfg!(debug_assertions) {
-        dylib.push("debug");
-    } else {
-        dylib.push("release");
-    }
-    let prefix = "lib";
-    let (env, suffix) = if cfg!(target_os = "linux") {
-        ("LD_PRELOAD", "so")
+fn env_segments() -> (&'static str, &'static str, &'static str) {
+    if cfg!(target_os = "linux") {
+        ("lib", "LD_PRELOAD", "so")
     } else if cfg!(target_os = "macos") {
-        ("DYLD_INSERT_LIBRARIES", "dylib")
+        ("lib", "DYLD_INSERT_LIBRARIES", "dylib")
     } else {
         unimplemented!()
-    };
+    }
+}
+
+pub fn test(malloc: &str, cmd: &str, args: &[&str]) {
+    let mut dylib = PathBuf::from(".")
+        .join("target")
+        .join(if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "release"
+        });
+    let (prefix, env, suffix) = env_segments();
     dylib.push(format!("{}{}.{}", prefix, malloc, suffix));
     println!(
         "🔵 env {}={} {} {}",
@@ -34,14 +33,7 @@ fn exec_with_malloc_wrapper(malloc: &str, cmd: &str, args: &[&str]) {
         .env(env, dylib)
         .output()
         .unwrap();
-    println!("status: {}", output.status);
-    if !output.status.success() {
-        io::stdout().write_all(&output.stdout).unwrap();
-        io::stderr().write_all(&output.stderr).unwrap();
-    }
+    println!("{}", String::from_utf8(output.stdout).unwrap());
+    eprintln!("{}", String::from_utf8(output.stderr).unwrap());
     assert!(output.status.success());
-}
-
-pub fn test(malloc: &str, cmd: &str, args: &[&str]) {
-    exec_with_malloc_wrapper(malloc, cmd, args);
 }
