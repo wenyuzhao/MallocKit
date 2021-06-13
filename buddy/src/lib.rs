@@ -97,7 +97,7 @@ impl Mutator for BuddyMutator {
             self.freelist.dealloc(ptr)
         } else if LARGE_OBJECT_SPACE.contains(ptr) {
             mallockit::stat::track_deallocation(false);
-            self.freelist.dealloc(ptr)
+            self.los.dealloc(ptr)
         }
     }
 }

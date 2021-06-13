@@ -41,7 +41,7 @@ impl PageResource {
             #[cfg(target_os = "linux")]
             const MAP_FIXED: libc::c_int = libc::MAP_FIXED_NOREPLACE;
             #[cfg(target_os = "macos")]
-            const MAP_FIXED: libc::c_int = libc::MAP_FIXED;
+            const MAP_FIXED: libc::c_int = 0; // `libc::MAP_FIXED` may trigger EXC_GUARD.
             libc::mmap(
                 start.start().as_mut_ptr(),
                 size,
@@ -51,7 +51,7 @@ impl PageResource {
                 0,
             )
         };
-        if addr == libc::MAP_FAILED {
+        if addr == libc::MAP_FAILED || addr != start.start().as_mut_ptr() {
             false
         } else {
             #[cfg(target_os = "linux")]
