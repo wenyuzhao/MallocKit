@@ -110,6 +110,14 @@ impl Cell {
     fn size(&self) -> usize {
         self.word.get::<{ Self::SIZE }>()
     }
+    #[inline(always)]
+    fn data_size(&self) -> usize {
+        self.size() - self.word.get::<{ Self::START_OFFSET }>()
+    }
+    #[inline(always)]
+    fn align(&self) -> usize {
+        1 << self.word.get::<{ Self::LOG_ALIGN }>()
+    }
 }
 
 pub struct FreeListAllocator {
@@ -154,9 +162,12 @@ impl FreeListAllocator {
 impl Allocator for FreeListAllocator {
     #[inline(always)]
     fn get_layout(&self, ptr: Address) -> Layout {
-        let bytes = Cell::from(ptr).size();
+        let cell = Cell::from(ptr);
+        let bytes = cell.data_size();
+        let align = cell.align();
         debug_assert_ne!(bytes, 0);
-        unsafe { Layout::from_size_align_unchecked(bytes, bytes.next_power_of_two()) }
+        debug_assert_ne!(align, 0);
+        unsafe { Layout::from_size_align_unchecked(bytes, align) }
     }
 
     #[inline(always)]

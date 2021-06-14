@@ -221,20 +221,14 @@ pub(super) trait InternalAbstractFreeList: Sized {
     }
 
     #[inline(always)]
-    fn release_aligned_units(
-        &mut self,
-        mut unit: Unit,
-        mut size_class: usize,
-        force_no_coalesce: bool,
-    ) {
+    fn release_aligned_units(&mut self, mut unit: Unit, mut size_class: usize) {
         loop {
             debug_assert!(unit.is_aligned(size_class));
             debug_assert!(size_class < Self::NUM_SIZE_CLASS);
             let sibling = unit.sibling(size_class);
             debug_assert!(!self.is_free(unit, size_class));
             if unlikely(
-                !force_no_coalesce
-                    && size_class < Self::NON_COALESCEABLE_SIZE_CLASS_THRESHOLD
+                size_class < Self::NON_COALESCEABLE_SIZE_CLASS_THRESHOLD
                     && self.is_free(sibling, size_class),
             ) {
                 let parent = unit.parent(size_class);
@@ -281,7 +275,7 @@ pub(super) trait InternalAbstractFreeList: Sized {
         debug_assert!(units.is_power_of_two());
         debug_assert!(*start & (units - 1) == 0);
         let size_class = <Self as InternalAbstractFreeList>::size_class(units);
-        self.release_aligned_units(start, size_class, false);
+        self.release_aligned_units(start, size_class);
     }
 
     /// Allocate a cell with a power-of-two alignment.
@@ -314,7 +308,7 @@ pub(super) trait InternalAbstractFreeList: Sized {
             let end = Unit(*start + size);
             debug_assert_eq!((*start & (size - 1)), 0);
             debug_assert!(*end <= *limit);
-            self.release_aligned_units(start, size_class, false);
+            self.release_aligned_units(start, size_class);
             start = end;
             units = *limit - *end;
         }

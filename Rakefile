@@ -1,11 +1,15 @@
 # Rakefile
 task default: []
 
-at_exit { sleep 1 }
+$command_finished = true
+at_exit { $command_finished || sleep(1) }
 
 def 🔵(command, cwd: '.', log: true)
     log && puts("🔵 #{command}")
-    system("cd #{cwd} && #{command}") || raise('❌')
+    $command_finished = false
+    res = system("cd #{cwd} && #{command}")
+    $command_finished = true
+    res || raise('❌')
 end
 
 

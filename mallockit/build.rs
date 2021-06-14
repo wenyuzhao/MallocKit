@@ -31,27 +31,33 @@ fn {}_{}() {{
 fn generate_tests(meta: &Yaml) {
     let mallocs = meta["algorithms"]
         .as_vec()
-        .unwrap()
-        .iter()
-        .map(|x| x.as_str().unwrap().to_owned())
-        .collect::<Vec<_>>();
+        .map(|v| {
+            v.iter()
+                .map(|x| x.as_str().unwrap().to_owned())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
     let slow_mallocs = meta["slow-algorithms"]
         .as_vec()
-        .unwrap()
-        .iter()
-        .map(|x| x.as_str().unwrap().to_owned())
-        .collect::<Vec<_>>();
+        .map(|v| {
+            v.iter()
+                .map(|x| x.as_str().unwrap().to_owned())
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
     let tests = meta["tests"]
         .as_hash()
-        .unwrap()
-        .iter()
-        .map(|(k, v)| {
-            (
-                k.as_str().unwrap().to_owned(),
-                v.as_str().unwrap().to_owned(),
-            )
+        .map(|v| {
+            v.iter()
+                .map(|(k, v)| {
+                    (
+                        k.as_str().unwrap().to_owned(),
+                        v.as_str().unwrap().to_owned(),
+                    )
+                })
+                .collect::<Vec<_>>()
         })
-        .collect::<Vec<_>>();
+        .unwrap_or_default();
     let mut code = "".to_owned();
     for (t, cmd) in &tests {
         for m in &mallocs {

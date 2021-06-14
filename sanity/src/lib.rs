@@ -9,7 +9,6 @@ extern crate mallockit;
 
 use core::alloc::Layout;
 use mallockit::{space::large_object_space::*, space::*, util::*, Mutator, Plan};
-use std::intrinsics::likely;
 
 const LARGE_OBJECT_SPACE: SpaceId = SpaceId::LARGE_OBJECT_SPACE;
 
@@ -56,6 +55,7 @@ impl Mutator for SanityMutator {
 
     #[inline(always)]
     fn get_layout(&self, ptr: Address) -> Layout {
+        debug_assert!(LARGE_OBJECT_SPACE.contains(ptr));
         self.los.get_layout(ptr)
     }
 
@@ -66,9 +66,8 @@ impl Mutator for SanityMutator {
 
     #[inline(always)]
     fn dealloc(&mut self, ptr: Address) {
-        if likely(LARGE_OBJECT_SPACE.contains(ptr)) {
-            self.los.dealloc(ptr)
-        }
+        debug_assert!(LARGE_OBJECT_SPACE.contains(ptr));
+        self.los.dealloc(ptr)
     }
 }
 

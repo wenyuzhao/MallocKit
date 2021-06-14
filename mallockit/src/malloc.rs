@@ -4,7 +4,6 @@ use crate::util::Address;
 use crate::util::Lazy;
 use crate::Mutator;
 use core::{alloc::Layout, ptr};
-use std::cmp;
 use std::intrinsics::unlikely;
 
 pub trait GetMutatorType {
@@ -138,7 +137,7 @@ impl<P: Plan> MallocAPI<P> {
                 ptr::copy_nonoverlapping(
                     ptr.as_ptr::<u8>(),
                     new_ptr.as_mut_ptr::<u8>(),
-                    cmp::min(old_size, new_size),
+                    std::cmp::min(old_size, new_size),
                 );
             }
             return new_ptr.into();

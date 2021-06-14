@@ -46,6 +46,7 @@ use core::alloc::Layout;
 pub use ctor::ctor;
 pub use libc;
 use std::cmp;
+use std::intrinsics::unlikely;
 use std::ptr;
 use util::Address;
 
@@ -90,6 +91,9 @@ pub trait Mutator: Sized + 'static + TLS {
     #[inline(always)]
     fn realloc(&mut self, ptr: Address, new_size: usize) -> Option<Address> {
         let layout = self.get_layout(ptr);
+        if unlikely(layout.size() >= new_size) {
+            return Some(ptr);
+        }
         let new_layout = unsafe { Layout::from_size_align_unchecked(new_size, layout.align()) };
         let new_ptr = self.alloc(new_layout);
         if let Some(new_ptr) = new_ptr {
