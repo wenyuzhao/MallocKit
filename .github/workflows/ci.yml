@@ -12,7 +12,7 @@ jobs:
           sudo apt install g++ clang iputils-ping
       - name: Try Ping
         run: |
-          ping -i 1 -c 3 www.google.com
+          ping -i 1 -c 3 localhost
       - name: Install Rust Toolchain (Nightly)
         uses: actions-rs/toolchain@v1
         with:
