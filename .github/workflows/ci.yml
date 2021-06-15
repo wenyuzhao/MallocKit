@@ -10,6 +10,9 @@ jobs:
         run: |
           sudo apt update
           sudo apt install g++ clang iputils-ping
+      - name: Try Ping
+        run: |
+          ping -i 1 -c 3 www.google.com
       - name: Install Rust Toolchain (Nightly)
         uses: actions-rs/toolchain@v1
         with:
