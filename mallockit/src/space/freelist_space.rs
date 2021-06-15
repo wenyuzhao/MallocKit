@@ -97,14 +97,16 @@ impl Cell {
         debug_assert!(align.is_power_of_two());
         let log_align = align.trailing_zeros() as usize;
         debug_assert!(log_align <= 21);
-        let start_offset = (Address::from(self as *const _) - start) as usize;
+        let start_offset =
+            unsafe { (Address::from((self as *const Self).add(1)) - start) as usize };
         self.word.set::<{ Self::START_OFFSET }>(start_offset);
         self.word.set::<{ Self::SIZE }>(size);
         self.word.set::<{ Self::LOG_ALIGN }>(log_align);
     }
     #[inline(always)]
     fn start(&self) -> Address {
-        Address::from(self) - self.word.get::<{ Self::START_OFFSET }>()
+        Address::from(self) + std::mem::size_of::<Self>()
+            - self.word.get::<{ Self::START_OFFSET }>()
     }
     #[inline(always)]
     fn size(&self) -> usize {
@@ -183,6 +185,7 @@ impl Allocator for FreeListAllocator {
         let mask = align - 1;
         let aligned_start = Address::from((*start + mask) & !mask);
         let data_start = aligned_start + offset;
+        debug_assert!(end - data_start >= layout.size());
         Cell::from(data_start).set(start, end - start, layout.align());
         debug_assert_eq!(usize::from(data_start) & (layout.align() - 1), 0);
         Some(data_start)
