@@ -14,6 +14,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
+          override: true
       - name: Checkout MallocKit Workspace
         uses: actions/checkout@v2
       - name: Style Checks
