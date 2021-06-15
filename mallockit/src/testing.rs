@@ -37,12 +37,3 @@ pub fn test(malloc: &str, cmd: &str, args: &[&str]) {
     std::eprintln!("{}", String::from_utf8(output.stderr).unwrap());
     assert!(output.status.success());
 }
-
-#[macro_export]
-macro_rules! include_tests {
-    ($malloc: expr) => {
-        const MALLOC: &'static str = $malloc;
-
-        include!(concat!(env!("CARGO_TARGET_DIR"), "/generated_tests.rs"));
-    };
-}

@@ -27,6 +27,8 @@
 #![feature(const_generics_defaults)]
 #![feature(asm)]
 
+extern crate mallockit_proc_macro;
+
 #[macro_use]
 pub mod log;
 #[macro_use]
@@ -34,96 +36,23 @@ pub mod util;
 #[doc(hidden)]
 pub mod hooks;
 pub mod malloc;
+pub mod mutator;
+pub mod plan;
 pub mod space;
 pub mod stat;
-#[macro_use]
 pub mod testing;
-pub mod thread_local;
 
-extern crate mallockit_proc_macro;
-pub use mallockit_proc_macro::*;
-use thread_local::TLS;
-
-use core::alloc::Layout;
 pub use ctor::ctor;
 pub use libc;
-use std::cmp;
-use std::intrinsics::unlikely;
-use std::ptr;
-use util::Address;
-
-pub trait Plan: Singleton + Sized + 'static {
-    type Mutator: Mutator<Plan = Self>;
-
-    fn new() -> Self;
-    fn init(&self) {}
-    fn get_layout(&self, ptr: Address) -> Layout;
-    fn get() -> &'static Self {
-        <Self as Singleton>::singleton()
-    }
-}
-
-pub trait Singleton: Sized + 'static {
-    fn singleton() -> &'static Self;
-}
-
-pub trait Mutator: Sized + 'static + TLS {
-    type Plan: Plan<Mutator = Self>;
-    const NEW: Self;
-
-    #[inline(always)]
-    fn current() -> &'static mut Self {
-        <Self as TLS>::current()
-    }
-
-    #[inline(always)]
-    fn plan() -> &'static Self::Plan {
-        Self::Plan::get()
-    }
-
-    #[inline(always)]
-    fn get_layout(&self, ptr: Address) -> Layout {
-        Self::plan().get_layout(ptr)
-    }
-
-    fn alloc(&mut self, layout: Layout) -> Option<Address>;
-
-    #[inline(always)]
-    fn alloc_zeroed(&mut self, layout: Layout) -> Option<Address> {
-        let size = layout.size();
-        let ptr = self.alloc(layout);
-        if let Some(ptr) = ptr {
-            unsafe { ptr::write_bytes(ptr.as_mut_ptr::<u8>(), 0, size) };
-        }
-        ptr
-    }
-
-    fn dealloc(&mut self, ptr: Address);
-
-    #[inline(always)]
-    fn realloc(&mut self, ptr: Address, new_size: usize) -> Option<Address> {
-        let layout = self.get_layout(ptr);
-        if unlikely(layout.size() >= new_size) {
-            return Some(ptr);
-        }
-        let new_layout = unsafe { Layout::from_size_align_unchecked(new_size, layout.align()) };
-        let new_ptr = self.alloc(new_layout);
-        if let Some(new_ptr) = new_ptr {
-            unsafe {
-                ptr::copy_nonoverlapping(
-                    ptr.as_ptr::<u8>(),
-                    new_ptr.as_mut_ptr::<u8>(),
-                    cmp::min(layout.size(), new_size),
-                );
-            }
-            self.dealloc(ptr);
-        }
-        new_ptr
-    }
-}
+pub use mallockit_proc_macro::*;
+pub use mutator::Mutator;
+pub use plan::Plan;
 
 #[cfg(not(target_pointer_width = "64"))]
 const ERROR: ! = "32-bit is not supported";
 
 #[cfg(not(any(target_os = "linux", target_os = "macos")))]
 const ERROR: ! = "Unsupported OS";
+
+#[cfg(not(target_arch = "x86_64"))]
+const ERROR: ! = "Unsupported Architecture";

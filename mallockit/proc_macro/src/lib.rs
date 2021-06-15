@@ -13,7 +13,7 @@ pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
             mallockit::export_malloc_api!(PLAN);
         }
 
-        impl mallockit::Singleton for #name {
+        impl mallockit::plan::Singleton for #name {
             #[inline(always)]
             fn singleton() -> &'static Self {
                 unsafe { &__mallockit_plan::PLAN }
@@ -41,7 +41,7 @@ pub fn mutator(_attr: TokenStream, item: TokenStream) -> TokenStream {
             pub(super) static mut MUTATOR: super::#name = <super::#name as mallockit::Mutator>::NEW;
         }
 
-        impl mallockit::thread_local::TLS for #name {
+        impl mallockit::mutator::TLS for #name {
             const NEW: Self = <Self as mallockit::Mutator>::NEW;
 
             #[cfg(not(target_os = "macos"))]
