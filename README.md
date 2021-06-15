@@ -15,7 +15,7 @@ $ env DYLD_INSERT_LIBRARIES=./target/release/libbump.dylib cargo # or some other
 ## Tests
 
 ```console
-$ rake test
+$ cargo test
 ```
 
 ## Benchmarking
