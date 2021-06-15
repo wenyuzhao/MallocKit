@@ -1,5 +1,5 @@
 tests:
-  cargo: cargo --help
+  cargo: cargo build
   clang: clang++ ./mallockit/tests/test.cpp -std=c++14 -O3 -o /dev/null
   gcc: g++ ./mallockit/tests/test.cpp -std=c++14 -O3 -o /dev/null
   ls: ls -al
