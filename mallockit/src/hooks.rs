@@ -13,6 +13,8 @@ pub fn set_panic_handler() {
 
 pub extern "C" fn process_start(plan: &impl Plan) {
     set_panic_handler();
+    #[cfg(target_os = "macos")]
+    crate::util::macos_malloc_zone::init();
     plan.init();
 }
 

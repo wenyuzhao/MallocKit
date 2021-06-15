@@ -61,8 +61,8 @@ impl<P: Plan> MallocAPI<P> {
     pub unsafe fn malloc_size(&self, ptr: Address) -> usize {
         let ptr = Address::from(ptr);
         #[cfg(target_os = "macos")]
-        if Self::zero_spaceid(ptr.into()) {
-            return (ptr - std::mem::size_of::<usize>()).load::<usize>();
+        if unlikely(Self::zero_spaceid(ptr.into())) {
+            return crate::util::macos_malloc_zone::external_memory_size(ptr);
         }
         self.mutator().get_layout(ptr).size()
     }
@@ -82,7 +82,7 @@ impl<P: Plan> MallocAPI<P> {
 
     #[inline(always)]
     pub unsafe fn alloc_or_enomem(&self, size: usize, align: usize) -> *mut u8 {
-        match self.alloc(size, Self::MIN_ALIGNMENT) {
+        match self.alloc(size, align) {
             Ok(ptr) => ptr.unwrap_or(0 as _),
             _ => {
                 Self::set_error(libc::ENOMEM);
@@ -123,7 +123,7 @@ impl<P: Plan> MallocAPI<P> {
         #[cfg(target_os = "macos")]
         if unlikely(Self::zero_spaceid(ptr.into())) {
             let ptr = Address::from(ptr);
-            let old_size = (ptr - std::mem::size_of::<usize>()).load::<usize>();
+            let old_size = crate::util::macos_malloc_zone::external_memory_size(ptr);
             let new_layout =
                 unsafe { Layout::from_size_align_unchecked(new_size, Self::MIN_ALIGNMENT) };
             let new_ptr = match self.mutator().alloc(new_layout) {
@@ -230,6 +230,12 @@ macro_rules! export_malloc_api {
                 MALLOC_IMPL.malloc_size(ptr.into())
             }
 
+            // #[cfg(target_os = "macos")]
+            // #[$crate::interpose]
+            // pub unsafe fn malloc_good_size(ptr: *mut u8) -> usize {
+            //     MALLOC_IMPL.malloc_size(ptr.into())
+            // }
+
             #[cfg(target_os = "linux")]
             #[$crate::interpose]
             pub unsafe extern "C" fn malloc_usable_size(ptr: *mut u8) -> usize {
@@ -310,6 +316,29 @@ macro_rules! export_malloc_api {
             pub unsafe extern "C" fn _aligned_malloc(size: usize, alignment: usize) -> *mut u8 {
                 MALLOC_IMPL.aligned_alloc(size, alignment, false, true)
             }
+        }
+    };
+}
+
+#[cfg(target_os = "macos")]
+pub use crate::util::macos_malloc_zone::{MallocZone, MALLOCKIT_MALLOC_ZONE as MACOS_MALLOC_ZONE};
+
+#[cfg(target_os = "macos")]
+#[cfg(not(feature = "macos_malloc_zone_override"))]
+#[macro_export]
+macro_rules! export_malloc_api_macos {
+    () => {};
+}
+
+#[cfg(target_os = "macos")]
+#[cfg(feature = "macos_malloc_zone_override")]
+#[macro_export]
+macro_rules! export_malloc_api_macos {
+    () => {
+        #[cfg(target_os = "macos")]
+        #[$crate::interpose]
+        pub unsafe extern "C" fn malloc_default_zone() -> *mut $crate::malloc::MallocZone {
+            &mut $crate::malloc::MACOS_MALLOC_ZONE
         }
     };
 }

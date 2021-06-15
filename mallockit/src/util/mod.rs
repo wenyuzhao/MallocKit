@@ -7,6 +7,9 @@ mod lazy;
 mod page;
 pub(crate) mod sys_alloc;
 
+#[cfg(target_os = "macos")]
+pub(crate) mod macos_malloc_zone;
+
 pub use address::*;
 pub use address_non_null::*;
 pub use core::alloc::Layout;
