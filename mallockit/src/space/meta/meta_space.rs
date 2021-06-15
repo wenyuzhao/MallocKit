@@ -18,6 +18,11 @@ impl MetaSpace {
         }
     }
 
+    #[inline(always)]
+    pub fn committed_size(&self) -> usize {
+        self.committed_size.load(Ordering::SeqCst)
+    }
+
     pub fn map<S: PageSize>(&self, pages: usize) -> Option<Range<Page<S>>> {
         let size = pages << S::LOG_BYTES;
         let addr = unsafe {

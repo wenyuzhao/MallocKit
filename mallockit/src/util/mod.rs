@@ -5,7 +5,6 @@ pub mod freelist;
 mod lab;
 mod lazy;
 mod page;
-pub(crate) mod sys_alloc;
 
 #[cfg(target_os = "macos")]
 pub(crate) mod macos_malloc_zone;
@@ -16,7 +15,6 @@ pub use core::alloc::Layout;
 pub use lab::*;
 pub use lazy::*;
 pub use page::*;
-pub use sys_alloc::*;
 
 #[macro_export]
 macro_rules! name_list {

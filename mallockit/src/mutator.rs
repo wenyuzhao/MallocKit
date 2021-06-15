@@ -81,7 +81,7 @@ pub trait TLS: Sized {
 #[cfg(target_os = "macos")]
 mod macos_tls {
     use super::TLS;
-    use crate::util::System;
+    use crate::space::meta::Meta;
 
     const SLOT: usize = 89;
     const OFFSET: usize = SLOT * std::mem::size_of::<usize>();
@@ -107,7 +107,7 @@ mod macos_tls {
     #[cold]
     #[allow(unused)]
     pub(super) fn init_tls<T: TLS>() -> *mut T {
-        let ptr = Box::leak(Box::new_in(T::NEW, System));
+        let ptr = Box::leak(Box::new_in(T::NEW, Meta));
         set_tls::<T>(ptr);
         ptr
     }

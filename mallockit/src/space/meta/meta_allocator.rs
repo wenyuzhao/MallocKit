@@ -1,14 +1,14 @@
-use super::{Page, Size4K};
-use crate::space::META_SPACE;
+use super::META_SPACE;
+use crate::util::{Page, Size4K};
 use std::{
     alloc::{AllocError, Allocator, Layout},
     ptr::NonNull,
     slice,
 };
 
-pub struct System;
+pub struct Meta;
 
-unsafe impl Allocator for System {
+unsafe impl Allocator for Meta {
     #[inline(always)]
     fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
         let pages = (layout.size() + Page::<Size4K>::MASK) >> Page::<Size4K>::LOG_BYTES;

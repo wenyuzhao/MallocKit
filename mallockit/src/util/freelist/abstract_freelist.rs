@@ -1,4 +1,4 @@
-use crate::util::*;
+use crate::{space::meta::Meta, util::*};
 use std::{
     intrinsics::unlikely,
     ops::{Deref, Range},
@@ -31,13 +31,13 @@ impl Unit {
 }
 
 pub(super) struct LazyBst {
-    bits: Vec<Option<Page>, System>,
+    bits: Vec<Option<Page>, Meta>,
 }
 
 impl LazyBst {
     pub(super) const fn new() -> Self {
         Self {
-            bits: Vec::new_in(System),
+            bits: Vec::new_in(Meta),
         }
     }
 

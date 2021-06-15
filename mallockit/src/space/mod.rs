@@ -5,10 +5,9 @@ use std::ptr;
 pub mod freelist_space;
 pub mod immortal_space;
 pub mod large_object_space;
-pub(crate) mod meta_space;
+pub mod meta;
 pub mod page_resource;
 pub(crate) mod page_table;
-pub use meta_space::META_SPACE;
 
 pub static PAGE_REGISTRY: PageRegistry = PageRegistry::new();
 

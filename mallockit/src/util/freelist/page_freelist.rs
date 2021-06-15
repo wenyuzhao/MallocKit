@@ -1,4 +1,7 @@
-use crate::{space::page_table::PageTable, util::*};
+use crate::{
+    space::{meta::Meta, page_table::PageTable},
+    util::*,
+};
 use std::{ops::Range, ptr::NonNull};
 
 use super::abstract_freelist::*;
@@ -59,7 +62,7 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{ NU
                 next: None,
                 unit,
             },
-            System,
+            Meta,
         ));
         let cell_ptr = unsafe { NonNull::new_unchecked(cell) };
         if let Some(mut head) = head {
@@ -80,7 +83,7 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{ NU
             return None;
         } else {
             let mut head_ptr = head.unwrap();
-            let head = unsafe { Box::<Cell, System>::from_raw_in(head_ptr.as_mut(), System) };
+            let head = unsafe { Box::<Cell, Meta>::from_raw_in(head_ptr.as_mut(), Meta) };
             let next = head.next;
             if let Some(mut next) = next {
                 unsafe {
@@ -98,7 +101,7 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{ NU
     #[inline(always)]
     fn remove_cell(&mut self, unit: Unit, size_class: usize) {
         let mut cell_ptr = self.unit_to_cell(unit);
-        let cell = unsafe { Box::<Cell, System>::from_raw_in(cell_ptr.as_mut(), System) };
+        let cell = unsafe { Box::<Cell, Meta>::from_raw_in(cell_ptr.as_mut(), Meta) };
         let next = cell.next;
         let prev = cell.prev;
         if let Some(mut prev) = prev {

@@ -1,3 +1,4 @@
+use crate::space::meta::Meta;
 use crate::util::*;
 use spin::RwLock;
 use std::iter::Step;
@@ -70,7 +71,7 @@ impl<L: PageTableLevel> PageTableEntry<L> {
         if Self::PRESENT.get(value) != 0 && Self::IS_PAGE_TABLE.get(value) != 0 {
             let table: &'static mut PageTable<L::NextLevel> =
                 unsafe { mem::transmute(value & Self::PAGE_TABLE_POINTER_MASK) };
-            let _ = unsafe { Box::from_raw_in(table, System) };
+            let _ = unsafe { Box::from_raw_in(table, Meta) };
         }
         self.0 = 0;
     }
@@ -207,7 +208,7 @@ impl<L: PageTableLevel> PageTable<L> {
                         table: unsafe { mem::transmute([0usize; 512]) },
                         phantom: PhantomData,
                     },
-                    System,
+                    Meta,
                 ));
                 self.table[index].set_next_page_table(table);
                 on_create();
