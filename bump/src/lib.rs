@@ -11,6 +11,7 @@ use mallockit::{space::immortal_space::*, space::*, util::*, Mutator, Plan};
 
 const IMMORTAL_SPACE: SpaceId = SpaceId::DEFAULT;
 
+#[mallockit::plan]
 struct Bump {
     immortal: ImmortalSpace,
 }
@@ -38,7 +39,7 @@ struct BumpMutator {
 impl BumpMutator {
     const fn new() -> Self {
         Self {
-            bump: BumpAllocator::new(Lazy::new(|| &PLAN.immortal)),
+            bump: BumpAllocator::new(Lazy::new(|| &Self::plan().immortal)),
         }
     }
 }
@@ -46,11 +47,6 @@ impl BumpMutator {
 impl Mutator for BumpMutator {
     type Plan = Bump;
     const NEW: Self = Self::new();
-
-    #[inline(always)]
-    fn plan(&self) -> &'static Self::Plan {
-        &PLAN
-    }
 
     #[inline(always)]
     fn get_layout(&self, ptr: Address) -> Layout {
@@ -66,6 +62,3 @@ impl Mutator for BumpMutator {
     #[inline(always)]
     fn dealloc(&mut self, _: Address) {}
 }
-
-#[mallockit::plan]
-static PLAN: Lazy<Bump> = Lazy::new(|| Bump::new());

@@ -52,12 +52,19 @@ use std::intrinsics::unlikely;
 use std::ptr;
 use util::Address;
 
-pub trait Plan: Sized + 'static {
+pub trait Plan: Singleton + Sized + 'static {
     type Mutator: Mutator<Plan = Self>;
 
     fn new() -> Self;
     fn init(&self) {}
     fn get_layout(&self, ptr: Address) -> Layout;
+    fn get() -> &'static Self {
+        <Self as Singleton>::singleton()
+    }
+}
+
+pub trait Singleton: Sized + 'static {
+    fn singleton() -> &'static Self;
 }
 
 pub trait Mutator: Sized + 'static + TLS {
@@ -69,11 +76,14 @@ pub trait Mutator: Sized + 'static + TLS {
         <Self as TLS>::current()
     }
 
-    fn plan(&self) -> &'static Self::Plan;
+    #[inline(always)]
+    fn plan() -> &'static Self::Plan {
+        Self::Plan::get()
+    }
 
     #[inline(always)]
     fn get_layout(&self, ptr: Address) -> Layout {
-        self.plan().get_layout(ptr)
+        Self::plan().get_layout(ptr)
     }
 
     fn alloc(&mut self, layout: Layout) -> Option<Address>;

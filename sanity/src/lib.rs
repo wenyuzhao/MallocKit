@@ -12,6 +12,7 @@ use mallockit::{space::large_object_space::*, space::*, util::*, Mutator, Plan};
 
 const LARGE_OBJECT_SPACE: SpaceId = SpaceId::LARGE_OBJECT_SPACE;
 
+#[mallockit::plan]
 struct Sanity {
     large_object_space: LargeObjectSpace,
 }
@@ -39,7 +40,7 @@ struct SanityMutator {
 impl SanityMutator {
     const fn new() -> Self {
         Self {
-            los: LargeObjectAllocator(Lazy::new(|| &PLAN.large_object_space)),
+            los: LargeObjectAllocator(Lazy::new(|| &Self::plan().large_object_space)),
         }
     }
 }
@@ -47,11 +48,6 @@ impl SanityMutator {
 impl Mutator for SanityMutator {
     type Plan = Sanity;
     const NEW: Self = Self::new();
-
-    #[inline(always)]
-    fn plan(&self) -> &'static Self::Plan {
-        &PLAN
-    }
 
     #[inline(always)]
     fn get_layout(&self, ptr: Address) -> Layout {
@@ -70,6 +66,3 @@ impl Mutator for SanityMutator {
         self.los.dealloc(ptr)
     }
 }
-
-#[mallockit::plan]
-static PLAN: Lazy<Sanity> = Lazy::new(|| Sanity::new());

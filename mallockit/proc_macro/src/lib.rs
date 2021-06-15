@@ -3,12 +3,22 @@ use quote::quote;
 
 #[proc_macro_attribute]
 pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input = syn::parse_macro_input!(item as syn::ItemStatic);
+    let input = syn::parse_macro_input!(item as syn::DeriveInput);
     let name = &input.ident;
     let result = quote! {
         #input
 
-        mallockit::export_malloc_api!(#name);
+        mod __mallockit_plan {
+            pub(super) static PLAN: mallockit::util::Lazy<super::#name> = mallockit::util::Lazy::new(|| <super::#name as mallockit::Plan>::new());
+            mallockit::export_malloc_api!(PLAN);
+        }
+
+        impl mallockit::Singleton for #name {
+            #[inline(always)]
+            fn singleton() -> &'static Self {
+                unsafe { &__mallockit_plan::PLAN }
+            }
+        }
 
         include!(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -25,10 +35,10 @@ pub fn mutator(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let result = quote! {
         #input
 
+        #[cfg(not(target_os = "macos"))]
         mod __mallockit_mutator {
             #[thread_local]
-            #[cfg(not(target_os = "macos"))]
-            pub(crate) static mut MUTATOR: super::#name = <super::#name as mallockit::Mutator>::NEW;
+            pub(super) static mut MUTATOR: super::#name = <super::#name as mallockit::Mutator>::NEW;
         }
 
         impl mallockit::thread_local::TLS for #name {
@@ -76,17 +86,6 @@ pub fn interpose(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #[cfg(not(target_os = "macos"))]
         #[no_mangle]
         #input
-    };
-    result.into()
-}
-
-#[proc_macro_attribute]
-pub fn malloc_test(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    let input = syn::parse_macro_input!(item as syn::ItemFn);
-    let name = &input.sig.ident;
-    let result = quote! {
-        #input
-        crate::test_all_malloc!(#name);
     };
     result.into()
 }

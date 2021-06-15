@@ -19,6 +19,7 @@ use std::intrinsics::likely;
 const FREELIST_SPACE: SpaceId = SpaceId::DEFAULT;
 const LARGE_OBJECT_SPACE: SpaceId = SpaceId::LARGE_OBJECT_SPACE;
 
+#[mallockit::plan]
 struct Buddy {
     freelist_space: FreeListSpace,
     large_object_space: LargeObjectSpace,
@@ -49,8 +50,11 @@ struct BuddyMutator {
 impl BuddyMutator {
     const fn new() -> Self {
         Self {
-            freelist: FreeListAllocator::new(Lazy::new(|| &PLAN.freelist_space), FREELIST_SPACE),
-            los: LargeObjectAllocator(Lazy::new(|| &PLAN.large_object_space)),
+            freelist: FreeListAllocator::new(
+                Lazy::new(|| &Self::plan().freelist_space),
+                FREELIST_SPACE,
+            ),
+            los: LargeObjectAllocator(Lazy::new(|| &Self::plan().large_object_space)),
         }
     }
 }
@@ -58,11 +62,6 @@ impl BuddyMutator {
 impl Mutator for BuddyMutator {
     type Plan = Buddy;
     const NEW: Self = Self::new();
-
-    #[inline(always)]
-    fn plan(&self) -> &'static Self::Plan {
-        &PLAN
-    }
 
     #[inline(always)]
     fn get_layout(&self, ptr: Address) -> Layout {
@@ -97,6 +96,3 @@ impl Mutator for BuddyMutator {
         }
     }
 }
-
-#[mallockit::plan]
-static PLAN: Lazy<Buddy> = Lazy::new(|| Buddy::new());
