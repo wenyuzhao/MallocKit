@@ -36,6 +36,8 @@ pub mod hooks;
 pub mod malloc;
 pub mod space;
 pub mod stat;
+#[macro_use]
+pub mod testing;
 pub mod thread_local;
 
 extern crate mallockit_proc_macro;

@@ -7,7 +7,13 @@ pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let name = &input.ident;
     let result = quote! {
         #input
+
         mallockit::export_malloc_api!(#name);
+
+        include!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../target/generated_tests.rs"
+        ));
     };
     result.into()
 }
@@ -43,6 +49,7 @@ pub fn interpose(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
     let name = &input.sig.ident;
     let result = quote! {
+        #[cfg(target_os = "macos")]
         pub mod #name {
             #[repr(C)]
             pub struct Interpose {

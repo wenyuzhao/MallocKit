@@ -20,7 +20,7 @@ pub fn test(malloc: &str, cmd: &str, args: &[&str]) {
         });
     let (prefix, env, suffix) = env_segments();
     dylib.push(format!("{}{}.{}", prefix, malloc, suffix));
-    println!(
+    std::println!(
         "🔵 env {}={} {} {}",
         env,
         dylib.to_str().unwrap(),
@@ -33,7 +33,16 @@ pub fn test(malloc: &str, cmd: &str, args: &[&str]) {
         .env(env, dylib)
         .output()
         .unwrap();
-    println!("{}", String::from_utf8(output.stdout).unwrap());
-    eprintln!("{}", String::from_utf8(output.stderr).unwrap());
+    std::println!("{}", String::from_utf8(output.stdout).unwrap());
+    std::eprintln!("{}", String::from_utf8(output.stderr).unwrap());
     assert!(output.status.success());
+}
+
+#[macro_export]
+macro_rules! include_tests {
+    ($malloc: expr) => {
+        const MALLOC: &'static str = $malloc;
+
+        include!(concat!(env!("CARGO_TARGET_DIR"), "/generated_tests.rs"));
+    };
 }

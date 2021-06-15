@@ -1,3 +1,3 @@
 import os;
 
-print(os.path.realpath('~'))
+print(os.path.realpath('.'))
