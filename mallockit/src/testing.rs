@@ -47,10 +47,12 @@ fn build_cdylib() {
         return;
     }
     *status = true;
-    let output = Command::new("cargo")
-        .args(["+nightly", "build"])
-        .output()
-        .unwrap();
+    let args = if cfg!(debug_assertions) {
+        vec!["+nightly", "build"]
+    } else {
+        vec!["+nightly", "build", "--release"]
+    };
+    let output = Command::new("cargo").args(args).output().unwrap();
     if !output.status.success() {
         std::println!("{}", String::from_utf8(output.stdout).unwrap());
         std::eprintln!("{}", String::from_utf8(output.stderr).unwrap());
