@@ -10,6 +10,8 @@ pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
         mod __mallockit_plan {
             pub(super) static PLAN: mallockit::util::Lazy<super::#name> = mallockit::util::Lazy::new(|| <super::#name as mallockit::Plan>::new());
+
+            #[cfg(not(test))]
             mallockit::export_malloc_api!(PLAN);
         }
 
