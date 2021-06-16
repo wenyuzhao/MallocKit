@@ -46,16 +46,13 @@ impl FreeListSpace {
     #[inline(always)]
     pub fn can_allocate(layout: Layout) -> bool {
         let (extended_layout, _) = Layout::new::<Cell>().extend(layout).unwrap();
-        let unaligned_size = if extended_layout.align() != 8 {
-            extended_layout.size() + extended_layout.align()
-        } else {
-            extended_layout.size()
-        };
-        unaligned_size <= FreeListSpace::MAX_ALLOCATION_SIZE
+        let padded_extended_layout = extended_layout.pad_to_align();
+        padded_extended_layout.size() + IntrusiveFreeList::<AddressSpace>::HEADER_SIZE
+            <= FreeListSpace::MAX_ALLOCATION_SIZE
     }
 
     #[inline(always)]
-    pub fn add_coalesced_page(&self, page: Page<Size2M>) {
+    fn add_coalesced_page(&self, page: Page<Size2M>) {
         let mut pages = self.pages.lock();
         let head = pages.map(|p| p.start()).unwrap_or(Address::ZERO);
         unsafe { page.start().store(head) }
@@ -63,7 +60,7 @@ impl FreeListSpace {
     }
 
     #[inline(always)]
-    pub fn get_coalesced_page(&self) -> Option<Page<Size2M>> {
+    fn get_coalesced_page(&self) -> Option<Page<Size2M>> {
         let mut pages = self.pages.lock();
         let page = (*pages)?;
         let next = unsafe { page.start().load::<Address>() };
@@ -137,8 +134,11 @@ impl FreeListAllocator {
 
     #[cold]
     fn alloc_cell_slow(&mut self, bytes: usize) -> Option<Range<Address>> {
-        let page = self.space.acquire::<Size2M>(1)?.start.start();
-        self.freelist.add_units(page, Size2M::BYTES);
+        let page = match self.space.get_coalesced_page() {
+            Some(page) => page,
+            _ => self.space.acquire::<Size2M>(1)?.start,
+        };
+        self.freelist.add_units(page.start(), Size2M::BYTES);
         self.alloc_cell(bytes)
     }
 
@@ -175,14 +175,9 @@ impl Allocator for FreeListAllocator {
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let (extended_layout, offset) = Layout::new::<Cell>().extend(layout).unwrap();
-        let unaligned_size = if extended_layout.align() > 8 {
-            extended_layout.size() + extended_layout.align()
-        } else {
-            extended_layout.size()
-        };
-        let align = extended_layout.align();
-        let Range { start, end } = self.alloc_cell(unaligned_size)?;
-        let aligned_start = start.align_up(align);
+        let padded_extended_layout = extended_layout.pad_to_align();
+        let Range { start, end } = self.alloc_cell(padded_extended_layout.size())?;
+        let aligned_start = start.align_up(extended_layout.align());
         let data_start = aligned_start + offset;
         debug_assert!(end - data_start >= layout.size());
         Cell::from(data_start).set(start, end - start, layout.align());

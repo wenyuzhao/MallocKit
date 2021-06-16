@@ -1,5 +1,7 @@
+use std::{alloc::Layout, marker::PhantomData};
+
 use super::{page_resource::PageResource, Allocator, Space, SpaceId};
-use crate::util::*;
+use crate::util::{Address, Lazy, Local, Page, PageSize, Size4K};
 
 pub struct LargeObjectSpace {
     id: SpaceId,
@@ -25,37 +27,44 @@ impl Space for LargeObjectSpace {
     }
 }
 
-pub struct LargeObjectAllocator(pub Lazy<&'static LargeObjectSpace, Local>);
+pub struct LargeObjectAllocator<S: PageSize = Size4K>(
+    Lazy<&'static LargeObjectSpace, Local>,
+    PhantomData<S>,
+);
 
-impl LargeObjectAllocator {
+impl<S: PageSize> LargeObjectAllocator<S> {
+    pub const fn new(los: Lazy<&'static LargeObjectSpace, Local>) -> Self {
+        Self(los, PhantomData)
+    }
+
     #[inline(always)]
     fn space(&self) -> &'static LargeObjectSpace {
         *self.0
     }
 }
 
-impl Allocator for LargeObjectAllocator {
+impl<S: PageSize> Allocator for LargeObjectAllocator<S> {
     #[inline(always)]
     fn get_layout(&self, ptr: Address) -> Layout {
         let pages = self
             .space()
             .page_resource()
-            .get_contiguous_pages(Page::<Size4K>::new(ptr));
-        let bytes = pages << Size4K::LOG_BYTES;
+            .get_contiguous_pages(Page::<S>::new(ptr));
+        let bytes = pages << S::LOG_BYTES;
         unsafe { Layout::from_size_align_unchecked(bytes, bytes.next_power_of_two()) }
     }
 
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let size = layout.size();
-        let pages = (size + Page::<Size4K>::MASK) >> Page::<Size4K>::LOG_BYTES;
-        let start_page = self.space().acquire::<Size4K>(pages)?.start;
-        debug_assert_eq!(usize::from(start_page.start()) & (layout.align() - 1), 0);
+        let pages = (size + Page::<S>::MASK) >> Page::<S>::LOG_BYTES;
+        let start_page = self.space().acquire::<S>(pages)?.start;
+        debug_assert!(start_page.start().is_aligned_to(layout.align()));
         Some(start_page.start())
     }
 
     #[inline(always)]
     fn dealloc(&mut self, ptr: Address) {
-        self.space().release(Page::<Size4K>::new(ptr))
+        self.space().release(Page::<S>::new(ptr))
     }
 }

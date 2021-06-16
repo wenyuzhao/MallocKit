@@ -44,7 +44,7 @@ impl Plan for Buddy {
 #[mallockit::mutator]
 struct BuddyMutator {
     freelist: FreeListAllocator,
-    los: LargeObjectAllocator,
+    los: LargeObjectAllocator<Size2M>,
 }
 
 impl BuddyMutator {
@@ -54,7 +54,7 @@ impl BuddyMutator {
                 Lazy::new(|| &Self::plan().freelist_space),
                 FREELIST_SPACE,
             ),
-            los: LargeObjectAllocator(Lazy::new(|| &Self::plan().large_object_space)),
+            los: LargeObjectAllocator::new(Lazy::new(|| &Self::plan().large_object_space)),
         }
     }
 }

@@ -40,7 +40,7 @@ struct SanityMutator {
 impl SanityMutator {
     const fn new() -> Self {
         Self {
-            los: LargeObjectAllocator(Lazy::new(|| &Self::plan().large_object_space)),
+            los: LargeObjectAllocator::new(Lazy::new(|| &Self::plan().large_object_space)),
         }
     }
 }

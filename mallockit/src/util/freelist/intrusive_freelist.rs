@@ -151,6 +151,8 @@ impl<Config: AddressSpaceConfig> IntrusiveFreeList<Config>
 where
     [(); Config::NUM_SIZE_CLASS]: Sized,
 {
+    pub const HEADER_SIZE: usize = Cell::HEADER_BYTES;
+
     pub const fn new(shared: bool, base: Address) -> Self {
         debug_assert!(std::mem::size_of::<Cell>() == 32);
         Self {
