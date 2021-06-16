@@ -3,6 +3,7 @@ use std::intrinsics::unlikely;
 use std::ptr;
 
 use crate::plan::Plan;
+use crate::space::meta::MetaLocal;
 use crate::util::Address;
 
 pub trait Mutator: Sized + 'static + TLS {
@@ -60,6 +61,32 @@ pub trait Mutator: Sized + 'static + TLS {
     }
 }
 
+pub(crate) struct InternalTLS {
+    pub meta: MetaLocal,
+}
+
+impl InternalTLS {
+    #[allow(unused)]
+    const NEW: Self = Self {
+        meta: MetaLocal::new(),
+    };
+
+    #[cfg(not(target_os = "macos"))]
+    pub fn current() -> &'static mut Self {
+        unsafe { &mut INTERNAL_TLS }
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn current() -> &'static mut Self {
+        let ptr = macos_tls::get_internal_tls();
+        unsafe { &mut *ptr }
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+#[thread_local]
+static mut INTERNAL_TLS: InternalTLS = InternalTLS::NEW;
+
 pub trait TLS: Sized {
     const NEW: Self;
 
@@ -69,26 +96,23 @@ pub trait TLS: Sized {
     #[cfg(target_os = "macos")]
     #[inline(always)]
     fn current() -> &'static mut Self {
-        let ptr = macos_tls::get_tls::<Self>();
-        if std::intrinsics::unlikely(ptr.is_null()) {
-            unsafe { &mut *macos_tls::init_tls::<Self>() }
-        } else {
-            unsafe { &mut *ptr }
-        }
+        unsafe { &mut *macos_tls::get_tls::<Self>() }
     }
 }
 
 #[cfg(target_os = "macos")]
 mod macos_tls {
-    use super::TLS;
-    use crate::space::meta::Meta;
+    use spin::Mutex;
+
+    use super::*;
+    use crate::util::{memory::RawMemory, AllocationArea, Page, Size4K};
 
     const SLOT: usize = 89;
     const OFFSET: usize = SLOT * std::mem::size_of::<usize>();
 
     #[inline(always)]
     #[allow(unused)]
-    pub(super) fn get_tls<T: TLS>() -> *mut T {
+    fn _get_tls<T>() -> *mut T {
         unsafe {
             let mut v: *mut T;
             asm!("mov {0}, gs:{offset}", out(reg) v, offset = const OFFSET);
@@ -98,17 +122,52 @@ mod macos_tls {
 
     #[inline(always)]
     #[allow(unused)]
-    fn set_tls<T: TLS>(v: *mut T) {
-        unsafe {
-            asm!("mov gs:{offset}, {0}", in(reg) v, offset = const OFFSET);
+    pub(super) fn get_internal_tls() -> *mut InternalTLS {
+        let tls = _get_tls::<InternalTLS>();
+        debug_assert!(!tls.is_null());
+        tls
+    }
+
+    #[inline(always)]
+    #[allow(unused)]
+    pub(super) fn get_tls<T: TLS>() -> *mut T {
+        let mut tls = _get_tls::<(InternalTLS, T)>();
+        if unlikely(tls.is_null()) {
+            tls = init_tls::<T>();
+        }
+        unsafe { &mut (*tls).1 }
+    }
+
+    fn alloc_tls<T>() -> *mut T {
+        static ALLOC_BUFFER: Mutex<AllocationArea> = Mutex::new(AllocationArea::EMPTY);
+
+        let layout = Layout::new::<T>();
+        if layout.size() > Page::<Size4K>::MASK / 2 {
+            RawMemory::map_anonymous(layout.size()).unwrap().into()
+        } else {
+            let mut buffer = ALLOC_BUFFER.lock();
+            if let Some(a) = buffer.alloc(layout) {
+                return a.into();
+            } else {
+                let size = layout.size() << 4;
+                let size = (size + Page::<Size4K>::MASK) & !Page::<Size4K>::MASK;
+                let top = RawMemory::map_anonymous(size).unwrap();
+                let limit = top + size;
+                *buffer = AllocationArea { top, limit };
+                buffer.alloc(layout).unwrap().into()
+            }
         }
     }
 
     #[cold]
     #[allow(unused)]
-    pub(super) fn init_tls<T: TLS>() -> *mut T {
-        let ptr = Box::leak(Box::new_in(T::NEW, Meta));
-        set_tls::<T>(ptr);
+    fn init_tls<T: TLS>() -> *mut (InternalTLS, T) {
+        let ptr = alloc_tls::<(InternalTLS, T)>();
+        unsafe {
+            (*ptr).0 = InternalTLS::NEW;
+            (*ptr).1 = T::NEW;
+            asm!("mov gs:{offset}, {0}", in(reg) ptr, offset = const OFFSET);
+        }
         ptr
     }
 }

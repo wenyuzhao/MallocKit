@@ -6,6 +6,31 @@ use std::{
     slice,
 };
 
+pub(crate) struct MetaLocal;
+
+impl MetaLocal {
+    pub const fn new() -> Self {
+        Self
+    }
+
+    #[inline(always)]
+    pub fn current() -> &'static mut Self {
+        &mut crate::mutator::InternalTLS::current().meta
+    }
+}
+
+unsafe impl Allocator for MetaLocal {
+    #[inline(always)]
+    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
+        MetaLocal::current().allocate(layout)
+    }
+
+    #[inline(always)]
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        MetaLocal::current().deallocate(ptr, layout)
+    }
+}
+
 pub struct Meta;
 
 unsafe impl Allocator for Meta {
