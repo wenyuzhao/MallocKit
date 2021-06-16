@@ -9,7 +9,7 @@ jobs:
       - name: Install Ubuntu Packages
         run: |
           sudo apt update
-          sudo apt install g++ clang iputils-ping
+          sudo apt install -y g++ clang iputils-ping python
       - name: Install Rust Toolchain (Nightly)
         uses: actions-rs/toolchain@v1
         with:
