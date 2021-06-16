@@ -1,4 +1,7 @@
-use crate::{space::meta::Meta, util::*};
+use crate::{
+    space::meta::Meta,
+    util::{memory::RawMemory, *},
+};
 use std::{
     intrinsics::unlikely,
     ops::{Deref, Range},
@@ -58,19 +61,7 @@ impl LazyBst {
             self.bits.resize((page_index + 1).next_power_of_two(), None);
         }
         if self.bits[page_index].is_none() {
-            let page = unsafe {
-                let addr = libc::mmap(
-                    0 as _,
-                    Size2M::BYTES,
-                    libc::PROT_READ | libc::PROT_WRITE,
-                    libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
-                    -1,
-                    0,
-                );
-                assert_ne!(addr, libc::MAP_FAILED);
-                let addr = Address::from(addr);
-                Page::new(addr)
-            };
+            let page = Page::new(RawMemory::map_anonymous(Size2M::BYTES).unwrap());
             debug_assert!(page.is_zeroed());
             self.bits[page_index] = Some(page);
         }

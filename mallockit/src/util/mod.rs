@@ -4,6 +4,7 @@ pub mod bits;
 pub mod freelist;
 mod lab;
 mod lazy;
+pub mod memory;
 mod page;
 
 #[cfg(target_os = "macos")]

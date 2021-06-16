@@ -1,5 +1,6 @@
 use super::{SpaceId, PAGE_REGISTRY};
 use crate::util::freelist::page_freelist::PageFreeList;
+use crate::util::memory::RawMemory;
 use crate::util::*;
 use spin::Mutex;
 use std::iter::Step;
@@ -36,39 +37,24 @@ impl PageResource {
 
     fn map_pages<S: PageSize>(&self, start: Page<S>, pages: usize) -> bool {
         let size = pages << S::LOG_BYTES;
-        let addr = unsafe {
-            #[cfg(target_os = "linux")]
-            const MAP_FIXED: libc::c_int = libc::MAP_FIXED_NOREPLACE;
-            #[cfg(target_os = "macos")]
-            const MAP_FIXED: libc::c_int = 0; // `libc::MAP_FIXED` may trigger EXC_GUARD.
-            libc::mmap(
-                start.start().as_mut_ptr(),
-                size,
-                libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | MAP_FIXED,
-                -1,
-                0,
-            )
-        };
-        if addr == libc::MAP_FAILED || addr != start.start().as_mut_ptr() {
-            false
-        } else {
-            #[cfg(target_os = "linux")]
-            if cfg!(feature = "transparent_huge_page") && S::LOG_BYTES != Size4K::LOG_BYTES {
-                unsafe {
-                    libc::madvise(start.start().as_mut_ptr(), size, libc::MADV_HUGEPAGE);
+        match RawMemory::map(start.start(), size) {
+            Ok(_) => {
+                #[cfg(target_os = "linux")]
+                if cfg!(feature = "transparent_huge_page") && S::LOG_BYTES != Size4K::LOG_BYTES {
+                    unsafe {
+                        libc::madvise(start.start().as_mut_ptr(), size, libc::MADV_HUGEPAGE);
+                    }
                 }
+                self.committed_size
+                    .fetch_add(pages << S::LOG_BYTES, Ordering::SeqCst);
+                true
             }
-            self.committed_size
-                .fetch_add(pages << S::LOG_BYTES, Ordering::SeqCst);
-            true
+            _ => false,
         }
     }
 
     fn unmap_pages<S: PageSize>(&self, start: Page<S>, pages: usize) {
-        unsafe {
-            libc::munmap(start.start().as_mut_ptr(), pages << S::LOG_BYTES);
-        }
+        RawMemory::unmap(start.start(), pages << S::LOG_BYTES);
         self.committed_size
             .fetch_sub(pages << S::LOG_BYTES, Ordering::SeqCst);
     }
