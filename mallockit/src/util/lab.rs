@@ -20,8 +20,7 @@ impl AllocationArea {
     }
 
     pub const fn align_allocation(start: Address, align: usize) -> Address {
-        let mask = align - 1;
-        Address::from((*start + mask) & !mask)
+        start.align_up(align)
     }
 
     #[inline(always)]

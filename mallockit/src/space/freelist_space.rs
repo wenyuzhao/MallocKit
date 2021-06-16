@@ -182,8 +182,7 @@ impl Allocator for FreeListAllocator {
         };
         let align = extended_layout.align();
         let Range { start, end } = self.alloc_cell(unaligned_size)?;
-        let mask = align - 1;
-        let aligned_start = Address::from((*start + mask) & !mask);
+        let aligned_start = start.align_up(align);
         let data_start = aligned_start + offset;
         debug_assert!(end - data_start >= layout.size());
         Cell::from(data_start).set(start, end - start, layout.align());

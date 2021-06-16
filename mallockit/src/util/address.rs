@@ -18,7 +18,20 @@ impl Address {
         self.0 == 0
     }
 
+    pub const fn align_up(&self, align: usize) -> Address {
+        debug_assert!(align.is_power_of_two());
+        let mask = align - 1;
+        Self((self.0 + mask) & !mask)
+    }
+
+    pub const fn align_down(&self, align: usize) -> Address {
+        debug_assert!(align.is_power_of_two());
+        let mask = align - 1;
+        Self(self.0 & !mask)
+    }
+
     pub const fn is_aligned_to(&self, align: usize) -> bool {
+        debug_assert!(align.is_power_of_two());
         (self.0 & (align - 1)) == 0
     }
 
