@@ -55,8 +55,9 @@ impl Mutator for BumpMutator {
     }
 
     #[inline(always)]
-    fn alloc(&mut self, layout: Layout) -> Option<Address> {
-        self.bump.alloc(layout)
+    fn alloc(&mut self, _layout: Layout) -> Option<Address> {
+        panic!();
+        // self.bump.alloc(layout)
     }
 
     #[inline(always)]
