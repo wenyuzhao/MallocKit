@@ -12,19 +12,15 @@ fn target_dir_file(filename: &str) -> PathBuf {
         .join(filename)
 }
 
-fn generate_one_test(test: &str, command: &str) -> String {
-    let (mut cmd, args) = command.split_once(" ").unwrap();
-    cmd = cmd.trim();
-    let args = args.trim().escape_debug().to_string();
-    let args = shell_words::split(&args).unwrap();
+fn generate_one_test(test: &str, script: &str) -> String {
     format!(
         r#"
 #[test]
 fn {}() {{
-    mallockit::testing::test(env!("CARGO_CRATE_NAME"), "{}", &{:?});
+    mallockit::testing::test(env!("CARGO_CRATE_NAME"), {:?});
 }}
 "#,
-        test, cmd, args,
+        test, script,
     )
 }
 

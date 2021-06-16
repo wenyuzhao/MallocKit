@@ -58,7 +58,7 @@ end
 task :lldb => :build do
     dylib_env = BenchmarkSuite::get_env(malloc)
     cmd = ARGV[(ARGV.index("--") + 1)..-1].join(" ")
-    🔵 "rust-lldb -b -o 'settings set auto-confirm true' -o 'env #{dylib_env}' -o 'run' -- #{cmd}"
+    🔵 "rust-lldb -o 'settings set auto-confirm true' -o 'env #{dylib_env}' -o 'run' -- #{cmd}"
     exit 0
 end
 

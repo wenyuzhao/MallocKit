@@ -1,5 +1,7 @@
 tests:
-  cargo: cargo build
+  rustc: |
+    rustc ./mallockit/tests/test.rs -o a.out
+    rm a.out
   clang: clang++ ./mallockit/tests/test.cpp -std=c++14 -O3 -o /dev/null
   gcc: g++ ./mallockit/tests/test.cpp -std=c++14 -O3 -o /dev/null
   ls: ls -al

@@ -67,6 +67,7 @@ impl LazyBst {
                     -1,
                     0,
                 );
+                assert_ne!(addr, libc::MAP_FAILED);
                 let addr = Address::from(addr);
                 Page::new(addr)
             };
