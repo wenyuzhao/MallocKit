@@ -35,6 +35,14 @@ impl Address {
         (self.0 & (align - 1)) == 0
     }
 
+    pub const fn from_usize(v: usize) -> Self {
+        Self(v)
+    }
+
+    pub const fn as_usize(&self) -> usize {
+        self.0
+    }
+
     pub const fn as_ptr<T>(&self) -> *const T {
         self.0 as _
     }

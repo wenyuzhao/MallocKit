@@ -104,7 +104,8 @@ where
         if unlikely(head_opt.is_none()) {
             return None;
         } else {
-            let mut head_ptr = head_opt.unwrap();
+            debug_assert!(head_opt.is_some());
+            let mut head_ptr = unsafe { head_opt.unwrap_unchecked() };
             let head = unsafe { head_ptr.as_mut() };
             let next = head.next;
             if let Some(mut next) = next {

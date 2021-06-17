@@ -3,6 +3,7 @@ mod address_non_null;
 pub mod bits;
 pub mod freelist;
 mod lab;
+mod layout_utils;
 mod lazy;
 pub mod memory;
 mod page;
@@ -14,6 +15,7 @@ pub use address::*;
 pub use address_non_null::*;
 pub use core::alloc::Layout;
 pub use lab::*;
+pub use layout_utils::*;
 pub use lazy::*;
 pub use page::*;
 

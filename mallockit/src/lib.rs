@@ -26,6 +26,8 @@
 #![feature(const_fn_trait_bound)]
 #![feature(const_generics_defaults)]
 #![feature(asm)]
+#![feature(alloc_layout_extra)]
+#![feature(option_result_unwrap_unchecked)]
 
 extern crate mallockit_proc_macro;
 

@@ -45,9 +45,8 @@ impl Space for FreeListSpace {
 impl FreeListSpace {
     #[inline(always)]
     pub fn can_allocate(layout: Layout) -> bool {
-        let (extended_layout, _) = Layout::new::<Cell>().extend(layout).unwrap();
-        let padded_extended_layout = extended_layout.pad_to_align();
-        padded_extended_layout.size() + IntrusiveFreeList::<AddressSpace>::HEADER_SIZE
+        let (extended_layout, _) = unsafe { Layout::new::<Cell>().extend_unchecked(layout) };
+        extended_layout.padded_size() + IntrusiveFreeList::<AddressSpace>::HEADER_SIZE
             <= FreeListSpace::MAX_ALLOCATION_SIZE
     }
 
@@ -174,9 +173,8 @@ impl Allocator for FreeListAllocator {
 
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
-        let (extended_layout, offset) = Layout::new::<Cell>().extend(layout).unwrap();
-        let padded_extended_layout = extended_layout.pad_to_align();
-        let Range { start, end } = self.alloc_cell(padded_extended_layout.size())?;
+        let (extended_layout, offset) = unsafe { Layout::new::<Cell>().extend_unchecked(layout) };
+        let Range { start, end } = self.alloc_cell(extended_layout.padded_size())?;
         let aligned_start = start.align_up(extended_layout.align());
         let data_start = aligned_start + offset;
         debug_assert!(end - data_start >= layout.size());

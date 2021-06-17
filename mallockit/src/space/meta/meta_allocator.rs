@@ -1,5 +1,5 @@
 use super::META_SPACE;
-use crate::util::{Address, Page, Size4K};
+use crate::util::{Address, LayoutUtils, Page, Size4K};
 use std::{
     alloc::{AllocError, Allocator, Layout},
     intrinsics::likely,
@@ -28,25 +28,27 @@ impl MetaLocal {
 
     #[cold]
     fn allocate_large(&self, layout: Layout) -> Result<Address, AllocError> {
+        let layout = unsafe { layout.pad_to_align_unchecked() };
         let pages = (layout.size() + Page::<Size4K>::MASK) >> Page::<Size4K>::LOG_BYTES;
         let ptr = META_SPACE
             .map::<Size4K>(pages)
             .ok_or(AllocError)?
             .start
             .start();
-        Ok(ptr)
+        Ok(ptr.align_up(layout.align()))
     }
 
     #[cold]
     fn release_large(&self, ptr: Address, layout: Layout) {
+        let layout = unsafe { layout.pad_to_align_unchecked() };
         let start = Page::<Size4K>::new(ptr);
         let pages = (layout.size() + Page::<Size4K>::MASK) >> Page::<Size4K>::LOG_BYTES;
         META_SPACE.unmap(start, pages)
     }
 
     #[inline(always)]
-    const fn request_large(layout: Layout) -> bool {
-        layout.size() > Self::MAX_NON_LARGE_ALLOC_SIZE
+    const fn request_large(padded_size: usize) -> bool {
+        padded_size > Self::MAX_NON_LARGE_ALLOC_SIZE
     }
 
     #[inline(always)]
@@ -106,9 +108,9 @@ impl MetaLocal {
 
     #[inline(always)]
     fn allocate(&mut self, layout: Layout) -> Result<Address, AllocError> {
-        let layout = layout.pad_to_align();
-        if likely(!Self::request_large(layout)) {
-            let size_class = Self::size_class(layout.size());
+        let padded_size = layout.padded_size();
+        if likely(!Self::request_large(padded_size)) {
+            let size_class = Self::size_class(padded_size);
             let cell = self.allocate_cell(size_class)?;
             let addr = cell.align_up(layout.align());
             Ok(addr)
@@ -119,9 +121,9 @@ impl MetaLocal {
 
     #[inline(always)]
     fn deallocate(&mut self, ptr: Address, layout: Layout) {
-        let layout = layout.pad_to_align();
-        if likely(!Self::request_large(layout)) {
-            let size_class = Self::size_class(layout.size());
+        let padded_size = layout.padded_size();
+        if likely(!Self::request_large(padded_size)) {
+            let size_class = Self::size_class(padded_size);
             let cell = ptr.align_down(1 << size_class);
             self.push_cell(cell, size_class)
         } else {
