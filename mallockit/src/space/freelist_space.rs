@@ -6,22 +6,25 @@ use crate::util::*;
 use spin::Mutex;
 use std::{ops::Range, sync::atomic::AtomicUsize};
 
+// type ActivePageSize = Size4K;
+type ActivePageSize = Size2M;
+
 pub struct AddressSpace;
 
 impl AddressSpaceConfig for AddressSpace {
     const LOG_MIN_ALIGNMENT: usize = 3;
     const LOG_COVERAGE: usize = SpaceId::LOG_MAX_SPACE_SIZE;
-    const LOG_MAX_CELL_SIZE: usize = Size2M::LOG_BYTES;
+    const LOG_MAX_CELL_SIZE: usize = ActivePageSize::LOG_BYTES;
 }
 
 pub struct FreeListSpace {
     id: SpaceId,
     pr: PageResource,
-    pages: Mutex<Option<Page<Size2M>>>,
+    pages: Mutex<Option<Page<ActivePageSize>>>,
 }
 
 impl Space for FreeListSpace {
-    const MAX_ALLOCATION_SIZE: usize = Size2M::BYTES;
+    const MAX_ALLOCATION_SIZE: usize = ActivePageSize::BYTES;
 
     fn new(id: SpaceId) -> Self {
         Self {
@@ -51,7 +54,7 @@ impl FreeListSpace {
     }
 
     #[inline(always)]
-    fn add_coalesced_page(&self, page: Page<Size2M>) {
+    fn add_coalesced_page(&self, page: Page<ActivePageSize>) {
         let mut pages = self.pages.lock();
         let head = pages.map(|p| p.start()).unwrap_or(Address::ZERO);
         unsafe { page.start().store(head) }
@@ -59,7 +62,7 @@ impl FreeListSpace {
     }
 
     #[inline(always)]
-    fn get_coalesced_page(&self) -> Option<Page<Size2M>> {
+    fn get_coalesced_page(&self) -> Option<Page<ActivePageSize>> {
         let mut pages = self.pages.lock();
         let page = (*pages)?;
         let next = unsafe { page.start().load::<Address>() };
@@ -135,9 +138,9 @@ impl FreeListAllocator {
     fn alloc_cell_slow(&mut self, bytes: usize) -> Option<Range<Address>> {
         let page = match self.space.get_coalesced_page() {
             Some(page) => page,
-            _ => self.space.acquire::<Size2M>(1)?.start,
+            _ => self.space.acquire::<ActivePageSize>(1)?.start,
         };
-        self.freelist.add_units(page.start(), Size2M::BYTES);
+        self.freelist.add_units(page.start(), ActivePageSize::BYTES);
         self.alloc_cell(bytes)
     }
 
@@ -155,8 +158,10 @@ impl FreeListAllocator {
     }
 
     #[inline(always)]
-    fn get_coalesced_pages(&mut self) -> Option<Page<Size2M>> {
-        Some(Page::new(self.freelist.pop_raw_cell(Size2M::LOG_BYTES)?))
+    fn get_coalesced_pages(&mut self) -> Option<Page<ActivePageSize>> {
+        Some(Page::new(
+            self.freelist.pop_raw_cell(ActivePageSize::LOG_BYTES)?,
+        ))
     }
 }
 

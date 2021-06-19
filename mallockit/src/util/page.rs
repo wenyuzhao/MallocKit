@@ -2,7 +2,7 @@ use std::{cmp::Ordering, fmt, iter::Step, marker::PhantomData, num::NonZeroUsize
 
 use super::Address;
 
-pub trait PageSize {
+pub trait PageSize: 'static + Sized {
     const NAME: &'static str;
     const LOG_BYTES: usize;
     const BYTES: usize = 1 << Self::LOG_BYTES;
