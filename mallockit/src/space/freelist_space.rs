@@ -24,7 +24,7 @@ pub struct FreeListSpace {
 }
 
 impl Space for FreeListSpace {
-    const MAX_ALLOCATION_SIZE: usize = ActivePageSize::BYTES;
+    const MAX_ALLOCATION_SIZE: usize = Size4K::BYTES;
 
     fn new(id: SpaceId) -> Self {
         Self {
