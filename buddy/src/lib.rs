@@ -44,7 +44,7 @@ impl Plan for Buddy {
 #[mallockit::mutator]
 struct BuddyMutator {
     freelist: FreeListAllocator,
-    los: LargeObjectAllocator<Size2M>,
+    los: LargeObjectAllocator<Size4K>,
 }
 
 impl BuddyMutator {
