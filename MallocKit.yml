@@ -1,7 +1,6 @@
 tests:
-  rustc: |
-    rustc ./mallockit/tests/test.rs -o a.out
-    rm a.out
+  sed: bash ./mallockit/tests/sed.sh
+  zip: bash ./mallockit/tests/zip.sh
   clang: clang++ ./mallockit/tests/test.cpp -std=c++14 -O3 -o /dev/null
   gcc: g++ ./mallockit/tests/test.cpp -std=c++14 -O3 -o /dev/null
   ls: ls -al
