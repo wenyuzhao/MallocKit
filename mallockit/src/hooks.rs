@@ -11,7 +11,7 @@ pub fn set_panic_handler() {
     std::panic::set_hook(unsafe { Box::from_raw(&mut panic_handler) });
 }
 
-pub extern "C" fn process_start(plan: &impl Plan) {
+pub extern "C" fn process_start(plan: &'static impl Plan) {
     set_panic_handler();
     #[cfg(target_os = "macos")]
     crate::util::macos_malloc_zone::init();

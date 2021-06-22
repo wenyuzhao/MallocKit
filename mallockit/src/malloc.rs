@@ -219,6 +219,12 @@ macro_rules! export_malloc_api {
                 $crate::libc::atexit($crate::hooks::process_exit);
             }
 
+            #[cfg(target_os = "macos")]
+            #[no_mangle]
+            pub extern "C" fn mallockit_initialize_macos_tls() -> *mut u8 {
+                MALLOC_IMPL.mutator() as *mut _ as _
+            }
+
             #[$crate::interpose]
             pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
                 MALLOC_IMPL.alloc_or_enomem(size, Malloc::MIN_ALIGNMENT)

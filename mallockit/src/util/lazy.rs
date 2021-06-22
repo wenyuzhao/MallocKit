@@ -137,3 +137,18 @@ impl<T: Default, TL: ThreadLocality> Default for Lazy<T, TL, fn() -> T> {
 
 unsafe impl<T, TL: ThreadLocality, F: FnOnce() -> T> Send for Lazy<T, TL, F> {}
 unsafe impl<T, TL: ThreadLocality, F: FnOnce() -> T> Sync for Lazy<T, TL, F> {}
+
+pub trait LazyVal<T>: Sized + Deref<Target = T> {}
+
+impl<T, F: FnOnce() -> T> LazyVal<T> for Lazy<T, Local, F> {}
+
+impl<T> LazyVal<T> for &T {}
+
+impl<T> LazyVal<T> for &mut T {}
+
+#[macro_export]
+macro_rules! lazy {
+    ($value: expr) => {
+        $crate::util::Lazy::new(|| $value)
+    };
+}

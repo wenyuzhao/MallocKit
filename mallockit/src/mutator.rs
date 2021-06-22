@@ -110,6 +110,10 @@ mod macos_tls {
     const SLOT: usize = 89;
     const OFFSET: usize = SLOT * std::mem::size_of::<usize>();
 
+    extern "C" {
+        fn mallockit_initialize_macos_tls() -> *mut u8;
+    }
+
     #[inline(always)]
     #[allow(unused)]
     fn _get_tls<T>() -> *mut T {
@@ -123,7 +127,13 @@ mod macos_tls {
     #[inline(always)]
     #[allow(unused)]
     pub(super) fn get_internal_tls() -> *mut InternalTLS {
-        let tls = _get_tls::<InternalTLS>();
+        let mut tls = _get_tls::<InternalTLS>();
+        if unlikely(tls.is_null()) {
+            unsafe {
+                mallockit_initialize_macos_tls();
+            }
+            tls = _get_tls::<InternalTLS>();
+        }
         debug_assert!(!tls.is_null());
         tls
     }

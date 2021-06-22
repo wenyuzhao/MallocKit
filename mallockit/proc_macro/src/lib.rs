@@ -11,7 +11,6 @@ pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
         mod __mallockit_plan {
             pub(super) static PLAN: mallockit::util::Lazy<super::#name> = mallockit::util::Lazy::new(|| <super::#name as mallockit::Plan>::new());
 
-            #[cfg(not(test))]
             mallockit::export_malloc_api!(PLAN);
         }
 
@@ -49,7 +48,7 @@ pub fn mutator(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #[cfg(not(target_os = "macos"))]
             #[inline(always)]
             fn current() -> &'static mut Self {
-                unsafe { &mut crate::__mallockit_mutator::MUTATOR }
+                unsafe { &mut __mallockit_mutator::MUTATOR }
             }
         }
     };
@@ -62,6 +61,7 @@ pub fn interpose(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let name = &input.sig.ident;
     let result = quote! {
         #[cfg(target_os = "macos")]
+        #[cfg(not(test))]
         pub mod #name {
             #[repr(C)]
             pub struct Interpose {
@@ -83,9 +83,11 @@ pub fn interpose(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         #[cfg(target_os = "macos")]
+        #[cfg(not(test))]
         #input
 
         #[cfg(not(target_os = "macos"))]
+        #[cfg(not(test))]
         #[no_mangle]
         #input
     };

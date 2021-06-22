@@ -13,6 +13,7 @@ spin = "0.9"
 ctor = "0.1"
 mallockit_proc_macro = { path = "./proc_macro" }
 shell-words = "1.0.0"
+num_cpus = "1.13.0"
 
 [build-dependencies]
 yaml-rust = "0.4.5"

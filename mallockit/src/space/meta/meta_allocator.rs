@@ -1,7 +1,7 @@
 use super::META_SPACE;
 use crate::util::{Address, LayoutUtils, Page, Size4K};
 use std::{
-    alloc::{AllocError, Allocator, Layout},
+    alloc::{AllocError, Allocator, GlobalAlloc, Layout},
     intrinsics::likely,
     ptr::NonNull,
     slice,
@@ -49,6 +49,13 @@ impl MetaLocal {
     #[inline(always)]
     const fn request_large(padded_size: usize) -> bool {
         padded_size > Self::MAX_NON_LARGE_ALLOC_SIZE
+    }
+
+    #[inline(always)]
+    fn update_layout(l: Layout) -> Layout {
+        let align = usize::max(16, l.align());
+        let size = (l.size() + 0b1111) & !0b1111;
+        unsafe { Layout::from_size_align_unchecked(size, align) }
     }
 
     #[inline(always)]
@@ -108,6 +115,7 @@ impl MetaLocal {
 
     #[inline(always)]
     fn allocate(&mut self, layout: Layout) -> Result<Address, AllocError> {
+        let layout = Self::update_layout(layout);
         let padded_size = layout.padded_size();
         if likely(!Self::request_large(padded_size)) {
             let size_class = Self::size_class(padded_size);
@@ -121,6 +129,7 @@ impl MetaLocal {
 
     #[inline(always)]
     fn deallocate(&mut self, ptr: Address, layout: Layout) {
+        let layout = Self::update_layout(layout);
         let padded_size = layout.padded_size();
         if likely(!Self::request_large(padded_size)) {
             let size_class = Self::size_class(padded_size);
@@ -145,5 +154,19 @@ unsafe impl Allocator for Meta {
     #[inline(always)]
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
         MetaLocal::current().deallocate(ptr.as_ptr().into(), layout)
+    }
+}
+
+unsafe impl GlobalAlloc for Meta {
+    #[inline(always)]
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        MetaLocal::current()
+            .allocate(layout)
+            .unwrap_or(Address::ZERO)
+            .into()
+    }
+    #[inline(always)]
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        MetaLocal::current().deallocate(ptr.into(), layout)
     }
 }

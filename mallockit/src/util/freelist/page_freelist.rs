@@ -56,14 +56,11 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{ NU
     #[inline(always)]
     fn push_cell(&mut self, unit: Unit, size_class: usize) {
         let head = self.table[size_class];
-        let mut cell = Box::leak(Box::new_in(
-            Cell {
-                prev: None,
-                next: None,
-                unit,
-            },
-            Meta,
-        ));
+        let mut cell = Box::leak(meta_box!(Cell {
+            prev: None,
+            next: None,
+            unit,
+        }));
         let cell_ptr = unsafe { NonNull::new_unchecked(cell) };
         if let Some(mut head) = head {
             unsafe {

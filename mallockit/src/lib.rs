@@ -43,12 +43,14 @@ pub mod plan;
 pub mod space;
 pub mod stat;
 pub mod testing;
+pub mod worker;
 
 pub use ctor::ctor;
 pub use libc;
 pub use mallockit_proc_macro::*;
 pub use mutator::Mutator;
 pub use plan::Plan;
+use space::meta::Meta;
 
 #[cfg(not(target_pointer_width = "64"))]
 const ERROR: ! = "32-bit is not supported";
@@ -58,3 +60,6 @@ const ERROR: ! = "Unsupported OS";
 
 #[cfg(not(target_arch = "x86_64"))]
 const ERROR: ! = "Unsupported Architecture";
+
+#[global_allocator]
+static META: Meta = Meta;

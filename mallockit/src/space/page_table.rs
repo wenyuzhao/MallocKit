@@ -203,13 +203,10 @@ impl<L: PageTableLevel> PageTable<L> {
             Some(PageTableEntryData::NextLevelPageTable { table, .. }) => table,
             Some(_) => unreachable!(),
             _ => {
-                let table = Box::leak(Box::new_in(
-                    PageTable::<L::NextLevel> {
-                        table: unsafe { mem::transmute([0usize; 512]) },
-                        phantom: PhantomData,
-                    },
-                    Meta,
-                ));
+                let table = Box::leak(meta_box!(PageTable::<L::NextLevel> {
+                    table: unsafe { mem::transmute([0usize; 512]) },
+                    phantom: PhantomData,
+                }));
                 self.table[index].set_next_page_table(table);
                 on_create();
                 self.get_next_page_table(address)
