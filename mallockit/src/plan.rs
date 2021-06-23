@@ -7,7 +7,7 @@ pub trait Plan: Singleton + Sized + 'static {
 
     fn new() -> Self;
     fn init(&'static self) {}
-    fn get_layout(&'static self, ptr: Address) -> Layout;
+    fn get_layout(ptr: Address) -> Layout;
 
     #[inline(always)]
     fn get() -> &'static Self {

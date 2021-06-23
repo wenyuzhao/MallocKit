@@ -20,11 +20,6 @@ pub trait Mutator: Sized + 'static + TLS {
         Self::Plan::get()
     }
 
-    #[inline(always)]
-    fn get_layout(&self, ptr: Address) -> Layout {
-        Self::plan().get_layout(ptr)
-    }
-
     fn alloc(&mut self, layout: Layout) -> Option<Address>;
 
     #[inline(always)]
@@ -41,7 +36,7 @@ pub trait Mutator: Sized + 'static + TLS {
 
     #[inline(always)]
     fn realloc(&mut self, ptr: Address, new_size: usize) -> Option<Address> {
-        let layout = self.get_layout(ptr);
+        let layout = Self::Plan::get_layout(ptr);
         if unlikely(layout.size() >= new_size) {
             return Some(ptr);
         }

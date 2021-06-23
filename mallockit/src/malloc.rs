@@ -64,7 +64,7 @@ impl<P: Plan> MallocAPI<P> {
         if unlikely(Self::zero_spaceid(ptr.into())) {
             return crate::util::macos_malloc_zone::external_memory_size(ptr);
         }
-        self.mutator().get_layout(ptr).size()
+        P::get_layout(ptr).size()
     }
 
     #[inline(always)]

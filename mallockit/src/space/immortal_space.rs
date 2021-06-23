@@ -23,6 +23,11 @@ impl Space for ImmortalSpace {
     fn page_resource(&self) -> &PageResource {
         &self.pr
     }
+
+    #[inline(always)]
+    fn get_layout(ptr: Address) -> Layout {
+        AllocationArea::load_layout(ptr)
+    }
 }
 
 pub struct BumpAllocator {
@@ -61,11 +66,6 @@ impl BumpAllocator {
 }
 
 impl Allocator for BumpAllocator {
-    #[inline(always)]
-    fn get_layout(&self, ptr: Address) -> Layout {
-        AllocationArea::load_layout(ptr)
-    }
-
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         if let Some(ptr) = self.allocation_area.alloc_with_layout(layout) {

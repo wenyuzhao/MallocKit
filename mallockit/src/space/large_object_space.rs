@@ -25,6 +25,21 @@ impl Space for LargeObjectSpace {
     fn page_resource(&self) -> &PageResource {
         &self.pr
     }
+
+    fn get_layout(_: Address) -> Layout {
+        unreachable!()
+    }
+}
+
+impl LargeObjectSpace {
+    #[inline(always)]
+    pub fn get_layout<S: PageSize>(&self, ptr: Address) -> Layout {
+        let pages = self
+            .page_resource()
+            .get_contiguous_pages(Page::<S>::new(ptr));
+        let bytes = pages << S::LOG_BYTES;
+        unsafe { Layout::from_size_align_unchecked(bytes, bytes.next_power_of_two()) }
+    }
 }
 
 pub struct LargeObjectAllocator<S: PageSize = Size4K>(
@@ -44,16 +59,6 @@ impl<S: PageSize> LargeObjectAllocator<S> {
 }
 
 impl<S: PageSize> Allocator for LargeObjectAllocator<S> {
-    #[inline(always)]
-    fn get_layout(&self, ptr: Address) -> Layout {
-        let pages = self
-            .space()
-            .page_resource()
-            .get_contiguous_pages(Page::<S>::new(ptr));
-        let bytes = pages << S::LOG_BYTES;
-        unsafe { Layout::from_size_align_unchecked(bytes, bytes.next_power_of_two()) }
-    }
-
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let size = layout.size();

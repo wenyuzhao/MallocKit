@@ -61,6 +61,8 @@ pub trait Space: Sized + 'static {
     fn id(&self) -> SpaceId;
     fn page_resource(&self) -> &PageResource;
 
+    fn get_layout(ptr: Address) -> Layout;
+
     #[inline(always)]
     fn contains(&self, address: Address) -> bool {
         SpaceId::from(address) == self.id()
@@ -81,8 +83,6 @@ pub trait Space: Sized + 'static {
 }
 
 pub trait Allocator {
-    fn get_layout(&self, ptr: Address) -> Layout;
-
     fn alloc(&mut self, layout: Layout) -> Option<Address>;
 
     #[inline(always)]

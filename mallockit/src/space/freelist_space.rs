@@ -43,6 +43,16 @@ impl Space for FreeListSpace {
     fn page_resource(&self) -> &PageResource {
         &self.pr
     }
+
+    #[inline(always)]
+    fn get_layout(ptr: Address) -> Layout {
+        let cell = Cell::from(ptr);
+        let bytes = cell.data_size();
+        let align = cell.align();
+        debug_assert_ne!(bytes, 0);
+        debug_assert_ne!(align, 0);
+        unsafe { Layout::from_size_align_unchecked(bytes, align) }
+    }
 }
 
 impl FreeListSpace {
@@ -166,16 +176,6 @@ impl FreeListAllocator {
 }
 
 impl Allocator for FreeListAllocator {
-    #[inline(always)]
-    fn get_layout(&self, ptr: Address) -> Layout {
-        let cell = Cell::from(ptr);
-        let bytes = cell.data_size();
-        let align = cell.align();
-        debug_assert_ne!(bytes, 0);
-        debug_assert_ne!(align, 0);
-        unsafe { Layout::from_size_align_unchecked(bytes, align) }
-    }
-
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let (extended_layout, offset) = unsafe { Layout::new::<Cell>().extend_unchecked(layout) };

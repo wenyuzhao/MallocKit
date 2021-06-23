@@ -36,8 +36,13 @@ impl Plan for Buddy {
     }
 
     #[inline(always)]
-    fn get_layout(&self, _: Address) -> Layout {
-        unreachable!()
+    fn get_layout(ptr: Address) -> Layout {
+        debug_assert!(FREELIST_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
+        if likely(FREELIST_SPACE.contains(ptr)) {
+            FreeListSpace::get_layout(ptr)
+        } else {
+            Self::get().large_object_space.get_layout::<Size4K>(ptr)
+        }
     }
 }
 
@@ -62,16 +67,6 @@ impl BuddyMutator {
 impl Mutator for BuddyMutator {
     type Plan = Buddy;
     const NEW: Self = Self::new();
-
-    #[inline(always)]
-    fn get_layout(&self, ptr: Address) -> Layout {
-        debug_assert!(FREELIST_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
-        if likely(FREELIST_SPACE.contains(ptr)) {
-            self.freelist.get_layout(ptr)
-        } else {
-            self.los.get_layout(ptr)
-        }
-    }
 
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
