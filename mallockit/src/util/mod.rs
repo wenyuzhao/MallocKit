@@ -19,6 +19,7 @@ macro_rules! name_list {
 
 mod address;
 mod address_non_null;
+pub mod arena;
 pub mod bits;
 pub mod freelist;
 mod lab;

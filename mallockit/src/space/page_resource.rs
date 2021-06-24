@@ -13,7 +13,7 @@ const NUM_SIZE_CLASS: usize = SpaceId::LOG_MAX_SPACE_SIZE - Page::<Size4K>::LOG_
 
 pub struct PageResource {
     pub id: SpaceId,
-    freelist: Mutex<PageFreeList<{ NUM_SIZE_CLASS }>>,
+    freelist: Mutex<PageFreeList<NUM_SIZE_CLASS>>,
     committed_size: AtomicUsize,
 }
 

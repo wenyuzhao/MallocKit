@@ -1,6 +1,6 @@
 use crate::{
-    space::{meta::Meta, page_table::PageTable},
-    util::*,
+    space::page_table::PageTable,
+    util::{arena::Arena, *},
 };
 use std::{ops::Range, ptr::NonNull};
 
@@ -21,9 +21,10 @@ pub struct PageFreeList<const NUM_SIZE_CLASS: usize> {
     table: [Option<CellPtr>; NUM_SIZE_CLASS],
     bst: LazyBst,
     page_table: PageTable,
+    arena: Arena<Cell>,
 }
 
-impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{ NUM_SIZE_CLASS }> {
+impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<NUM_SIZE_CLASS> {
     const MIN_SIZE_CLASS: usize = 0;
     const NUM_SIZE_CLASS: usize = NUM_SIZE_CLASS;
 
@@ -56,11 +57,11 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{ NU
     #[inline(always)]
     fn push_cell(&mut self, unit: Unit, size_class: usize) {
         let head = self.table[size_class];
-        let mut cell = Box::leak(meta_box!(Cell {
+        let mut cell = self.arena.alloc(Cell {
             prev: None,
             next: None,
             unit,
-        }));
+        });
         let cell_ptr = unsafe { NonNull::new_unchecked(cell) };
         if let Some(mut head) = head {
             unsafe {
@@ -80,7 +81,7 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{ NU
             return None;
         } else {
             let mut head_ptr = head.unwrap();
-            let head = unsafe { Box::<Cell, Meta>::from_raw_in(head_ptr.as_mut(), Meta) };
+            let head = unsafe { head_ptr.as_mut() };
             let next = head.next;
             if let Some(mut next) = next {
                 unsafe {
@@ -91,6 +92,7 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{ NU
             self.table[size_class] = next;
             let unit = head.unit;
             self.delete_pages(unit);
+            self.arena.dealloc(head);
             return Some(unit);
         }
     }
@@ -98,7 +100,7 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{ NU
     #[inline(always)]
     fn remove_cell(&mut self, unit: Unit, size_class: usize) {
         let mut cell_ptr = self.unit_to_cell(unit);
-        let cell = unsafe { Box::<Cell, Meta>::from_raw_in(cell_ptr.as_mut(), Meta) };
+        let cell = unsafe { cell_ptr.as_mut() };
         let next = cell.next;
         let prev = cell.prev;
         if let Some(mut prev) = prev {
@@ -117,10 +119,11 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<{ NU
             }
         }
         self.delete_pages(unit);
+        self.arena.dealloc(cell);
     }
 }
 
-impl<const NUM_SIZE_CLASS: usize> PageFreeList<{ NUM_SIZE_CLASS }> {
+impl<const NUM_SIZE_CLASS: usize> PageFreeList<NUM_SIZE_CLASS> {
     #[inline(always)]
     fn unit_to_address(&self, unit: Unit) -> Address {
         self.base + (*unit << Size4K::LOG_BYTES)
@@ -151,13 +154,14 @@ impl<const NUM_SIZE_CLASS: usize> PageFreeList<{ NUM_SIZE_CLASS }> {
     }
 }
 
-impl<const NUM_SIZE_CLASS: usize> PageFreeList<{ NUM_SIZE_CLASS }> {
+impl<const NUM_SIZE_CLASS: usize> PageFreeList<NUM_SIZE_CLASS> {
     pub fn new(base: Address) -> Self {
         Self {
             base,
             table: [None; NUM_SIZE_CLASS],
             bst: LazyBst::new(),
             page_table: PageTable::new(),
+            arena: Arena::new(),
         }
     }
 
