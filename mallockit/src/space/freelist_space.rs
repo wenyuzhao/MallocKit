@@ -108,26 +108,25 @@ impl Cell {
         debug_assert!(log_align <= 21);
         let start_offset =
             unsafe { (Address::from((self as *const Self).add(1)) - start) as usize };
-        self.word.set::<{ Self::START_OFFSET }>(start_offset);
-        self.word.set::<{ Self::SIZE }>(size);
-        self.word.set::<{ Self::LOG_ALIGN }>(log_align);
+        self.word.set(Self::START_OFFSET, start_offset);
+        self.word.set(Self::SIZE, size);
+        self.word.set(Self::LOG_ALIGN, log_align);
     }
     #[inline(always)]
     fn start(&self) -> Address {
-        Address::from(self) + std::mem::size_of::<Self>()
-            - self.word.get::<{ Self::START_OFFSET }>()
+        Address::from(self) + std::mem::size_of::<Self>() - self.word.get(Self::START_OFFSET)
     }
     #[inline(always)]
     fn size(&self) -> usize {
-        self.word.get::<{ Self::SIZE }>()
+        self.word.get(Self::SIZE)
     }
     #[inline(always)]
     fn data_size(&self) -> usize {
-        self.size() - self.word.get::<{ Self::START_OFFSET }>()
+        self.size() - self.word.get(Self::START_OFFSET)
     }
     #[inline(always)]
     fn align(&self) -> usize {
-        1 << self.word.get::<{ Self::LOG_ALIGN }>()
+        1 << self.word.get(Self::LOG_ALIGN)
     }
 }
 

@@ -1,5 +1,5 @@
 use crate::util::Address;
-use std::cmp;
+use std::cmp::Ordering;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::{iter::Step, ops::Range};
@@ -22,6 +22,10 @@ impl<const LOG_BYTES: usize, Meta: MemoryChunkMeta> const Clone for MemoryChunk<
     fn clone(&self) -> Self {
         Self(self.0, PhantomData)
     }
+
+    fn clone_from(&mut self, source: &Self) {
+        *self = source.clone()
+    }
 }
 
 impl<const LOG_BYTES: usize, Meta: MemoryChunkMeta> const PartialEq
@@ -31,14 +35,40 @@ impl<const LOG_BYTES: usize, Meta: MemoryChunkMeta> const PartialEq
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
+
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
 }
 
 impl<const LOG_BYTES: usize, Meta: MemoryChunkMeta> const PartialOrd
     for MemoryChunk<LOG_BYTES, Meta>
 {
     #[inline(always)]
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.0.cmp(&other.0))
+    }
+
+    fn lt(&self, other: &Self) -> bool {
+        matches!(self.partial_cmp(other), Some(Ordering::Less))
+    }
+
+    fn le(&self, other: &Self) -> bool {
+        matches!(
+            self.partial_cmp(other),
+            Some(Ordering::Less | Ordering::Equal)
+        )
+    }
+
+    fn gt(&self, other: &Self) -> bool {
+        matches!(self.partial_cmp(other), Some(Ordering::Greater))
+    }
+
+    fn ge(&self, other: &Self) -> bool {
+        matches!(
+            self.partial_cmp(other),
+            Some(Ordering::Greater | Ordering::Equal)
+        )
     }
 }
 

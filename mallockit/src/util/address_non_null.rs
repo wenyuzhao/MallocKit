@@ -51,6 +51,10 @@ impl const Clone for AddressNonNull {
     fn clone(&self) -> Self {
         Self(self.0)
     }
+
+    fn clone_from(&mut self, source: &Self) {
+        *self = source.clone()
+    }
 }
 
 impl const Copy for AddressNonNull {}
@@ -125,13 +129,41 @@ impl const PartialEq for AddressNonNull {
     fn eq(&self, other: &Self) -> bool {
         unsafe { self.0.as_ptr() as usize == other.0.as_ptr() as usize }
     }
+
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
 }
 
-impl const Eq for AddressNonNull {}
+impl const Eq for AddressNonNull {
+    fn assert_receiver_is_total_eq(&self) {}
+}
 
 impl const PartialOrd for AddressNonNull {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
+    }
+
+    fn lt(&self, other: &Self) -> bool {
+        matches!(self.partial_cmp(other), Some(Ordering::Less))
+    }
+
+    fn le(&self, other: &Self) -> bool {
+        matches!(
+            self.partial_cmp(other),
+            Some(Ordering::Less | Ordering::Equal)
+        )
+    }
+
+    fn gt(&self, other: &Self) -> bool {
+        matches!(self.partial_cmp(other), Some(Ordering::Greater))
+    }
+
+    fn ge(&self, other: &Self) -> bool {
+        matches!(
+            self.partial_cmp(other),
+            Some(Ordering::Greater | Ordering::Equal)
+        )
     }
 }
 
@@ -141,6 +173,31 @@ impl const Ord for AddressNonNull {
             (x, y) if x == y => Ordering::Equal,
             (x, y) if x < y => Ordering::Less,
             _ => Ordering::Greater,
+        }
+    }
+
+    fn max(self, other: Self) -> Self {
+        match Self::cmp(&self, &other) {
+            Ordering::Less | Ordering::Equal => other,
+            Ordering::Greater => self,
+        }
+    }
+
+    fn min(self, other: Self) -> Self {
+        match Self::cmp(&self, &other) {
+            Ordering::Less | Ordering::Equal => self,
+            Ordering::Greater => other,
+        }
+    }
+
+    fn clamp(self, min: Self, max: Self) -> Self {
+        assert!(min <= max);
+        if self < min {
+            min
+        } else if self > max {
+            max
+        } else {
+            self
         }
     }
 }

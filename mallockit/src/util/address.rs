@@ -81,6 +81,10 @@ impl const Clone for Address {
     fn clone(&self) -> Self {
         Self(self.0)
     }
+
+    fn clone_from(&mut self, source: &Self) {
+        *self = source.clone()
+    }
 }
 
 impl const Copy for Address {}
@@ -150,13 +154,41 @@ impl const PartialEq for Address {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
+
+    fn ne(&self, other: &Self) -> bool {
+        !self.eq(other)
+    }
 }
 
-impl const Eq for Address {}
+impl const Eq for Address {
+    fn assert_receiver_is_total_eq(&self) {}
+}
 
 impl const PartialOrd for Address {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
+    }
+
+    fn lt(&self, other: &Self) -> bool {
+        matches!(self.partial_cmp(other), Some(Ordering::Less))
+    }
+
+    fn le(&self, other: &Self) -> bool {
+        matches!(
+            self.partial_cmp(other),
+            Some(Ordering::Less | Ordering::Equal)
+        )
+    }
+
+    fn gt(&self, other: &Self) -> bool {
+        matches!(self.partial_cmp(other), Some(Ordering::Greater))
+    }
+
+    fn ge(&self, other: &Self) -> bool {
+        matches!(
+            self.partial_cmp(other),
+            Some(Ordering::Greater | Ordering::Equal)
+        )
     }
 }
 
@@ -166,6 +198,31 @@ impl const Ord for Address {
             (x, y) if x == y => Ordering::Equal,
             (x, y) if x < y => Ordering::Less,
             _ => Ordering::Greater,
+        }
+    }
+
+    fn max(self, other: Self) -> Self {
+        match Self::cmp(&self, &other) {
+            Ordering::Less | Ordering::Equal => other,
+            Ordering::Greater => self,
+        }
+    }
+
+    fn min(self, other: Self) -> Self {
+        match Self::cmp(&self, &other) {
+            Ordering::Less | Ordering::Equal => self,
+            Ordering::Greater => other,
+        }
+    }
+
+    fn clamp(self, min: Self, max: Self) -> Self {
+        assert!(min <= max);
+        if self < min {
+            min
+        } else if self > max {
+            max
+        } else {
+            self
         }
     }
 }
@@ -264,5 +321,19 @@ impl const Step for Address {
 
     fn backward_checked(start: Self, count: usize) -> Option<Self> {
         Some(start - count)
+    }
+
+    fn forward(start: Self, count: usize) -> Self {
+        Step::forward_checked(start, count).unwrap()
+    }
+
+    unsafe fn forward_unchecked(start: Self, count: usize) -> Self {
+        Step::forward(start, count)
+    }
+    fn backward(start: Self, count: usize) -> Self {
+        Step::backward_checked(start, count).unwrap()
+    }
+    unsafe fn backward_unchecked(start: Self, count: usize) -> Self {
+        Step::backward(start, count)
     }
 }
