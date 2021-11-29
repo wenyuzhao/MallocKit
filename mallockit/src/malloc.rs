@@ -206,12 +206,13 @@ impl<P: Plan> MallocAPI<P> {
 
 #[macro_export]
 macro_rules! export_malloc_api {
-    ($plan: expr) => {
+    ($plan: expr, $plan_ty: ty) => {
         pub mod __mallockit {
             use super::*;
             use $crate::Plan;
-            type Malloc = $crate::malloc::MallocAPI<impl $crate::Plan>;
-            static MALLOC_IMPL: Malloc = $crate::malloc::MallocAPI::new(&$plan);
+            type ConcretePlan = $plan_ty;
+            type Malloc = $crate::malloc::MallocAPI<ConcretePlan>;
+            static MALLOC_IMPL: Malloc = $crate::malloc::MallocAPI::<ConcretePlan>::new(&$plan);
 
             #[$crate::ctor]
             unsafe fn ctor() {

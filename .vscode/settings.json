@@ -1,4 +1,6 @@
 {
     "editor.formatOnSave": true,
     "rust-analyzer.checkOnSave.allTargets": false,
+    // Buggy. Disable it for now.
+    "rust-analyzer.procMacro.enable": false,
 }

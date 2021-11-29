@@ -1,4 +1,3 @@
-use super::address_non_null::AddressNonNull;
 use std::cmp::Ordering;
 use std::fmt;
 use std::iter::Step;
@@ -97,31 +96,25 @@ impl const From<usize> for Address {
 
 impl<T> const From<*const T> for Address {
     fn from(value: *const T) -> Self {
-        unsafe { Self(value as _) }
+        unsafe { Self(mem::transmute(value)) }
     }
 }
 
 impl<T> const From<*mut T> for Address {
     fn from(value: *mut T) -> Self {
-        unsafe { Self(value as _) }
+        unsafe { Self(mem::transmute(value)) }
     }
 }
 
 impl<T> const From<&T> for Address {
     fn from(value: &T) -> Self {
-        unsafe { Self(value as *const T as _) }
+        unsafe { Self(mem::transmute(value as *const T)) }
     }
 }
 
 impl<T> const From<&mut T> for Address {
     fn from(value: &mut T) -> Self {
-        unsafe { Self(value as *const T as _) }
-    }
-}
-
-impl const From<AddressNonNull> for Address {
-    fn from(value: AddressNonNull) -> Self {
-        Self(usize::from(value))
+        unsafe { Self(mem::transmute(value as *const T)) }
     }
 }
 
