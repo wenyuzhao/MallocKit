@@ -59,6 +59,7 @@ pub fn mutator(_attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn interpose(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::ItemFn);
     let name = &input.sig.ident;
+    let interpose_name = syn::Ident::new(&format!("_interpose_{}", name), name.span());
     let result = quote! {
         #[cfg(target_os = "macos")]
         #[cfg(not(test))]
@@ -69,10 +70,10 @@ pub fn interpose(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 _old: *const (),
             }
 
-            #[used]
+            #[no_mangle]
             #[allow(non_upper_case_globals)]
             #[link_section = "__DATA,__interpose"]
-            pub static mut interpose: Interpose = Interpose {
+            pub static mut #interpose_name: Interpose = Interpose {
                 _new: super::#name as *const (),
                 _old: #name as *const (),
             };

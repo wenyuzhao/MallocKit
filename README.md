@@ -12,6 +12,8 @@ $ env LD_PRELOAD=./target/release/libbump.so cargo # or some other command
 $ env DYLD_INSERT_LIBRARIES=./target/release/libbump.dylib cargo # or some other command
 ```
 
+*Note: If you'd like to hijack the system apps and libraries as well, disable System Integrity Protection (SIP). Do this at your own risk 😉*
+
 ## Tests
 
 ```console
