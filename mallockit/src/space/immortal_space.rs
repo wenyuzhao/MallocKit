@@ -1,16 +1,18 @@
-use super::{page_resource::PageResource, Allocator, Space, SpaceId};
+use super::{page_resource::FreelistPageResource, Allocator, Space, SpaceId};
 use crate::util::*;
 
 pub struct ImmortalSpace {
     id: SpaceId,
-    pr: PageResource,
+    pr: FreelistPageResource,
 }
 
 impl Space for ImmortalSpace {
+    type PR = FreelistPageResource;
+
     fn new(id: SpaceId) -> Self {
         Self {
             id,
-            pr: PageResource::new(id),
+            pr: FreelistPageResource::new(id),
         }
     }
 
@@ -20,7 +22,7 @@ impl Space for ImmortalSpace {
     }
 
     #[inline(always)]
-    fn page_resource(&self) -> &PageResource {
+    fn page_resource(&self) -> &Self::PR {
         &self.pr
     }
 
