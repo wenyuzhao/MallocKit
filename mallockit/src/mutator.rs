@@ -1,5 +1,4 @@
 use std::alloc::Layout;
-use std::arch::asm;
 use std::intrinsics::unlikely;
 use std::ptr;
 
@@ -99,6 +98,7 @@ pub trait TLS: Sized {
 #[cfg(target_os = "macos")]
 mod macos_tls {
     use spin::Mutex;
+    use std::arch::asm;
 
     use super::*;
     use crate::util::{memory::RawMemory, AllocationArea, Page, Size4K};

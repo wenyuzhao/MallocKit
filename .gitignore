@@ -7,3 +7,5 @@ a.out
 
 /_*
 /*.log
+
+/.venv
