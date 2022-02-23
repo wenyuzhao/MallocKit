@@ -1,6 +1,6 @@
 use spin::Mutex;
-use std::{path::PathBuf, process::Command};
 use std::fs;
+use std::{path::PathBuf, process::Command};
 
 fn env_segments() -> (&'static str, &'static str, &'static str) {
     if cfg!(target_os = "linux") {
