@@ -3,3 +3,4 @@ __pycache__
 /*.log
 !/__init__.py
 !/__main__.py
+!requirements.txt
