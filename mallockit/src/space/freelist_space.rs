@@ -1,4 +1,4 @@
-use super::{page_resource::FreelistPageResource, Allocator, Space, SpaceId};
+use super::{page_resource::BlockPageResource, Allocator, Space, SpaceId};
 use crate::util::bits::{BitField, BitFieldSlot};
 use crate::util::freelist::intrusive_freelist::AddressSpaceConfig;
 use crate::util::freelist::intrusive_freelist::IntrusiveFreeList;
@@ -19,18 +19,18 @@ impl AddressSpaceConfig for AddressSpace {
 
 pub struct FreeListSpace {
     id: SpaceId,
-    pr: FreelistPageResource,
+    pr: BlockPageResource,
     pages: Mutex<Option<Page<ActivePageSize>>>,
 }
 
 impl Space for FreeListSpace {
     const MAX_ALLOCATION_SIZE: usize = Size4K::BYTES;
-    type PR = FreelistPageResource;
+    type PR = BlockPageResource;
 
     fn new(id: SpaceId) -> Self {
         Self {
             id,
-            pr: FreelistPageResource::new(id),
+            pr: BlockPageResource::new(id, ActivePageSize::LOG_BYTES),
             pages: Mutex::new(None),
         }
     }
