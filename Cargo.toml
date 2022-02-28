@@ -4,6 +4,7 @@ members = [
     "mallockit/proc_macro",
     "bump",
     "buddy",
+    "hoard",
     "sanity",
 ]
 
