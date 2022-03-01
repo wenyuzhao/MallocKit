@@ -28,7 +28,7 @@ class Pipeline:
             for a in mallocs:
                 idx = data[(a, bm)]
                 invocations = len(idx)
-                avg = df.loc[idx].mean(axis=0)
+                avg = df.loc[idx].mean(axis=0, numeric_only=True, skipna=True)
                 v = [v for i, v in avg.items()]
                 i = [i for i, v in avg.items()]
                 df.loc[idx[0], i] = v
