@@ -1,40 +1,69 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub struct BitField {
     pub bits: usize,
     pub shift: usize,
 }
 
-pub trait BitFieldSlot {
-    fn get<const BITS: BitField>(&self) -> usize;
-    fn set<const BITS: BitField>(&self, value: usize);
-    fn delta<const BITS: BitField>(&self, delta: isize) -> usize {
-        let old = self.get::<{ BITS }>();
+pub trait BitFieldSlot: Sized {
+    fn get(&self, field: BitField) -> usize;
+    fn set(&mut self, field: BitField, value: usize);
+    fn delta(&mut self, field: BitField, delta: isize) -> usize {
+        let old = self.get(field);
         let new = if delta > 0 {
             old + (delta as usize)
         } else {
             old - ((-delta) as usize)
         };
-        self.set::<{ BITS }>(new);
+        self.set(field, new);
         new
     }
 }
 
 impl BitFieldSlot for AtomicUsize {
     #[inline(always)]
-    fn get<const BITS: BitField>(&self) -> usize {
+    fn get(&self, field: BitField) -> usize {
         let value = self.load(Ordering::Relaxed);
-        (value >> BITS.shift) & ((1usize << BITS.bits) - 1)
+        (value >> field.shift) & ((1usize << field.bits) - 1)
     }
 
     #[inline(always)]
-    fn set<const BITS: BitField>(&self, value: usize) {
+    fn set(&mut self, field: BitField, value: usize) {
         let old_value = self.load(Ordering::Relaxed);
-        let mask = ((1usize << BITS.bits) - 1) << BITS.shift;
-        let shifted_value = value << BITS.shift;
+        let mask = ((1usize << field.bits) - 1) << field.shift;
+        let shifted_value = value << field.shift;
         debug_assert!((shifted_value & !mask) == 0);
-        let new_value = (old_value & !mask) | (value << BITS.shift);
+        let new_value = (old_value & !mask) | (value << field.shift);
         self.store(new_value, Ordering::Relaxed);
+    }
+}
+
+impl const BitFieldSlot for usize {
+    #[inline(always)]
+    fn get(&self, field: BitField) -> usize {
+        let value = *self;
+        (value >> field.shift) & ((1usize << field.bits) - 1)
+    }
+
+    #[inline(always)]
+    fn set(&mut self, field: BitField, value: usize) {
+        let old_value = *self;
+        let mask = ((1usize << field.bits) - 1) << field.shift;
+        let shifted_value = value << field.shift;
+        debug_assert!((shifted_value & !mask) == 0);
+        let new_value = (old_value & !mask) | (value << field.shift);
+        *self = new_value;
+    }
+
+    fn delta(&mut self, field: BitField, delta: isize) -> usize {
+        let old = self.get(field);
+        let new = if delta > 0 {
+            old + (delta as usize)
+        } else {
+            old - ((-delta) as usize)
+        };
+        self.set(field, new);
+        new
     }
 }

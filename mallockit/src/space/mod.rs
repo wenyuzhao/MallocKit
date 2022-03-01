@@ -56,10 +56,11 @@ impl SpaceId {
 
 pub trait Space: Sized + 'static {
     const MAX_ALLOCATION_SIZE: usize = usize::MAX;
+    type PR: PageResource;
 
     fn new(id: SpaceId) -> Self;
     fn id(&self) -> SpaceId;
-    fn page_resource(&self) -> &PageResource;
+    fn page_resource(&self) -> &Self::PR;
 
     fn get_layout(ptr: Address) -> Layout;
 
@@ -69,8 +70,8 @@ pub trait Space: Sized + 'static {
     }
 
     #[inline(always)]
-    fn committed_size(&self) -> usize {
-        self.page_resource().committed_size()
+    fn reserved_bytes(&self) -> usize {
+        self.page_resource().reserved_bytes()
     }
 
     fn acquire<S: PageSize>(&self, pages: usize) -> Option<Range<Page<S>>> {

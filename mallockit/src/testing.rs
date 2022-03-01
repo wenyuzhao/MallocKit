@@ -1,4 +1,5 @@
 use spin::Mutex;
+use std::fs;
 use std::{path::PathBuf, process::Command};
 
 fn env_segments() -> (&'static str, &'static str, &'static str) {
@@ -28,7 +29,7 @@ fn run_cmd(env: &str, dylib: &str, cmd: &str) {
 
 pub fn test(malloc: &str, script: &str) {
     build_cdylib();
-    let mut dylib = PathBuf::from(".")
+    let mut dylib = PathBuf::from("..")
         .join("target")
         .join(if cfg!(debug_assertions) {
             "debug"
@@ -37,6 +38,7 @@ pub fn test(malloc: &str, script: &str) {
         });
     let (prefix, env, suffix) = env_segments();
     dylib.push(format!("{}{}.{}", prefix, malloc, suffix));
+    let dylib = fs::canonicalize(&dylib).unwrap();
     let commands = script
         .trim()
         .split("\n")

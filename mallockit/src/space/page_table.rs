@@ -1,4 +1,5 @@
 use crate::space::meta::Meta;
+use crate::util::bits::{BitField, BitFieldSlot};
 use crate::util::*;
 use spin::RwLock;
 use std::iter::Step;
@@ -7,37 +8,6 @@ use std::{
     mem,
     sync::atomic::{AtomicUsize, Ordering},
 };
-
-struct BitField {
-    bits: usize,
-    shift: usize,
-}
-
-impl BitField {
-    const fn get(&self, value: usize) -> usize {
-        (value >> self.shift) & ((1usize << self.bits) - 1)
-    }
-
-    const fn set(&self, slot: &mut usize, value: usize) {
-        let old_value = *slot;
-        let mask = ((1usize << self.bits) - 1) << self.shift;
-        let shifted_value = value << self.shift;
-        debug_assert!((shifted_value & !mask) == 0);
-        let new_value = (old_value & !mask) | (value << self.shift);
-        *slot = new_value;
-    }
-
-    const fn delta(&self, slot: &mut usize, delta: isize) -> usize {
-        let old = self.get(*slot);
-        let new = if delta > 0 {
-            old + (delta as usize)
-        } else {
-            old - ((-delta) as usize)
-        };
-        self.set(slot, new);
-        new
-    }
-}
 
 #[repr(transparent)]
 struct PageTableEntry<L: PageTableLevel>(usize, PhantomData<L>);
@@ -68,7 +38,7 @@ impl<L: PageTableLevel> PageTableEntry<L> {
 
     fn clear(&mut self) {
         let value = self.0;
-        if Self::PRESENT.get(value) != 0 && Self::IS_PAGE_TABLE.get(value) != 0 {
+        if value.get(Self::PRESENT) != 0 && value.get(Self::IS_PAGE_TABLE) != 0 {
             let table: &'static mut PageTable<L::NextLevel> =
                 unsafe { mem::transmute(value & Self::PAGE_TABLE_POINTER_MASK) };
             let _ = unsafe { Box::from_raw_in(table, Meta) };
@@ -78,16 +48,16 @@ impl<L: PageTableLevel> PageTableEntry<L> {
 
     const fn get(&self) -> Option<PageTableEntryData<L::NextLevel>> {
         let value = self.0;
-        if Self::PRESENT.get(value) == 0 {
+        if value.get(Self::PRESENT) == 0 {
             return None;
         }
-        if Self::IS_PAGE_TABLE.get(value) != 0 {
+        if value.get(Self::IS_PAGE_TABLE) != 0 {
             let table: &'static mut PageTable<L::NextLevel> =
                 unsafe { mem::transmute(value & Self::PAGE_TABLE_POINTER_MASK) };
             Some(PageTableEntryData::NextLevelPageTable { table })
         } else {
-            let contiguous_pages = Self::PAGE_CONTIGUOUS_PAGES.get(value);
-            let pointer_meta = Address::from(Self::PAGE_POINTER_META.get(value) << 3);
+            let contiguous_pages = value.get(Self::PAGE_CONTIGUOUS_PAGES);
+            let pointer_meta = Address::from(value.get(Self::PAGE_POINTER_META) << 3);
             Some(PageTableEntryData::Page {
                 contiguous_pages: if contiguous_pages == 0 {
                     None
@@ -101,9 +71,9 @@ impl<L: PageTableLevel> PageTableEntry<L> {
 
     fn set_next_page_table(&mut self, table: &'static mut PageTable<L::NextLevel>) {
         debug_assert!(self.0 == 0);
-        Self::PRESENT.set(&mut self.0, 1);
-        Self::IS_PAGE_TABLE.set(&mut self.0, 1);
-        Self::PAGE_TABLE_USED_ENTRIES.set(&mut self.0, 0);
+        self.0.set(Self::PRESENT, 1);
+        self.0.set(Self::IS_PAGE_TABLE, 1);
+        self.0.set(Self::PAGE_TABLE_USED_ENTRIES, 0);
         let word = table as *mut _ as usize;
         debug_assert!((word & !Self::PAGE_TABLE_POINTER_MASK) == 0);
         self.0 = self.0 | word;
@@ -111,21 +81,21 @@ impl<L: PageTableLevel> PageTableEntry<L> {
 
     fn set_next_page(&mut self, pages: Option<usize>) {
         debug_assert!(self.0 == 0);
-        Self::PRESENT.set(&mut self.0, 1);
-        Self::IS_PAGE_TABLE.set(&mut self.0, 0);
-        Self::PAGE_CONTIGUOUS_PAGES.set(&mut self.0, pages.unwrap_or(0));
+        self.0.set(Self::PRESENT, 1);
+        self.0.set(Self::IS_PAGE_TABLE, 0);
+        self.0.set(Self::PAGE_CONTIGUOUS_PAGES, pages.unwrap_or(0));
     }
 
     const fn delta_entries(&mut self, entries: i32) -> usize {
-        Self::PAGE_TABLE_USED_ENTRIES.delta(&mut self.0, entries as _)
+        self.0.delta(Self::PAGE_TABLE_USED_ENTRIES, entries as _)
     }
 }
 
 impl PageTableEntry<L1> {
     const fn set_pointer_meta(&mut self, ptr: Address) {
-        debug_assert!(Self::PRESENT.get(self.0) != 0);
-        debug_assert!(Self::IS_PAGE_TABLE.get(self.0) == 0);
-        Self::PAGE_POINTER_META.set(&mut self.0, usize::from(ptr) >> 3);
+        debug_assert!(self.0.get(Self::PRESENT) != 0);
+        debug_assert!(self.0.get(Self::IS_PAGE_TABLE) == 0);
+        self.0.set(Self::PAGE_POINTER_META, usize::from(ptr) >> 3);
     }
 }
 

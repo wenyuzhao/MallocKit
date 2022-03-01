@@ -98,6 +98,7 @@ pub trait TLS: Sized {
 #[cfg(target_os = "macos")]
 mod macos_tls {
     use spin::Mutex;
+    use std::arch::asm;
 
     use super::*;
     use crate::util::{memory::RawMemory, AllocationArea, Page, Size4K};
@@ -105,8 +106,18 @@ mod macos_tls {
     const SLOT: usize = 89;
     const OFFSET: usize = SLOT * std::mem::size_of::<usize>();
 
+    #[cfg(not(test))]
     extern "C" {
         fn mallockit_initialize_macos_tls() -> *mut u8;
+    }
+
+    #[cfg(test)]
+    #[no_mangle]
+    extern "C" fn mallockit_initialize_macos_tls() -> *mut u8 {
+        impl TLS for u8 {
+            const NEW: Self = 0;
+        }
+        get_tls::<u8>()
     }
 
     #[inline(always)]

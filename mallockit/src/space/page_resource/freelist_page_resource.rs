@@ -1,4 +1,5 @@
-use super::{SpaceId, PAGE_REGISTRY};
+use super::super::{SpaceId, PAGE_REGISTRY};
+use super::PageResource;
 use crate::util::freelist::page_freelist::PageFreeList;
 use crate::util::memory::RawMemory;
 use crate::util::*;
@@ -11,13 +12,13 @@ use std::{
 
 const NUM_SIZE_CLASS: usize = SpaceId::LOG_MAX_SPACE_SIZE - Page::<Size4K>::LOG_BYTES;
 
-pub struct PageResource {
+pub struct FreelistPageResource {
     pub id: SpaceId,
-    freelist: Mutex<PageFreeList<NUM_SIZE_CLASS>>,
-    committed_size: AtomicUsize,
+    freelist: Mutex<PageFreeList<{ NUM_SIZE_CLASS }>>,
+    reserved_bytes: AtomicUsize,
 }
 
-impl PageResource {
+impl FreelistPageResource {
     pub fn new(id: SpaceId) -> Self {
         debug_assert!(id.0 < 0b0000_1111);
         let base = id.address_space().start;
@@ -26,13 +27,8 @@ impl PageResource {
         Self {
             id,
             freelist: Mutex::new(freelist),
-            committed_size: AtomicUsize::new(0),
+            reserved_bytes: AtomicUsize::new(0),
         }
-    }
-
-    #[inline(always)]
-    pub fn committed_size(&self) -> usize {
-        self.committed_size.load(Ordering::SeqCst)
     }
 
     fn map_pages<S: PageSize>(&self, start: Page<S>, pages: usize) -> bool {
@@ -45,7 +41,7 @@ impl PageResource {
                         libc::madvise(start.start().as_mut_ptr(), size, libc::MADV_HUGEPAGE);
                     }
                 }
-                self.committed_size
+                self.reserved_bytes
                     .fetch_add(pages << S::LOG_BYTES, Ordering::SeqCst);
                 true
             }
@@ -55,11 +51,18 @@ impl PageResource {
 
     fn unmap_pages<S: PageSize>(&self, start: Page<S>, pages: usize) {
         RawMemory::unmap(start.start(), pages << S::LOG_BYTES);
-        self.committed_size
+        self.reserved_bytes
             .fetch_sub(pages << S::LOG_BYTES, Ordering::SeqCst);
     }
+}
 
-    pub fn acquire_pages<S: PageSize>(&self, pages: usize) -> Option<Range<Page<S>>> {
+impl PageResource for FreelistPageResource {
+    #[inline(always)]
+    fn reserved_bytes(&self) -> usize {
+        self.reserved_bytes.load(Ordering::Relaxed)
+    }
+
+    fn acquire_pages<S: PageSize>(&self, pages: usize) -> Option<Range<Page<S>>> {
         let units = pages << (S::LOG_BYTES - Size4K::LOG_BYTES);
         let start = self.freelist.lock().allocate_cell(units)?.start;
         let start = Page::<S>::new(start);
@@ -71,13 +74,9 @@ impl PageResource {
         Some(start..end)
     }
 
-    pub fn release_pages<S: PageSize>(&self, start: Page<S>) {
+    fn release_pages<S: PageSize>(&self, start: Page<S>) {
         let pages = PAGE_REGISTRY.delete_pages(start);
         self.unmap_pages(start, pages);
         self.freelist.lock().release_cell(start.start(), pages);
-    }
-
-    pub fn get_contiguous_pages<S: PageSize>(&self, start: Page<S>) -> usize {
-        PAGE_REGISTRY.get_contiguous_pages(start.start())
     }
 }

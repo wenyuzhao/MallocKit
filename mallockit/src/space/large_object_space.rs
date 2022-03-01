@@ -1,18 +1,23 @@
 use std::{alloc::Layout, marker::PhantomData};
 
-use super::{page_resource::PageResource, Allocator, Space, SpaceId};
+use super::{
+    page_resource::{FreelistPageResource, PageResource},
+    Allocator, Space, SpaceId,
+};
 use crate::util::{Address, Lazy, Local, Page, PageSize, Size4K};
 
 pub struct LargeObjectSpace {
     id: SpaceId,
-    pr: PageResource,
+    pr: FreelistPageResource,
 }
 
 impl Space for LargeObjectSpace {
+    type PR = FreelistPageResource;
+
     fn new(id: SpaceId) -> Self {
         Self {
             id,
-            pr: PageResource::new(id),
+            pr: FreelistPageResource::new(id),
         }
     }
 
@@ -22,7 +27,7 @@ impl Space for LargeObjectSpace {
     }
 
     #[inline(always)]
-    fn page_resource(&self) -> &PageResource {
+    fn page_resource(&self) -> &Self::PR {
         &self.pr
     }
 

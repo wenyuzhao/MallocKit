@@ -1,4 +1,4 @@
-use super::{page_resource::PageResource, Allocator, Space, SpaceId};
+use super::{page_resource::BlockPageResource, Allocator, Space, SpaceId};
 use crate::util::bits::{BitField, BitFieldSlot};
 use crate::util::freelist::intrusive_freelist::AddressSpaceConfig;
 use crate::util::freelist::intrusive_freelist::IntrusiveFreeList;
@@ -19,17 +19,18 @@ impl AddressSpaceConfig for AddressSpace {
 
 pub struct FreeListSpace {
     id: SpaceId,
-    pr: PageResource,
+    pr: BlockPageResource,
     pages: Mutex<Option<Page<ActivePageSize>>>,
 }
 
 impl Space for FreeListSpace {
     const MAX_ALLOCATION_SIZE: usize = Size4K::BYTES;
+    type PR = BlockPageResource;
 
     fn new(id: SpaceId) -> Self {
         Self {
             id,
-            pr: PageResource::new(id),
+            pr: BlockPageResource::new(id, ActivePageSize::LOG_BYTES),
             pages: Mutex::new(None),
         }
     }
@@ -40,7 +41,7 @@ impl Space for FreeListSpace {
     }
 
     #[inline(always)]
-    fn page_resource(&self) -> &PageResource {
+    fn page_resource(&self) -> &Self::PR {
         &self.pr
     }
 
@@ -108,26 +109,25 @@ impl Cell {
         debug_assert!(log_align <= 21);
         let start_offset =
             unsafe { (Address::from((self as *const Self).add(1)) - start) as usize };
-        self.word.set::<{ Self::START_OFFSET }>(start_offset);
-        self.word.set::<{ Self::SIZE }>(size);
-        self.word.set::<{ Self::LOG_ALIGN }>(log_align);
+        self.word.set(Self::START_OFFSET, start_offset);
+        self.word.set(Self::SIZE, size);
+        self.word.set(Self::LOG_ALIGN, log_align);
     }
     #[inline(always)]
     fn start(&self) -> Address {
-        Address::from(self) + std::mem::size_of::<Self>()
-            - self.word.get::<{ Self::START_OFFSET }>()
+        Address::from(self) + std::mem::size_of::<Self>() - self.word.get(Self::START_OFFSET)
     }
     #[inline(always)]
     fn size(&self) -> usize {
-        self.word.get::<{ Self::SIZE }>()
+        self.word.get(Self::SIZE)
     }
     #[inline(always)]
     fn data_size(&self) -> usize {
-        self.size() - self.word.get::<{ Self::START_OFFSET }>()
+        self.size() - self.word.get(Self::START_OFFSET)
     }
     #[inline(always)]
     fn align(&self) -> usize {
-        1 << self.word.get::<{ Self::LOG_ALIGN }>()
+        1 << self.word.get(Self::LOG_ALIGN)
     }
 }
 

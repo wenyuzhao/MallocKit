@@ -1,6 +1,5 @@
 #![allow(incomplete_features)]
-#![feature(impl_trait_in_bindings)]
-#![feature(min_type_alias_impl_trait)]
+#![feature(type_alias_impl_trait)]
 #![feature(thread_local)]
 #![feature(const_fn_fn_ptr_basics)]
 

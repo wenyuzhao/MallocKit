@@ -10,14 +10,13 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y g++ clang iputils-ping python
+      - name: Checkout MallocKit Workspace
+        uses: actions/checkout@v2
       - name: Install Rust Toolchain (Nightly)
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
           override: true
           components: rustfmt
-      - name: Checkout MallocKit Workspace
-        uses: actions/checkout@v2
       - name: Style Checks
         uses: actions-rs/cargo@v1
         with:

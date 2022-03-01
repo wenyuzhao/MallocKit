@@ -18,7 +18,6 @@ macro_rules! name_list {
 }
 
 mod address;
-mod address_non_null;
 pub mod arena;
 pub mod bits;
 pub mod freelist;
@@ -33,7 +32,6 @@ mod page;
 pub(crate) mod macos_malloc_zone;
 
 pub use address::*;
-pub use address_non_null::*;
 pub use core::alloc::Layout;
 pub use lab::*;
 pub use layout_utils::*;
