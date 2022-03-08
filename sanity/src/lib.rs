@@ -1,7 +1,6 @@
 #![allow(incomplete_features)]
 #![feature(type_alias_impl_trait)]
 #![feature(thread_local)]
-#![feature(const_fn_fn_ptr_basics)]
 #![feature(core_intrinsics)]
 
 extern crate mallockit;
