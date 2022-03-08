@@ -2,24 +2,26 @@
 #![feature(type_alias_impl_trait)]
 #![feature(thread_local)]
 #![feature(core_intrinsics)]
+#![feature(const_mut_refs)]
+#![feature(const_ptr_offset)]
+#![feature(generic_const_exprs)]
 
 extern crate mallockit;
 
+mod block;
+mod hoard_space;
+
 use core::alloc::Layout;
-use mallockit::{
-    space::*,
-    space::{freelist_space::*, large_object_space::*},
-    util::*,
-    Mutator, Plan,
-};
+use hoard_space::*;
+use mallockit::{space::large_object_space::*, space::*, util::*, Mutator, Plan};
 use std::intrinsics::likely;
 
-const FREELIST_SPACE: SpaceId = SpaceId::DEFAULT;
+const HOARD_SPACE: SpaceId = SpaceId::DEFAULT;
 const LARGE_OBJECT_SPACE: SpaceId = SpaceId::LARGE_OBJECT_SPACE;
 
 #[mallockit::plan]
 struct Hoard {
-    freelist_space: FreeListSpace,
+    hoard_space: HoardSpace,
     large_object_space: LargeObjectSpace,
 }
 
@@ -28,16 +30,16 @@ impl Plan for Hoard {
 
     fn new() -> Self {
         Self {
-            freelist_space: FreeListSpace::new(FREELIST_SPACE),
+            hoard_space: HoardSpace::new(HOARD_SPACE),
             large_object_space: LargeObjectSpace::new(LARGE_OBJECT_SPACE),
         }
     }
 
     #[inline(always)]
     fn get_layout(ptr: Address) -> Layout {
-        debug_assert!(FREELIST_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
-        if likely(FREELIST_SPACE.contains(ptr)) {
-            FreeListSpace::get_layout(ptr)
+        debug_assert!(HOARD_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
+        if likely(HOARD_SPACE.contains(ptr)) {
+            HoardSpace::get_layout(ptr)
         } else {
             Self::get().large_object_space.get_layout::<Size4K>(ptr)
         }
@@ -46,17 +48,14 @@ impl Plan for Hoard {
 
 #[mallockit::mutator]
 struct HoardMutator {
-    freelist: FreeListAllocator,
+    hoard: HoardAllocator,
     los: LargeObjectAllocator<Size4K>,
 }
 
 impl HoardMutator {
     const fn new() -> Self {
         Self {
-            freelist: FreeListAllocator::new(
-                Lazy::new(|| &Self::plan().freelist_space),
-                FREELIST_SPACE,
-            ),
+            hoard: HoardAllocator::new(Lazy::new(|| &Self::plan().hoard_space), HOARD_SPACE),
             los: LargeObjectAllocator::new(Lazy::new(|| &Self::plan().large_object_space)),
         }
     }
@@ -68,9 +67,9 @@ impl Mutator for HoardMutator {
 
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
-        if likely(FreeListSpace::can_allocate(layout)) {
+        if likely(HoardSpace::can_allocate(layout)) {
             mallockit::stat::track_allocation(layout, false);
-            self.freelist.alloc(layout)
+            self.hoard.alloc(layout)
         } else {
             mallockit::stat::track_allocation(layout, true);
             self.los.alloc(layout)
@@ -79,10 +78,10 @@ impl Mutator for HoardMutator {
 
     #[inline(always)]
     fn dealloc(&mut self, ptr: Address) {
-        debug_assert!(FREELIST_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
-        if likely(FREELIST_SPACE.contains(ptr)) {
+        debug_assert!(HOARD_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
+        if likely(HOARD_SPACE.contains(ptr)) {
             mallockit::stat::track_deallocation(false);
-            self.freelist.dealloc(ptr)
+            self.hoard.dealloc(ptr)
         } else {
             mallockit::stat::track_deallocation(false);
             self.los.dealloc(ptr)
