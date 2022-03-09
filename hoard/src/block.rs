@@ -1,12 +1,12 @@
 use mallockit::util::aligned_block::{AlignedBlock, AlignedBlockConfig};
 
-use crate::hoard_space::HoardLocal;
+use crate::{hoard_space::HoardSpace, pool::Pool};
 
 use super::Address;
 
 #[repr(C)]
 pub struct BlockMeta {
-    pub owner: Option<&'static HoardLocal>,
+    pub owner: Option<&'static Pool>,
     pub size_class: usize,
     pub free_bytes: usize,
     pub head_cell: Option<Address>,
@@ -22,22 +22,22 @@ impl AlignedBlockConfig for BlockConfig {
 
 pub type Block = AlignedBlock<BlockConfig>;
 
-pub trait BlockExt {
+pub trait BlockExt: Sized {
     const DATA_BYTES: usize = Block::BYTES - Block::HEADER_BYTES;
-    fn init(self, local: &'static HoardLocal, sc: usize);
+    fn init(self, local: &'static Pool, sc: usize);
     fn alloc_cell(self) -> Option<Address>;
     fn free_cell(self, cell: Address);
 }
 
 impl BlockExt for Block {
-    fn init(mut self, local: &'static HoardLocal, sc: usize) {
+    fn init(mut self, local: &'static Pool, size_class: usize) {
         self.owner = Some(local);
-        self.size_class = sc;
-        let size = 1usize << (sc + 3);
+        self.size_class = size_class;
+        let size = HoardSpace::size_class_to_bytes(size_class);
         let mut cell = (self.start() + Self::HEADER_BYTES).align_up(size);
         while cell < self.end() {
             self.free_cell(cell);
-            cell = cell + (1 << (sc + 3));
+            cell = cell + size;
         }
     }
 
@@ -50,7 +50,7 @@ impl BlockExt for Block {
         } else {
             self.head_cell = Some(next);
         }
-        self.free_bytes += 1usize << (self.size_class + 3);
+        // self.free_bytes += HoardSpace::size_class_to_bytes(self.size_class);
         Some(cell)
     }
 
@@ -59,9 +59,7 @@ impl BlockExt for Block {
         unsafe {
             cell.store(self.head_cell.unwrap_or(Address::ZERO));
         }
-        self.free_bytes -= 1usize << (self.size_class + 3);
+        // self.free_bytes -= HoardSpace::size_class_to_bytes(self.size_class);
         self.head_cell = Some(cell);
     }
 }
-
-// //

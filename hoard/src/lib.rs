@@ -6,10 +6,12 @@
 #![feature(const_ptr_offset)]
 #![feature(generic_const_exprs)]
 
+#[macro_use]
 extern crate mallockit;
 
 mod block;
 mod hoard_space;
+mod pool;
 
 use core::alloc::Layout;
 use hoard_space::*;
@@ -67,13 +69,15 @@ impl Mutator for HoardMutator {
 
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
-        if likely(HoardSpace::can_allocate(layout)) {
+        let x = if likely(HoardSpace::can_allocate(layout)) {
             mallockit::stat::track_allocation(layout, false);
             self.hoard.alloc(layout)
         } else {
             mallockit::stat::track_allocation(layout, true);
             self.los.alloc(layout)
-        }
+        };
+        assert!(x.is_some());
+        x
     }
 
     #[inline(always)]
