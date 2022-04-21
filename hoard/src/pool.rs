@@ -9,7 +9,6 @@ use crate::{
 struct BlockList {
     head: Option<Block>,
     tail: Option<Block>,
-    // num_blocks: usize,
     total_bytes: usize,
     used_bytes: usize,
 }
@@ -19,19 +18,48 @@ impl BlockList {
         Self {
             head: None,
             tail: None,
-            // num_blocks: 0,
             total_bytes: 0,
             used_bytes: 0,
         }
     }
 
-    fn add(&mut self, mut block: Block) {
-        block.next = self.head;
-        self.head = Some(block);
-        if self.tail.is_none() {
-            self.tail = Some(block)
+    #[inline(always)]
+    fn push_back(&mut self, mut block: Block) {
+        if let Some(mut tail) = self.tail {
+            tail.next = Some(block);
         }
-        self.total_bytes += Block::DATA_BYTES;
+        block.next = None;
+        block.prev = self.tail;
+        self.tail = Some(block);
+        if self.head.is_none() {
+            self.head = Some(block)
+        }
+    }
+
+    #[inline(always)]
+    fn remove(&mut self, mut block: Block) {
+        let prev = block.prev;
+        let next = block.next;
+        if let Some(mut prev) = prev {
+            prev.next = next;
+        }
+        if let Some(mut next) = next {
+            next.prev = prev;
+        }
+        if self.head == Some(block) {
+            self.head = next;
+        }
+        if self.tail == Some(block) {
+            self.tail = prev;
+        }
+        block.prev = None;
+        block.next = None;
+    }
+
+    #[inline(always)]
+    fn move_to_back(&mut self, block: Block) {
+        self.remove(block);
+        self.push_back(block);
     }
 
     #[inline(always)]
@@ -39,28 +67,23 @@ impl BlockList {
         (self.used_bytes * 100 / self.total_bytes) < 10
     }
 
-    fn merge(&mut self, global_pool: &Pool, bin: Self) {
-        {
-            let mut b = bin.head;
-            while let Some(mut x) = b {
-                x.owner = Some(global_pool.static_ref());
-                b = x.next;
+    #[inline(always)]
+    fn pop_mostly_empty_block(&mut self) -> Option<Block> {
+        let mut cursor = self.head;
+        while let Some(mut b) = cursor {
+            if b.free_bytes >= (Block::BYTES >> 1) {
+                self.remove(b);
+                b.owner = None;
+                return Some(b);
             }
+            cursor = b.next;
         }
-        if self.tail.is_none() {
-            self.head = bin.head;
-            self.tail = bin.tail;
-        } else {
-            self.tail.unwrap().next = bin.head;
-        }
-        self.total_bytes += bin.total_bytes;
-        self.used_bytes += bin.used_bytes;
+        None
     }
 }
 
 pub struct Pool {
     pub global: bool,
-    // pub space: Option<Lazy<&'static HoardSpace, Local>>,
     blocks: Mutex<[BlockList; 9]>,
 }
 
@@ -79,7 +102,13 @@ impl Pool {
         unsafe { &*(self as *const Self) }
     }
 
-    pub fn pop_block(&self, size_class: usize) -> Option<Block> {
+    pub fn push_pack(&self, size_class: usize, block: Block) {
+        debug_assert!(self.global);
+        let mut blocks = self.blocks.lock();
+        blocks[size_class].push_back(block);
+    }
+
+    pub fn pop_back(&self, size_class: usize) -> Option<Block> {
         debug_assert!(self.global);
         let mut blocks = self.blocks.lock();
         if let Some(block) = blocks[size_class].head {
@@ -93,51 +122,37 @@ impl Pool {
         None
     }
 
-    fn flush(&self, size_class: usize, list: BlockList) {
-        debug_assert!(self.global);
-        let mut blocks = self.blocks.lock();
-        blocks[size_class].merge(self, list);
-    }
-
     #[inline(always)]
     pub fn alloc_cell(
         &self,
         size_class: usize,
         space: &Lazy<&'static HoardSpace, Local>,
     ) -> Option<Address> {
-        // println!("alloc_cell {:?}", size_class);
         let mut blocks = self.blocks.lock();
         // Get a local block
         let block = {
-            // Go through the list to find a non-full block
+            // Go through the list reversely to find a non-full block
             let mut target = None;
-            let mut block = blocks[size_class].head;
+            let mut block = blocks[size_class].tail;
             while let Some(b) = block {
                 if b.head_cell.is_some() {
                     target = Some(b);
                     break;
                 }
-                block = b.next;
+                block = b.prev;
             }
-            // Quit if not found
-            // if target.is_none() {
-            //     println!("alloc_cell failed");
-            //     return None;
-            // }
-            // println!("alloc_cell {:?} target {:?}", size_class, target);
             match target {
                 Some(block) => block,
                 _ => {
                     // Get a block from global pool
                     let block = space.acquire_block(self, size_class).unwrap();
-                    debug_assert!(block.head_cell.is_some());
-                    blocks[size_class].add(block);
+                    blocks[size_class].push_back(block);
+                    blocks[size_class].total_bytes += Block::DATA_BYTES;
+                    blocks[size_class].used_bytes += Block::DATA_BYTES - block.free_bytes;
                     block
                 }
             }
         };
-        // println!("alloc_cell {:?} {:?}", size_class, block);
-        // println!("{:?}", block);
         // Alloc a cell from the block
         let cell = block.alloc_cell().unwrap();
         blocks[size_class].used_bytes += HoardSpace::size_class_to_bytes(size_class);
@@ -151,11 +166,17 @@ impl Pool {
         let size_class = block.size_class;
         block.free_cell(cell);
         blocks[size_class].used_bytes -= HoardSpace::size_class_to_bytes(size_class);
+        // Move the block to back
+        blocks[size_class].move_to_back(block);
+        // Flush?
         if !self.global && blocks[size_class].should_flush() {
+            // Find a mostly-empty block
             debug_assert!(!self.global);
-            let mut list = BlockList::new();
-            std::mem::swap(&mut list, &mut blocks[size_class]);
-            space.pool.flush(size_class, list);
+            if let Some(mostly_empty_block) = blocks[size_class].pop_mostly_empty_block() {
+                blocks[size_class].total_bytes -= Block::DATA_BYTES;
+                blocks[size_class].used_bytes -= Block::DATA_BYTES - block.free_bytes;
+                space.flush_block(size_class, mostly_empty_block);
+            }
         }
     }
 }

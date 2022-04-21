@@ -10,6 +10,7 @@ pub struct BlockMeta {
     pub size_class: usize,
     pub free_bytes: usize,
     pub head_cell: Option<Address>,
+    pub prev: Option<Block>,
     pub next: Option<Block>,
 }
 
@@ -36,7 +37,10 @@ impl BlockExt for Block {
         let size = HoardSpace::size_class_to_bytes(size_class);
         let mut cell = (self.start() + Self::HEADER_BYTES).align_up(size);
         while cell < self.end() {
-            self.free_cell(cell);
+            unsafe {
+                cell.store(self.head_cell.unwrap_or(Address::ZERO));
+            }
+            self.head_cell = Some(cell);
             cell = cell + size;
         }
     }
@@ -50,7 +54,7 @@ impl BlockExt for Block {
         } else {
             self.head_cell = Some(next);
         }
-        // self.free_bytes += HoardSpace::size_class_to_bytes(self.size_class);
+        self.free_bytes += HoardSpace::size_class_to_bytes(self.size_class);
         Some(cell)
     }
 
@@ -59,7 +63,7 @@ impl BlockExt for Block {
         unsafe {
             cell.store(self.head_cell.unwrap_or(Address::ZERO));
         }
-        // self.free_bytes -= HoardSpace::size_class_to_bytes(self.size_class);
+        self.free_bytes -= HoardSpace::size_class_to_bytes(self.size_class);
         self.head_cell = Some(cell);
     }
 }

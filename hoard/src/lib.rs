@@ -6,6 +6,7 @@
 #![feature(const_ptr_offset)]
 #![feature(generic_const_exprs)]
 
+#[allow(unused)]
 #[macro_use]
 extern crate mallockit;
 

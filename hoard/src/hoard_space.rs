@@ -71,7 +71,7 @@ impl HoardSpace {
     #[inline(always)]
     pub fn acquire_block(&self, local: &Pool, size_class: usize) -> Option<Block> {
         // Try allocate from the global pool
-        if let Some(mut block) = self.pool.pop_block(size_class) {
+        if let Some(mut block) = self.pool.pop_back(size_class) {
             block.owner = Some(local.static_ref());
             return Some(block);
         }
@@ -83,6 +83,12 @@ impl HoardSpace {
         let block = Block::new(addr);
         block.init(local.static_ref(), size_class);
         Some(block)
+    }
+
+    #[inline(always)]
+    pub fn flush_block(&self, size_class: usize, mut block: Block) {
+        self.pool.push_pack(size_class, block);
+        block.owner = Some(self.pool.static_ref());
     }
 }
 /// Thread-local heap
@@ -111,6 +117,5 @@ impl Allocator for HoardAllocator {
     fn dealloc(&mut self, ptr: Address) {
         let block = Block::containing(ptr);
         block.owner.unwrap().free_cell(ptr, &self.space);
-        // TODO: transfer to global space if the block is mostly empty
     }
 }
