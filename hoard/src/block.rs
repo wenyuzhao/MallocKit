@@ -1,17 +1,20 @@
-use mallockit::util::aligned_block::{AlignedBlock, AlignedBlockConfig};
+use mallockit::util::{
+    aligned_block::{AlignedBlock, AlignedBlockConfig},
+    size_class::SizeClass,
+};
 
-use crate::{hoard_space::HoardSpace, pool::Pool};
+use crate::pool::Pool;
 
 use super::Address;
 
 #[repr(C)]
 pub struct BlockMeta {
     pub owner: &'static Pool,
+    pub size_class: SizeClass,
+    used_bytes: u32,
     head_cell: Address,
     pub prev: Option<Block>,
     pub next: Option<Block>,
-    size_class: u32,
-    used_bytes: u32,
 }
 
 pub struct BlockConfig;
@@ -25,23 +28,22 @@ pub type Block = AlignedBlock<BlockConfig>;
 
 pub trait BlockExt: Sized {
     const DATA_BYTES: usize = Block::BYTES - Block::HEADER_BYTES;
-    fn init(self, local: &'static Pool, sc: usize);
+    fn init(self, local: &'static Pool, sc: SizeClass);
     fn alloc_cell(self) -> Option<Address>;
     fn free_cell(self, cell: Address);
     fn is_empty(self) -> bool;
     fn is_full(self) -> bool;
     fn is_owned_by(self, owner: &Pool) -> bool;
-    fn size_class(self) -> usize;
     fn used_bytes(self) -> usize;
 }
 
 impl BlockExt for Block {
     #[inline(always)]
-    fn init(mut self, local: &'static Pool, size_class: usize) {
+    fn init(mut self, local: &'static Pool, size_class: SizeClass) {
         debug_assert_eq!(Block::HEADER_BYTES, Address::BYTES * 5);
         self.owner = local;
-        self.size_class = size_class as _;
-        let size = HoardSpace::size_class_to_bytes(size_class);
+        self.size_class = size_class;
+        let size = size_class.bytes();
         self.head_cell = Address::ZERO;
         let mut cell = (self.start() + Self::HEADER_BYTES).align_up(size);
         while cell < self.end() {
@@ -54,11 +56,6 @@ impl BlockExt for Block {
         self.used_bytes = 0;
         self.prev = None;
         self.next = None;
-    }
-
-    #[inline(always)]
-    fn size_class(self) -> usize {
-        self.size_class as _
     }
 
     #[inline(always)]
@@ -84,7 +81,7 @@ impl BlockExt for Block {
             self.head_cell
         };
         self.head_cell = unsafe { cell.load::<Address>() };
-        self.used_bytes += HoardSpace::size_class_to_bytes(self.size_class()) as u32;
+        self.used_bytes += self.size_class.bytes() as u32;
         Some(cell)
     }
 
@@ -94,7 +91,7 @@ impl BlockExt for Block {
             cell.store(self.head_cell);
         }
         self.head_cell = cell;
-        self.used_bytes -= HoardSpace::size_class_to_bytes(self.size_class()) as u32;
+        self.used_bytes -= self.size_class.bytes() as u32;
     }
 
     #[inline(always)]

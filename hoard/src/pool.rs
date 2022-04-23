@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use mallockit::util::{Address, Lazy, Local};
+use mallockit::util::{size_class::SizeClass, Address, Lazy, Local};
 use spin::{Mutex, MutexGuard};
 
 use crate::{
@@ -136,11 +136,11 @@ impl Pool {
     }
 
     #[inline(always)]
-    fn should_flush(&self, obj_size: usize) -> bool {
+    fn should_flush(&self, log_obj_size: usize) -> bool {
         const EMPTINESS_CLASSES: usize = 8;
         let u = self.used_bytes.load(Ordering::Relaxed);
         let a = self.total_bytes.load(Ordering::Relaxed);
-        u + (2 * Block::BYTES) / obj_size < a
+        u + ((2 * Block::BYTES) >> log_obj_size) < a
             && (EMPTINESS_CLASSES * u) < ((EMPTINESS_CLASSES - 1) * a)
     }
 
@@ -150,26 +150,27 @@ impl Pool {
     }
 
     #[inline(always)]
-    pub fn push(&self, size_class: usize, mut block: Block) {
+    pub fn push(&self, size_class: SizeClass, mut block: Block) {
         debug_assert!(!block.is_full());
         debug_assert!(block.prev.is_none());
         debug_assert!(block.next.is_none());
         let mut blocks = self.blocks.lock();
-        blocks[size_class].push(block);
+        blocks[size_class.as_usize()].push(block);
         block.owner = self.static_ref();
         self.used_bytes
             .fetch_add(block.used_bytes(), Ordering::Relaxed);
         self.total_bytes.fetch_add(Block::BYTES, Ordering::Relaxed);
-        blocks[size_class].verify(self);
+        blocks[size_class.as_usize()].verify(self);
     }
 
     #[inline(always)]
-    pub fn pop(&self, size_class: usize) -> Option<(Block, MutexGuard<BlockLists>)> {
+    pub fn pop(&self, size_class: SizeClass) -> Option<(Block, MutexGuard<BlockLists>)> {
         debug_assert!(self.global);
         let mut blocks = self.blocks.lock();
-        blocks[size_class].verify(self);
-        if let Some(mut block) = blocks[size_class].head {
-            blocks[size_class].head = block.next;
+        let index = size_class.as_usize();
+        blocks[index].verify(self);
+        if let Some(mut block) = blocks[index].head {
+            blocks[index].head = block.next;
             if let Some(mut next) = block.next {
                 next.prev = None;
             }
@@ -179,7 +180,7 @@ impl Pool {
             debug_assert!(block.is_owned_by(self));
             block.prev = None;
             block.next = None;
-            blocks[size_class].verify(self);
+            blocks[index].verify(self);
             return Some((block, blocks));
         }
         None
@@ -188,15 +189,16 @@ impl Pool {
     #[cold]
     pub fn acquire_block_slow(
         &self,
-        size_class: usize,
+        size_class: SizeClass,
         blocks: &mut MutexGuard<BlockLists>,
         space: &Lazy<&'static HoardSpace, Local>,
     ) -> Block {
-        blocks[size_class].verify(self);
+        let index = size_class.as_usize();
+        blocks[index].verify(self);
         // Get a block from global pool
         let block = space
             .acquire_block(size_class, self, |mut block| {
-                blocks[size_class].push(block);
+                blocks[index].push(block);
                 block.owner = self.static_ref();
             })
             .unwrap();
@@ -204,24 +206,25 @@ impl Pool {
             .fetch_add(block.used_bytes(), Ordering::Relaxed);
         self.total_bytes.fetch_add(Block::BYTES, Ordering::Relaxed);
         debug_assert!(!block.is_full());
-        blocks[size_class].verify(self);
+        blocks[index].verify(self);
         block
     }
 
     #[inline(always)]
     pub fn alloc_cell(
         &self,
-        size_class: usize,
+        size_class: SizeClass,
         space: &Lazy<&'static HoardSpace, Local>,
     ) -> Option<Address> {
         debug_assert!(!self.global);
         let mut blocks = self.blocks.lock();
-        blocks[size_class].verify(self);
+        let index = size_class.as_usize();
+        blocks[index].verify(self);
         // Get a local block
         let block = {
             // Go through the list reversely to find a non-full block
             let mut target = None;
-            let mut block = blocks[size_class].head;
+            let mut block = blocks[index].head;
             while let Some(b) = block {
                 if !b.is_full() {
                     target = Some(b);
@@ -238,10 +241,10 @@ impl Pool {
         // Alloc a cell from the block
         let cell = block.alloc_cell().unwrap();
         self.used_bytes.store(
-            self.used_bytes.load(Ordering::Relaxed) + HoardSpace::size_class_to_bytes(size_class),
+            self.used_bytes.load(Ordering::Relaxed) + size_class.bytes(),
             Ordering::Relaxed,
         );
-        blocks[size_class].verify(self);
+        blocks[index].verify(self);
         Some(cell)
     }
 
@@ -266,46 +269,47 @@ impl Pool {
         mut blocks: MutexGuard<BlockLists>,
     ) {
         let block = Block::containing(cell);
-        let size_class = block.size_class();
-        blocks[size_class].verify(self);
+        let index = block.size_class.as_usize();
+        blocks[index].verify(self);
         block.free_cell(cell);
         self.used_bytes.store(
-            self.used_bytes.load(Ordering::Relaxed) - HoardSpace::size_class_to_bytes(size_class),
+            self.used_bytes.load(Ordering::Relaxed) - block.size_class.bytes(),
             Ordering::Relaxed,
         );
-        blocks[size_class].verify(self);
+        blocks[index].verify(self);
         if block.is_empty() {
-            blocks[size_class].remove(block);
+            blocks[index].remove(block);
             space.release_block(block);
         } else {
             // Move the block to front
-            blocks[size_class].move_to_front(block);
+            blocks[index].move_to_front(block);
         }
-        blocks[size_class].verify(self);
+        blocks[index].verify(self);
         debug_assert!(block.is_owned_by(self));
         // Flush?
-        if !self.global && self.should_flush(HoardSpace::size_class_to_bytes(size_class)) {
-            self.free_cell_slow(size_class, space, blocks);
+        if !self.global && self.should_flush(block.size_class.log_bytes()) {
+            self.free_cell_slow(block.size_class, space, blocks);
         }
     }
 
     #[inline(never)]
     fn free_cell_slow(
         &self,
-        size_class: usize,
+        size_class: SizeClass,
         space: &Lazy<&'static HoardSpace, Local>,
         mut blocks: MutexGuard<BlockLists>,
     ) {
         // Transit a mostly-empty block to the global pool
         debug_assert!(!self.global);
-        if let Some(mostly_empty_block) = blocks[size_class].pop_mostly_empty_block() {
+        let index = size_class.as_usize();
+        if let Some(mostly_empty_block) = blocks[index].pop_mostly_empty_block() {
             debug_assert!(!mostly_empty_block.is_full());
             debug_assert!(mostly_empty_block.is_owned_by(self));
             self.used_bytes
                 .fetch_sub(mostly_empty_block.used_bytes(), Ordering::Relaxed);
             self.total_bytes.fetch_sub(Block::BYTES, Ordering::Relaxed);
             space.flush_block(size_class, mostly_empty_block);
-            blocks[size_class].verify(self);
+            blocks[index].verify(self);
             debug_assert!(!mostly_empty_block.is_owned_by(self));
         }
     }

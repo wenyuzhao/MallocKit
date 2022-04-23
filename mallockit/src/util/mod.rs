@@ -28,6 +28,7 @@ mod lazy;
 pub mod memory;
 pub mod memory_chunk;
 mod page;
+pub mod size_class;
 
 #[cfg(target_os = "macos")]
 pub(crate) mod macos_malloc_zone;

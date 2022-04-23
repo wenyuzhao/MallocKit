@@ -3,7 +3,7 @@ use crate::{
     block::{Block, BlockExt},
     pool::Pool,
 };
-use mallockit::util::*;
+use mallockit::util::{size_class::SizeClass, *};
 
 /// Global heap
 pub struct HoardSpace {
@@ -37,8 +37,7 @@ impl Space for HoardSpace {
     #[inline(always)]
     fn get_layout(ptr: Address) -> Layout {
         let block = Block::containing(ptr);
-        let size = 1usize << (block.size_class() + 3);
-        Layout::from_size_align(size, size).unwrap()
+        block.size_class.layout()
     }
 }
 
@@ -51,27 +50,9 @@ impl HoardSpace {
     }
 
     #[inline(always)]
-    pub fn size_class_of_layout(layout: Layout) -> usize {
-        let layout = unsafe { layout.pad_to_align_unchecked() };
-        let size = layout.size().next_power_of_two();
-        Self::size_class(size)
-    }
-
-    #[inline(always)]
-    pub const fn size_class(bytes: usize) -> usize {
-        // debug_assert!(bytes <= Self::MAX_ALLOCATION_SIZE);
-        bytes.trailing_zeros() as usize - 3
-    }
-
-    #[inline(always)]
-    pub const fn size_class_to_bytes(size_class: usize) -> usize {
-        1 << (size_class + 3)
-    }
-
-    #[inline(always)]
     pub fn acquire_block(
         &self,
-        size_class: usize,
+        size_class: SizeClass,
         local: &Pool,
         mut register: impl FnMut(Block),
     ) -> Option<Block> {
@@ -97,7 +78,7 @@ impl HoardSpace {
     }
 
     #[inline(always)]
-    pub fn flush_block(&self, size_class: usize, block: Block) {
+    pub fn flush_block(&self, size_class: SizeClass, block: Block) {
         debug_assert!(!block.is_full());
         self.pool.push(size_class, block);
     }
@@ -125,7 +106,7 @@ impl HoardAllocator {
 impl Allocator for HoardAllocator {
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
-        let size_class = HoardSpace::size_class_of_layout(layout);
+        let size_class = SizeClass::from_layout(layout);
         self.local.alloc_cell(size_class, &self.space)
     }
 
