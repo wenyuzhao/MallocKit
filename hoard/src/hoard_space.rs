@@ -59,7 +59,7 @@ impl HoardSpace {
 
     #[inline(always)]
     pub const fn size_class(bytes: usize) -> usize {
-        debug_assert!(bytes <= Self::MAX_ALLOCATION_SIZE);
+        // debug_assert!(bytes <= Self::MAX_ALLOCATION_SIZE);
         bytes.trailing_zeros() as usize - 3
     }
 
@@ -89,6 +89,11 @@ impl HoardSpace {
     pub fn flush_block(&self, size_class: usize, mut block: Block) {
         self.pool.push_pack(size_class, block);
         block.owner = Some(self.pool.static_ref());
+    }
+
+    #[inline(always)]
+    pub fn release_block(&self, block: Block) {
+        self.release::<Size4K>(Page::new(block.start()));
     }
 }
 /// Thread-local heap

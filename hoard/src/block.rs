@@ -8,7 +8,7 @@ use super::Address;
 pub struct BlockMeta {
     pub owner: Option<&'static Pool>,
     pub size_class: usize,
-    pub free_bytes: usize,
+    pub used_bytes: usize,
     pub head_cell: Option<Address>,
     pub prev: Option<Block>,
     pub next: Option<Block>,
@@ -28,6 +28,7 @@ pub trait BlockExt: Sized {
     fn init(self, local: &'static Pool, sc: usize);
     fn alloc_cell(self) -> Option<Address>;
     fn free_cell(self, cell: Address);
+    fn is_empty(self) -> bool;
 }
 
 impl BlockExt for Block {
@@ -46,6 +47,11 @@ impl BlockExt for Block {
     }
 
     #[inline(always)]
+    fn is_empty(self) -> bool {
+        self.used_bytes == 0
+    }
+
+    #[inline(always)]
     fn alloc_cell(mut self) -> Option<Address> {
         let cell = self.head_cell?;
         let next = unsafe { cell.load::<Address>() };
@@ -54,7 +60,7 @@ impl BlockExt for Block {
         } else {
             self.head_cell = Some(next);
         }
-        self.free_bytes += HoardSpace::size_class_to_bytes(self.size_class);
+        self.used_bytes += HoardSpace::size_class_to_bytes(self.size_class);
         Some(cell)
     }
 
@@ -63,7 +69,7 @@ impl BlockExt for Block {
         unsafe {
             cell.store(self.head_cell.unwrap_or(Address::ZERO));
         }
-        self.free_bytes -= HoardSpace::size_class_to_bytes(self.size_class);
+        self.used_bytes -= HoardSpace::size_class_to_bytes(self.size_class);
         self.head_cell = Some(cell);
     }
 }
