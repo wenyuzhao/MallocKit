@@ -9,7 +9,7 @@ pub struct BlockMeta {
     pub owner: Option<&'static Pool>,
     pub size_class: usize,
     pub used_bytes: usize,
-    pub head_cell: Option<Address>,
+    head_cell: Address,
     pub prev: Option<Block>,
     pub next: Option<Block>,
 }
@@ -29,6 +29,7 @@ pub trait BlockExt: Sized {
     fn alloc_cell(self) -> Option<Address>;
     fn free_cell(self, cell: Address);
     fn is_empty(self) -> bool;
+    fn is_full(self) -> bool;
 }
 
 impl BlockExt for Block {
@@ -36,14 +37,18 @@ impl BlockExt for Block {
         self.owner = Some(local);
         self.size_class = size_class;
         let size = HoardSpace::size_class_to_bytes(size_class);
+        self.head_cell = Address::ZERO;
         let mut cell = (self.start() + Self::HEADER_BYTES).align_up(size);
         while cell < self.end() {
             unsafe {
-                cell.store(self.head_cell.unwrap_or(Address::ZERO));
+                cell.store(self.head_cell);
             }
-            self.head_cell = Some(cell);
+            self.head_cell = cell;
             cell = cell + size;
         }
+        self.used_bytes = 0;
+        self.prev = None;
+        self.next = None;
     }
 
     #[inline(always)]
@@ -52,14 +57,18 @@ impl BlockExt for Block {
     }
 
     #[inline(always)]
+    fn is_full(self) -> bool {
+        self.head_cell.is_zero()
+    }
+
+    #[inline(always)]
     fn alloc_cell(mut self) -> Option<Address> {
-        let cell = self.head_cell?;
-        let next = unsafe { cell.load::<Address>() };
-        if next.is_zero() {
-            self.head_cell = None;
+        let cell = if self.head_cell.is_zero() {
+            return None;
         } else {
-            self.head_cell = Some(next);
-        }
+            self.head_cell
+        };
+        self.head_cell = unsafe { cell.load::<Address>() };
         self.used_bytes += HoardSpace::size_class_to_bytes(self.size_class);
         Some(cell)
     }
@@ -67,9 +76,9 @@ impl BlockExt for Block {
     #[inline(always)]
     fn free_cell(mut self, cell: Address) {
         unsafe {
-            cell.store(self.head_cell.unwrap_or(Address::ZERO));
+            cell.store(self.head_cell);
         }
+        self.head_cell = cell;
         self.used_bytes -= HoardSpace::size_class_to_bytes(self.size_class);
-        self.head_cell = Some(cell);
     }
 }

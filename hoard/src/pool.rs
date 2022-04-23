@@ -163,7 +163,7 @@ impl Pool {
             let mut target = None;
             let mut block = blocks[size_class].tail;
             while let Some(b) = block {
-                if b.head_cell.is_some() {
+                if !b.is_full() {
                     target = Some(b);
                     break;
                 }
