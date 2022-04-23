@@ -1,3 +1,5 @@
+use std::intrinsics::unlikely;
+
 use mallockit::util::{
     aligned_block::{AlignedBlock, AlignedBlockConfig},
     size_class::SizeClass,
@@ -15,6 +17,7 @@ pub struct BlockMeta {
     head_cell: Address,
     pub prev: Option<Block>,
     pub next: Option<Block>,
+    bump_cursor: Address,
 }
 
 pub struct BlockConfig;
@@ -40,19 +43,12 @@ pub trait BlockExt: Sized {
 impl BlockExt for Block {
     #[inline(always)]
     fn init(mut self, local: &'static Pool, size_class: SizeClass) {
-        debug_assert_eq!(Block::HEADER_BYTES, Address::BYTES * 5);
+        debug_assert_eq!(Block::HEADER_BYTES, Address::BYTES * 6);
         self.owner = local;
         self.size_class = size_class;
         let size = size_class.bytes();
         self.head_cell = Address::ZERO;
-        let mut cell = (self.start() + Self::HEADER_BYTES).align_up(size);
-        while cell < self.end() {
-            unsafe {
-                cell.store(self.head_cell);
-            }
-            self.head_cell = cell;
-            cell = cell + size;
-        }
+        self.bump_cursor = (self.start() + Self::HEADER_BYTES).align_up(size);
         self.used_bytes = 0;
         self.prev = None;
         self.next = None;
@@ -70,13 +66,20 @@ impl BlockExt for Block {
 
     #[inline(always)]
     fn is_full(self) -> bool {
-        self.head_cell.is_zero()
+        self.bump_cursor >= self.end() && self.head_cell.is_zero()
     }
 
     #[inline(always)]
     fn alloc_cell(mut self) -> Option<Address> {
-        let cell = if self.head_cell.is_zero() {
-            return None;
+        let cell = if unlikely(self.head_cell.is_zero()) {
+            if self.bump_cursor < self.end() {
+                let cell = self.bump_cursor;
+                self.bump_cursor = self.bump_cursor + self.size_class.bytes();
+                self.used_bytes += self.size_class.bytes() as u32;
+                return Some(cell);
+            } else {
+                return None;
+            }
         } else {
             self.head_cell
         };

@@ -49,7 +49,6 @@ impl HoardSpace {
         size <= Self::MAX_ALLOCATION_SIZE
     }
 
-    #[inline(always)]
     pub fn acquire_block(
         &self,
         size_class: SizeClass,
@@ -77,13 +76,11 @@ impl HoardSpace {
         Some(block)
     }
 
-    #[inline(always)]
     pub fn flush_block(&self, size_class: SizeClass, block: Block) {
         debug_assert!(!block.is_full());
         self.pool.push(size_class, block);
     }
 
-    #[inline(always)]
     pub fn release_block(&self, block: Block) {
         self.release::<Size4K>(Page::new(block.start()));
     }
