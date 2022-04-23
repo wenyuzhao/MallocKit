@@ -77,7 +77,7 @@ impl Mutator for HoardMutator {
             mallockit::stat::track_allocation(layout, true);
             self.los.alloc(layout)
         };
-        assert!(x.is_some());
+        debug_assert!(x.is_some());
         x
     }
 

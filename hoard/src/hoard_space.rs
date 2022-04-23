@@ -1,7 +1,7 @@
 use super::{page_resource::BlockPageResource, Allocator, Space, SpaceId};
 use crate::{
     block::{Block, BlockExt},
-    pool::Pool,
+    pool::{BlockList, Pool},
 };
 use mallockit::util::*;
 
@@ -13,7 +13,7 @@ pub struct HoardSpace {
 }
 
 impl Space for HoardSpace {
-    const MAX_ALLOCATION_SIZE: usize = Block::BYTES / 2;
+    const MAX_ALLOCATION_SIZE: usize = Block::BYTES / 4;
     type PR = BlockPageResource;
 
     fn new(id: SpaceId) -> Self {
@@ -69,10 +69,17 @@ impl HoardSpace {
     }
 
     #[inline(always)]
-    pub fn acquire_block(&self, local: &Pool, size_class: usize) -> Option<Block> {
+    pub fn acquire_block(
+        &self,
+        local: &Pool,
+        size_class: usize,
+        block_list: &mut BlockList,
+    ) -> Option<Block> {
         // Try allocate from the global pool
-        if let Some(mut block) = self.pool.pop_back(size_class) {
+        if let Some((mut block, _guard)) = self.pool.pop_back(size_class) {
+            block_list.push_back(block);
             block.owner = Some(local.static_ref());
+            debug_assert!(!block.is_full());
             return Some(block);
         }
         // Acquire new memory
@@ -80,15 +87,18 @@ impl HoardSpace {
             .acquire::<Size4K>(1 << (Block::LOG_BYTES - Size4K::LOG_BYTES))?
             .start
             .start();
-        let block = Block::new(addr);
+        let mut block = Block::new(addr);
         block.init(local.static_ref(), size_class);
+        block_list.push_back(block);
+        block.owner = Some(local.static_ref());
+        debug_assert!(!block.is_full());
         Some(block)
     }
 
     #[inline(always)]
-    pub fn flush_block(&self, size_class: usize, mut block: Block) {
+    pub fn flush_block(&self, size_class: usize, block: Block) {
+        debug_assert!(!block.is_full());
         self.pool.push_pack(size_class, block);
-        block.owner = Some(self.pool.static_ref());
     }
 
     #[inline(always)]

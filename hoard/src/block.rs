@@ -33,8 +33,8 @@ pub trait BlockExt: Sized {
 }
 
 impl BlockExt for Block {
-    fn init(mut self, local: &'static Pool, size_class: usize) {
-        self.owner = Some(local);
+    fn init(mut self, _local: &'static Pool, size_class: usize) {
+        self.owner = None;
         self.size_class = size_class;
         let size = HoardSpace::size_class_to_bytes(size_class);
         self.head_cell = Address::ZERO;
