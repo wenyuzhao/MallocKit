@@ -1,7 +1,7 @@
 use super::{page_resource::BlockPageResource, Allocator, Space, SpaceId};
 use crate::{
     block::{Block, BlockExt},
-    pool::{BlockList, Pool},
+    pool::Pool,
 };
 use mallockit::util::*;
 
@@ -37,7 +37,7 @@ impl Space for HoardSpace {
     #[inline(always)]
     fn get_layout(ptr: Address) -> Layout {
         let block = Block::containing(ptr);
-        let size = 1usize << (block.size_class + 3);
+        let size = 1usize << (block.size_class() + 3);
         Layout::from_size_align(size, size).unwrap()
     }
 }
@@ -71,15 +71,15 @@ impl HoardSpace {
     #[inline(always)]
     pub fn acquire_block(
         &self,
-        local: &Pool,
         size_class: usize,
-        block_list: &mut BlockList,
+        local: &Pool,
+        mut register: impl FnMut(Block),
     ) -> Option<Block> {
         // Try allocate from the global pool
-        if let Some((mut block, _guard)) = self.pool.pop_back(size_class) {
-            block_list.push_back(block);
-            block.owner = Some(local.static_ref());
+        if let Some((block, _guard)) = self.pool.pop(size_class) {
             debug_assert!(!block.is_full());
+            register(block);
+            debug_assert!(block.is_owned_by(local));
             return Some(block);
         }
         // Acquire new memory
@@ -87,18 +87,19 @@ impl HoardSpace {
             .acquire::<Size4K>(1 << (Block::LOG_BYTES - Size4K::LOG_BYTES))?
             .start
             .start();
-        let mut block = Block::new(addr);
+        let block = Block::new(addr);
         block.init(local.static_ref(), size_class);
-        block_list.push_back(block);
-        block.owner = Some(local.static_ref());
         debug_assert!(!block.is_full());
+        debug_assert!(block.is_empty());
+        register(block);
+        debug_assert!(block.is_owned_by(local));
         Some(block)
     }
 
     #[inline(always)]
     pub fn flush_block(&self, size_class: usize, block: Block) {
         debug_assert!(!block.is_full());
-        self.pool.push_pack(size_class, block);
+        self.pool.push(size_class, block);
     }
 
     #[inline(always)]
@@ -131,6 +132,6 @@ impl Allocator for HoardAllocator {
     #[inline(always)]
     fn dealloc(&mut self, ptr: Address) {
         let block = Block::containing(ptr);
-        block.owner.unwrap().free_cell(ptr, &self.space);
+        block.owner.free_cell(ptr, &self.space);
     }
 }
