@@ -1,6 +1,5 @@
 import subprocess
 from typing import List, Optional
-import os
 from os import path
 import pandas as pd
 
@@ -12,7 +11,6 @@ MIMALLOC_BENCH_EXTERN_DIR = f'{BENCH_DIR}/mimalloc-bench/extern'
 TEMP_REPORT_FILE = f'{BENCH_LOGS_DIR}/.temp.csv'
 RESULTS_FILE = f'{BENCH_LOGS_DIR}/results.csv'
 PROJECT_DIR = path.dirname(BENCH_DIR)
-CARGO_TARGET_DIR = f'{PROJECT_DIR}/target/release'
 
 class Benchmark:
     name = None
@@ -84,6 +82,7 @@ class Benchmark:
         return df
 
 class BenchmarkSuite:
+    debug = False
     sys_malloc = 'sys'
     non_mallockit_algorithms = {
         'je': f'{MIMALLOC_BENCH_EXTERN_DIR}/jemalloc/lib/libjemalloc.so',
@@ -109,7 +108,8 @@ class BenchmarkSuite:
         if malloc in self.non_mallockit_algorithms:
             return self.non_mallockit_algorithms[malloc]
         else:
-            return f'{CARGO_TARGET_DIR}/lib{malloc}.so'
+            profile = 'debug' if BenchmarkSuite.debug else 'release'
+            return f'{PROJECT_DIR}/target/{profile}/lib{malloc}.so'
 
     def __run_bm(self, bm: Benchmark, algorithms: List[str], invocation: int):
         for a in algorithms:
