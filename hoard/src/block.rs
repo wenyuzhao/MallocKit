@@ -17,7 +17,7 @@ pub struct BlockMeta {
 pub struct BlockConfig;
 
 impl AlignedBlockConfig for BlockConfig {
-    const LOG_BYTES: usize = 12;
+    const LOG_BYTES: usize = 18;
     type Header = BlockMeta;
 }
 
