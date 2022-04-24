@@ -49,6 +49,7 @@ impl HoardSpace {
         size <= Self::MAX_ALLOCATION_SIZE
     }
 
+    #[inline(always)]
     pub fn acquire_block(
         &self,
         size_class: SizeClass,

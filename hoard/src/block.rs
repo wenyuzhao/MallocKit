@@ -13,11 +13,12 @@ use super::Address;
 pub struct BlockMeta {
     pub owner: &'static Pool,
     pub size_class: SizeClass,
+    pub group: u8,
     used_bytes: u32,
+    bump_cursor: u32,
     head_cell: Address,
     pub prev: Option<Block>,
     pub next: Option<Block>,
-    bump_cursor: Address,
 }
 
 pub struct BlockConfig;
@@ -42,16 +43,15 @@ pub trait BlockExt: Sized {
 
 impl BlockExt for Block {
     #[inline(always)]
-    fn init(mut self, local: &'static Pool, size_class: SizeClass) {
+    fn init(mut self, _local: &'static Pool, size_class: SizeClass) {
         debug_assert_eq!(Block::HEADER_BYTES, Address::BYTES * 6);
-        self.owner = local;
         self.size_class = size_class;
         let size = size_class.bytes();
         self.head_cell = Address::ZERO;
-        self.bump_cursor = (self.start() + Self::HEADER_BYTES).align_up(size);
+        self.bump_cursor = (Address::ZERO + Self::HEADER_BYTES)
+            .align_up(size)
+            .as_usize() as u32;
         self.used_bytes = 0;
-        self.prev = None;
-        self.next = None;
     }
 
     #[inline(always)]
@@ -66,15 +66,15 @@ impl BlockExt for Block {
 
     #[inline(always)]
     fn is_full(self) -> bool {
-        self.bump_cursor >= self.end() && self.head_cell.is_zero()
+        self.bump_cursor >= Self::BYTES as u32 && self.head_cell.is_zero()
     }
 
     #[inline(always)]
     fn alloc_cell(mut self) -> Option<Address> {
         let cell = if unlikely(self.head_cell.is_zero()) {
-            if self.bump_cursor < self.end() {
-                let cell = self.bump_cursor;
-                self.bump_cursor = self.bump_cursor + self.size_class.bytes();
+            if self.bump_cursor < Self::BYTES as u32 {
+                let cell = self.start() + (self.bump_cursor as usize);
+                self.bump_cursor = self.bump_cursor + self.size_class.bytes() as u32;
                 self.used_bytes += self.size_class.bytes() as u32;
                 return Some(cell);
             } else {

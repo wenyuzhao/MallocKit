@@ -11,4 +11,4 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 mallockit = { path = "../mallockit" }
-spin = "0.9"
+spin = { version="0.9", features = ["std"] }

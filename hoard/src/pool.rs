@@ -1,137 +1,31 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use mallockit::util::{size_class::SizeClass, Address, Lazy, Local};
-use spin::{Mutex, MutexGuard};
+use spin::{relax::Yield, MutexGuard};
+
+type Mutex<T> = spin::mutex::Mutex<T, Yield>;
 
 use crate::{
     block::{Block, BlockExt},
     hoard_space::HoardSpace,
 };
 
-pub type BlockLists = [BlockList; 32];
+pub type BlockLists = [Mutex<BlockList>; 32];
 
 pub struct BlockList {
-    head: Option<Block>,
+    groups: [Option<Block>; Self::GROUPS], // fullnesss groups: <25%, <50%, <75%, <100%, FULL
+    used_bytes: AtomicUsize,
+    total_bytes: AtomicUsize,
 }
 
 impl BlockList {
+    const GROUPS: usize = 4 + 1;
+
     const fn new() -> Self {
-        Self { head: None }
-    }
-
-    #[inline(always)]
-    fn push(&mut self, mut block: Block) {
-        debug_assert!(block.prev.is_none());
-        debug_assert!(block.next.is_none());
-        block.next = self.head;
-        block.prev = None;
-        if let Some(mut head) = self.head {
-            head.prev = Some(block)
-        }
-        self.head = Some(block);
-        debug_assert_ne!(block.prev, Some(block));
-    }
-
-    #[inline(always)]
-    fn remove(&mut self, mut block: Block) {
-        if self.head == Some(block) {
-            self.head = block.next;
-        }
-        if let Some(mut prev) = block.prev {
-            prev.next = block.next;
-        }
-        if let Some(mut next) = block.next {
-            next.prev = block.prev;
-        }
-        block.prev = None;
-        block.next = None;
-    }
-
-    #[inline(always)]
-    fn move_to_front(&mut self, block: Block) {
-        if Some(block) == self.head {
-            return;
-        }
-        self.remove(block);
-        self.push(block);
-    }
-
-    #[inline(always)]
-    fn pop_mostly_empty_block(&mut self) -> Option<Block> {
-        let mut cursor = self.head;
-        while let Some(b) = cursor {
-            if b.used_bytes() < (Block::BYTES >> 1) {
-                self.remove(b);
-                return Some(b);
-            }
-            cursor = b.next;
-        }
-        None
-    }
-
-    #[inline(always)]
-    fn verify(&self, pool: &Pool) {
-        if !cfg!(debug_assertions) {
-            return;
-        }
-        let mut cursor = self.head;
-        while let Some(b) = cursor {
-            assert!(b.is_owned_by(pool));
-            cursor = b.next;
-        }
-    }
-}
-
-pub struct Pool {
-    pub global: bool,
-    pub used_bytes: AtomicUsize,
-    pub total_bytes: AtomicUsize,
-    blocks: Mutex<BlockLists>,
-}
-
-impl Pool {
-    pub const fn new(global: bool) -> Self {
-        const fn b() -> BlockList {
-            BlockList::new()
-        }
         Self {
-            global,
+            groups: [None; Self::GROUPS],
             used_bytes: AtomicUsize::new(0),
             total_bytes: AtomicUsize::new(0),
-            blocks: Mutex::new([
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-            ]),
         }
     }
 
@@ -145,6 +39,158 @@ impl Pool {
     }
 
     #[inline(always)]
+    fn group(block: Block, alloc: bool) -> usize {
+        let u = block.used_bytes()
+            + if alloc { block.size_class.bytes() } else { 0 }
+            + (Address::ZERO + Block::HEADER_BYTES)
+                .align_up(block.size_class.bytes())
+                .as_usize();
+        (u << 2) >> Block::LOG_BYTES
+    }
+
+    #[inline(always)]
+    fn push(&mut self, mut block: Block, alloc: bool) {
+        let group = Self::group(block, alloc);
+        block.group = group as _;
+        block.next = self.groups[group];
+        block.prev = None;
+        if let Some(mut head) = self.groups[group] {
+            head.prev = Some(block)
+        }
+        self.groups[group] = Some(block);
+        debug_assert_ne!(block.prev, Some(block));
+    }
+
+    #[inline(always)]
+    fn find(&mut self) -> Option<Block> {
+        for i in (0..Self::GROUPS - 1).rev() {
+            if let Some(block) = self.groups[i] {
+                debug_assert!(!block.is_full());
+                return Some(block);
+            }
+        }
+        None
+    }
+
+    #[inline(always)]
+    fn pop(&mut self) -> Option<Block> {
+        for i in (0..Self::GROUPS - 1).rev() {
+            if let Some(mut block) = self.groups[i] {
+                self.groups[i] = block.next;
+                if let Some(mut next) = block.next {
+                    next.prev = None;
+                }
+                block.prev = None;
+                block.next = None;
+                return Some(block);
+            }
+        }
+        None
+    }
+
+    #[inline(always)]
+    fn remove(&mut self, block: Block) {
+        if self.groups[block.group as usize] == Some(block) {
+            self.groups[block.group as usize] = block.next;
+        }
+        if let Some(mut prev) = block.prev {
+            prev.next = block.next;
+        }
+        if let Some(mut next) = block.next {
+            next.prev = block.prev;
+        }
+    }
+
+    #[inline(always)]
+    fn move_to_front(&mut self, mut block: Block, alloc: bool) {
+        let group = Self::group(block, alloc);
+        let block_group = block.group as usize;
+        if Some(block) == self.groups[group] || (alloc && group == block_group) {
+            return;
+        }
+        if self.groups[block_group] == Some(block) {
+            self.groups[block_group] = block.next;
+        }
+        if let Some(mut prev) = block.prev {
+            prev.next = block.next;
+        }
+        if let Some(mut next) = block.next {
+            next.prev = block.prev;
+        }
+        block.group = group as _;
+        block.next = self.groups[group];
+        block.prev = None;
+        if let Some(mut head) = self.groups[group] {
+            head.prev = Some(block)
+        }
+        self.groups[group] = Some(block);
+    }
+
+    #[inline(always)]
+    fn pop_mostly_empty_block(&mut self) -> Option<Block> {
+        for i in 0..Self::GROUPS / 2 {
+            if let Some(block) = self.groups[i] {
+                self.groups[i] = block.next;
+                if let Some(mut next) = block.next {
+                    next.prev = None;
+                }
+                return Some(block);
+            }
+        }
+        None
+    }
+}
+
+pub struct Pool {
+    pub global: bool,
+    blocks: BlockLists,
+}
+
+impl Pool {
+    pub const fn new(global: bool) -> Self {
+        const fn b() -> Mutex<BlockList> {
+            Mutex::new(BlockList::new())
+        }
+        Self {
+            global,
+            blocks: [
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+                b(),
+            ],
+        }
+    }
+
+    #[inline(always)]
     pub const fn static_ref(&self) -> &'static Self {
         unsafe { &*(self as *const Self) }
     }
@@ -152,35 +198,33 @@ impl Pool {
     #[inline(always)]
     pub fn push(&self, size_class: SizeClass, mut block: Block) {
         debug_assert!(!block.is_full());
-        debug_assert!(block.prev.is_none());
-        debug_assert!(block.next.is_none());
-        let mut blocks = self.blocks.lock();
-        blocks[size_class.as_usize()].push(block);
+        let mut blocks = self.lock_blocks(size_class);
+        blocks.push(block, false);
         block.owner = self.static_ref();
-        self.used_bytes
-            .fetch_add(block.used_bytes(), Ordering::Relaxed);
-        self.total_bytes.fetch_add(Block::BYTES, Ordering::Relaxed);
-        blocks[size_class.as_usize()].verify(self);
+        blocks.used_bytes.store(
+            blocks.used_bytes.load(Ordering::Relaxed) + block.used_bytes(),
+            Ordering::Relaxed,
+        );
+        blocks.total_bytes.store(
+            blocks.total_bytes.load(Ordering::Relaxed) + Block::BYTES,
+            Ordering::Relaxed,
+        );
     }
 
     #[inline(always)]
-    pub fn pop(&self, size_class: SizeClass) -> Option<(Block, MutexGuard<BlockLists>)> {
+    pub fn pop(&self, size_class: SizeClass) -> Option<(Block, MutexGuard<BlockList>)> {
         debug_assert!(self.global);
-        let mut blocks = self.blocks.lock();
-        let index = size_class.as_usize();
-        blocks[index].verify(self);
-        if let Some(mut block) = blocks[index].head {
-            blocks[index].head = block.next;
-            if let Some(mut next) = block.next {
-                next.prev = None;
-            }
-            self.used_bytes
-                .fetch_sub(block.used_bytes(), Ordering::Relaxed);
-            self.total_bytes.fetch_sub(Block::BYTES, Ordering::Relaxed);
+        let mut blocks = self.lock_blocks(size_class);
+        if let Some(block) = blocks.pop() {
+            blocks.used_bytes.store(
+                blocks.used_bytes.load(Ordering::Relaxed) - block.used_bytes(),
+                Ordering::Relaxed,
+            );
+            blocks.total_bytes.store(
+                blocks.total_bytes.load(Ordering::Relaxed) - Block::BYTES,
+                Ordering::Relaxed,
+            );
             debug_assert!(block.is_owned_by(self));
-            block.prev = None;
-            block.next = None;
-            blocks[index].verify(self);
             return Some((block, blocks));
         }
         None
@@ -190,24 +234,33 @@ impl Pool {
     pub fn acquire_block_slow(
         &self,
         size_class: SizeClass,
-        blocks: &mut MutexGuard<BlockLists>,
+        blocks: &mut MutexGuard<BlockList>,
         space: &Lazy<&'static HoardSpace, Local>,
     ) -> Block {
-        let index = size_class.as_usize();
-        blocks[index].verify(self);
         // Get a block from global pool
         let block = space
             .acquire_block(size_class, self, |mut block| {
-                blocks[index].push(block);
+                blocks.push(block, true);
                 block.owner = self.static_ref();
+                blocks.used_bytes.store(
+                    blocks.used_bytes.load(Ordering::Relaxed)
+                        + block.used_bytes()
+                        + size_class.bytes(),
+                    Ordering::Relaxed,
+                );
+                blocks.total_bytes.store(
+                    blocks.total_bytes.load(Ordering::Relaxed) + Block::BYTES,
+                    Ordering::Relaxed,
+                );
             })
             .unwrap();
-        self.used_bytes
-            .fetch_add(block.used_bytes(), Ordering::Relaxed);
-        self.total_bytes.fetch_add(Block::BYTES, Ordering::Relaxed);
         debug_assert!(!block.is_full());
-        blocks[index].verify(self);
         block
+    }
+
+    #[inline(always)]
+    pub fn lock_blocks(&self, size_class: SizeClass) -> MutexGuard<BlockList> {
+        self.blocks[size_class.as_usize()].lock()
     }
 
     #[inline(always)]
@@ -217,46 +270,36 @@ impl Pool {
         space: &Lazy<&'static HoardSpace, Local>,
     ) -> Option<Address> {
         debug_assert!(!self.global);
-        let mut blocks = self.blocks.lock();
-        let index = size_class.as_usize();
-        blocks[index].verify(self);
         // Get a local block
+        let mut blocks = self.lock_blocks(size_class);
         let block = {
-            // Go through the list reversely to find a non-full block
-            let mut target = None;
-            let mut block = blocks[index].head;
-            while let Some(b) = block {
-                if !b.is_full() {
-                    target = Some(b);
-                    break;
-                }
-                debug_assert_ne!(block, b.next);
-                block = b.next;
-            }
-            match target {
-                Some(block) => block,
-                _ => self.acquire_block_slow(size_class, &mut blocks, space),
+            // Find a mostly-full block
+            if let Some(block) = blocks.find() {
+                blocks.move_to_front(block, true);
+                block
+            } else {
+                self.acquire_block_slow(size_class, &mut blocks, space)
             }
         };
         // Alloc a cell from the block
         let cell = block.alloc_cell().unwrap();
-        self.used_bytes.store(
-            self.used_bytes.load(Ordering::Relaxed) + size_class.bytes(),
+        blocks.used_bytes.store(
+            blocks.used_bytes.load(Ordering::Relaxed) + size_class.bytes(),
             Ordering::Relaxed,
         );
-        blocks[index].verify(self);
         Some(cell)
     }
 
     #[inline(always)]
     pub fn free_cell(&self, cell: Address, space: &Lazy<&'static HoardSpace, Local>) {
-        let mut owner = self;
-        let mut blocks = self.blocks.lock();
         let block = Block::containing(cell);
+        let mut owner = self;
+        let mut blocks = owner.lock_blocks(block.size_class);
         while !block.is_owned_by(owner) {
             std::mem::drop(blocks);
+            std::thread::yield_now();
             owner = block.owner;
-            blocks = owner.blocks.lock();
+            blocks = owner.lock_blocks(block.size_class);
         }
         owner.free_cell_impl(cell, space, blocks)
     }
@@ -266,50 +309,48 @@ impl Pool {
         &self,
         cell: Address,
         space: &Lazy<&'static HoardSpace, Local>,
-        mut blocks: MutexGuard<BlockLists>,
+        mut blocks: MutexGuard<BlockList>,
     ) {
         let block = Block::containing(cell);
-        let index = block.size_class.as_usize();
-        blocks[index].verify(self);
         block.free_cell(cell);
-        self.used_bytes.store(
-            self.used_bytes.load(Ordering::Relaxed) - block.size_class.bytes(),
+        blocks.used_bytes.store(
+            blocks.used_bytes.load(Ordering::Relaxed) - block.size_class.bytes(),
             Ordering::Relaxed,
         );
-        blocks[index].verify(self);
         if block.is_empty() {
-            blocks[index].remove(block);
+            blocks.remove(block);
             space.release_block(block);
         } else {
-            // Move the block to front
-            blocks[index].move_to_front(block);
+            blocks.move_to_front(block, false);
         }
-        blocks[index].verify(self);
         debug_assert!(block.is_owned_by(self));
         // Flush?
-        if !self.global && self.should_flush(block.size_class.log_bytes()) {
+        if !self.global && blocks.should_flush(block.size_class.log_bytes()) {
             self.free_cell_slow(block.size_class, space, blocks);
         }
     }
 
-    #[inline(never)]
+    #[cold]
     fn free_cell_slow(
         &self,
         size_class: SizeClass,
         space: &Lazy<&'static HoardSpace, Local>,
-        mut blocks: MutexGuard<BlockLists>,
+        mut blocks: MutexGuard<BlockList>,
     ) {
         // Transit a mostly-empty block to the global pool
         debug_assert!(!self.global);
-        let index = size_class.as_usize();
-        if let Some(mostly_empty_block) = blocks[index].pop_mostly_empty_block() {
+        if let Some(mostly_empty_block) = blocks.pop_mostly_empty_block() {
             debug_assert!(!mostly_empty_block.is_full());
             debug_assert!(mostly_empty_block.is_owned_by(self));
-            self.used_bytes
-                .fetch_sub(mostly_empty_block.used_bytes(), Ordering::Relaxed);
-            self.total_bytes.fetch_sub(Block::BYTES, Ordering::Relaxed);
+            blocks.used_bytes.store(
+                blocks.used_bytes.load(Ordering::Relaxed) - mostly_empty_block.used_bytes(),
+                Ordering::Relaxed,
+            );
+            blocks.total_bytes.store(
+                blocks.total_bytes.load(Ordering::Relaxed) - Block::BYTES,
+                Ordering::Relaxed,
+            );
             space.flush_block(size_class, mostly_empty_block);
-            blocks[index].verify(self);
             debug_assert!(!mostly_empty_block.is_owned_by(self));
         }
     }
