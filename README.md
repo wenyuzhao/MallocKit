@@ -22,7 +22,13 @@ $ cargo test
 
 ## Benchmarking
 
-...WIP
+```
+python3 -m bench -a mi hd sys hoard -i 10 --build
+```
+
+Then please use `bench/visual.ipynb` for visualization.
+
+Run `python3 -m bench -a hoard -b cfrac --build --record -e dTLB-loads` followed by `perf report` to record and analyze perf event data.
 
 ## TODO
 

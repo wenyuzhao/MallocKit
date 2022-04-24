@@ -9,3 +9,6 @@ a.out
 /*.log
 
 /.venv
+
+/perf.data
+/perf.data.old

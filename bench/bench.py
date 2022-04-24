@@ -14,6 +14,7 @@ PROJECT_DIR = path.dirname(BENCH_DIR)
 
 class Benchmark:
     name = None
+    record = False
     def __init__(self):
         self.current_invocation = None
         self.current_malloc = None
@@ -40,7 +41,31 @@ class Benchmark:
     def exec(self, cmd: str, cwd: Optional[str] = None):
         return subprocess.check_call(cmd, shell=True, text=True, cwd=cwd)
 
-    def measure(self, cmd: str, env: List[str] = [], cwd: str = DEFAULT_BENCH_CWD, infile: Optional[str] = None) -> pd.DataFrame:
+    def __measure_record(self, cmd: str, env: List[str] = [], cwd: str = DEFAULT_BENCH_CWD, infile: Optional[str] = None):
+        self.exec(f'mkdir -p {BENCH_LOGS_DIR}')
+        assert Benchmark.record
+        # Prepare commands
+        perf_wrapper = f'perf record -o {PROJECT_DIR}/perf.data'
+        if self.perf is not None:
+            perf_wrapper += f' -e {self.perf}'
+        perf_wrapper += ' --'
+        env_wrapper = 'env'
+        for e in env:
+            env_wrapper += f' {e}'
+        command = f'{perf_wrapper} {env_wrapper} {cmd}'
+        # Run
+        print(f'🚀 [{self.name}] #{self.current_invocation} {self.current_malloc}')
+        self.exec('mkdir -p _logs', cwd=BENCH_DIR)
+        print(f'>  {command}')
+        if infile is not None:
+            with open(infile, 'r') as infile:
+                subprocess.check_call(command, shell=True, text=True, cwd=cwd, stdin=infile)
+        else:
+            subprocess.check_call(command, shell=True, text=True, cwd=cwd)
+        print(f'Please run `perf report`.')
+
+    def measure(self, cmd: str, env: List[str] = [], cwd: str = DEFAULT_BENCH_CWD, infile: Optional[str] = None):
+        if Benchmark.record: return self.__measure_record(cmd, env, cwd, infile)
         self.exec(f'mkdir -p {BENCH_LOGS_DIR}')
         # Prepare commands
         perf_wrapper = f'perf stat --no-scale -o {TEMP_REPORT_FILE} -x ,'
