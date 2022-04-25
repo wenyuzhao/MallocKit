@@ -12,8 +12,9 @@ parser.add_argument('-e', '--events', '--perf-events', nargs='*')
 parser.add_argument('--build', default=False, action='store_true')
 parser.add_argument('--features', nargs='*')
 parser.add_argument('--debug', default=False, action='store_true')
-parser.add_argument('--test', default=False, action='store_true')
 parser.add_argument('--record', default=False, action='store_true')
+parser.add_argument('--test', default=False, action='store_true')
+parser.add_argument('--lldb', default=False, action='store_true')
 
 args = parser.parse_args()
 
@@ -37,6 +38,9 @@ if args.record:
 
 if args.test:
     Benchmark.test = True
+
+if args.lldb:
+    Benchmark.lldb = True
 
 if args.events is not None and len(args.events) > 0:
     BENCHMARK_SUITE.perf = ','.join(args.events)

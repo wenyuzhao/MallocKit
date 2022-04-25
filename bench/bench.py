@@ -16,6 +16,7 @@ class Benchmark:
     name = None
     record = False
     test = False
+    lldb = False
 
     def __init__(self):
         self.current_invocation = None
@@ -68,12 +69,12 @@ class Benchmark:
 
     def __measure_test(self, cmd: str, env: List[str] = [], cwd: str = DEFAULT_BENCH_CWD, infile: Optional[str] = None):
         self.exec(f'mkdir -p {BENCH_LOGS_DIR}')
-        assert Benchmark.test
+        assert Benchmark.test or Benchmark.lldb
         # Prepare commands
         env_wrapper = 'env'
         for e in env:
             env_wrapper += f' {e}'
-        command = f'{env_wrapper} {cmd}'
+        command = f'rust-lldb -o "{env_wrapper}" -- {cmd}' if Benchmark.lldb else  f'{env_wrapper} {cmd}'
         # Run
         print(f'🚀 [{self.name}] #{self.current_invocation} {self.current_malloc}')
         self.exec('mkdir -p _logs', cwd=BENCH_DIR)
@@ -86,7 +87,7 @@ class Benchmark:
 
     def measure(self, cmd: str, env: List[str] = [], cwd: str = DEFAULT_BENCH_CWD, infile: Optional[str] = None):
         if Benchmark.record: return self.__measure_record(cmd, env, cwd, infile)
-        if Benchmark.test: return self.__measure_test(cmd, env, cwd, infile)
+        if Benchmark.test or Benchmark.lldb: return self.__measure_test(cmd, env, cwd, infile)
         self.exec(f'mkdir -p {BENCH_LOGS_DIR}')
         # Prepare commands
         perf_wrapper = f'perf stat --no-scale -o {TEMP_REPORT_FILE} -x ,'
