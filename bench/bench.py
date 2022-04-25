@@ -95,38 +95,45 @@ class Benchmark:
             perf_wrapper += f' -e {self.perf}'
         perf_wrapper += ' --'
         env_wrapper = 'env'
+        wrapper = PROJECT_DIR + '/bench/wrapper.sh'
         for e in env:
             env_wrapper += f' {e}'
-        command = f'{perf_wrapper} {env_wrapper} {cmd}'
+        command = f'{perf_wrapper} {wrapper} {env_wrapper} {cmd}'
         # Run
         print(f'🚀 [{self.name}] #{self.current_invocation} {self.current_malloc}')
         self.exec('mkdir -p _logs', cwd=BENCH_DIR)
+        success = True
         with open(f'{BENCH_LOGS_DIR}/{self.name}-{self.current_malloc}.log', 'a') as file:
             file.write(f'---------- Invocation #{self.current_invocation} ----------\n\n')
             file.write(f'> {command}\n\n')
             file.flush()
-            if infile is not None:
-                with open(infile, 'r') as infile:
-                    subprocess.check_call(command, shell=True, text=True, cwd=cwd, stdout=file, stderr=file, stdin=infile)
-            else:
-                subprocess.check_call(command, shell=True, text=True, cwd=cwd, stdout=file, stderr=file)
+            try:
+                if infile is not None:
+                    with open(infile, 'r') as infile:
+                        subprocess.check_call(command, shell=True, text=True, cwd=cwd, stdout=file, stderr=file, stdin=infile)
+                else:
+                    subprocess.check_call(command, shell=True, text=True, cwd=cwd, stdout=file, stderr=file)
+            except Exception as e:
+                file.write(f'\n\nERROR\n\n')
+                print(f'❌ {self.name} did not complete successfully.')
+                success = False
             file.flush()
             with open(TEMP_REPORT_FILE, 'r') as csv:
                 file.write(f'\n> results\n\n{csv.read()}\n\n\n\n')
                 file.flush()
-        # Parse report
-        self.exec(f"sed -i '1,2d' {TEMP_REPORT_FILE}")
-        df = pd.read_csv(TEMP_REPORT_FILE, header=None)
-        df = df.iloc[:, [0, 2]].T
-        df.iloc[[0,1], :] = df.iloc[[1,0], :]
-        df.insert(loc=0, column='malloc', value=['malloc', self.current_malloc])
-        df.insert(loc=0, column='bench', value=['bench', self.name])
-        df.insert(loc=0, column='invocation', value=['invocation', self.current_invocation])
-        if not path.isfile(RESULTS_FILE):
-            df.loc[[0]].to_csv(RESULTS_FILE, header=False, index=False)
-        df.loc[[2]].to_csv(RESULTS_FILE, header=False, index=False, mode='a')
-        print(df.to_string(header=False, index=False))
-        return df
+        if success:
+            # Parse report
+            self.exec(f"sed -i '1,2d' {TEMP_REPORT_FILE}")
+            df = pd.read_csv(TEMP_REPORT_FILE, header=None)
+            df = df.iloc[:, [0, 2]].T
+            df.iloc[[0,1], :] = df.iloc[[1,0], :]
+            df.insert(loc=0, column='malloc', value=['malloc', self.current_malloc])
+            df.insert(loc=0, column='bench', value=['bench', self.name])
+            df.insert(loc=0, column='invocation', value=['invocation', self.current_invocation])
+            if not path.isfile(RESULTS_FILE):
+                df.loc[[0]].to_csv(RESULTS_FILE, header=False, index=False)
+            df.loc[[2]].to_csv(RESULTS_FILE, header=False, index=False, mode='a')
+            print(df.to_string(header=False, index=False))
 
 class BenchmarkSuite:
     debug = False
