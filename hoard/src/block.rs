@@ -11,14 +11,14 @@ use super::Address;
 
 #[repr(C)]
 pub struct BlockMeta {
-    pub owner: &'static Pool,
-    pub size_class: SizeClass,
-    pub group: u8,
-    used_bytes: u32,
     bump_cursor: u32,
-    head_cell: Address,
+    used_bytes: u32,
     pub prev: Option<Block>,
     pub next: Option<Block>,
+    pub size_class: SizeClass,
+    pub group: u8,
+    head_cell: Address,
+    pub owner: &'static Pool,
 }
 
 pub struct BlockConfig;
