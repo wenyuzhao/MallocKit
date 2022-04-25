@@ -54,7 +54,7 @@ impl BlockList {
     }
 
     #[inline(always)]
-    fn push(&mut self, mut block: Block, alloc: bool, update_stat: bool) {
+    fn push(&mut self, mut block: Block, alloc: bool, update_stats: bool) {
         if alloc && self.cache.is_some() {
             let cache = self.cache.unwrap();
             self.cache = Some(block);
@@ -70,7 +70,7 @@ impl BlockList {
         }
         self.groups[group] = Some(block);
         debug_assert_ne!(block.prev, Some(block));
-        if update_stat {
+        if update_stats {
             self.inc_used_bytes(block.used_bytes());
             self.inc_total_bytes(Block::BYTES);
         }
@@ -89,8 +89,7 @@ impl BlockList {
         for i in (0..Self::GROUPS - 1).rev() {
             if let Some(mut block) = self.groups[i] {
                 debug_assert!(!block.is_full());
-                debug_assert!(block.group < 5);
-                self.remove(block);
+                self.remove(block, false);
                 self.cache = Some(block);
                 block.group = u8::MAX;
                 return Some(block);
@@ -119,7 +118,7 @@ impl BlockList {
     }
 
     #[inline(always)]
-    fn remove(&mut self, block: Block) {
+    fn remove(&mut self, block: Block, update_stats: bool) {
         if self.cache == Some(block) {
             self.cache = None;
             return;
@@ -133,8 +132,10 @@ impl BlockList {
         if let Some(mut next) = block.next {
             next.prev = block.prev;
         }
-        self.dec_used_bytes(block.used_bytes());
-        self.dec_total_bytes(Block::BYTES);
+        if update_stats {
+            self.dec_used_bytes(block.used_bytes());
+            self.dec_total_bytes(Block::BYTES);
+        }
     }
 
     #[inline(always)]
@@ -364,7 +365,7 @@ impl Pool {
         block.free_cell(cell);
         blocks.dec_used_bytes(block.size_class.bytes());
         if block.is_empty() {
-            blocks.remove(block);
+            blocks.remove(block, true);
             space.release_block(block);
         } else {
             blocks.move_to_front(block, false);
