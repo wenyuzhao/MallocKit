@@ -5,6 +5,7 @@ import pandas as pd
 import platform
 import psutil
 import math
+from pandas.api.types import is_numeric_dtype
 
 class Pipeline:
     @staticmethod
@@ -37,6 +38,16 @@ class Pipeline:
         df.drop(['invocation'], axis=1, inplace=True)
         df.reset_index(drop=True, inplace=True)
         return (df, invocations)
+
+    @staticmethod
+    def normalize(df: pd.DataFrame, baseline: str) -> pd.DataFrame:
+        def apply(x):
+            y = x.copy()
+            for col in x.columns.values:
+                if is_numeric_dtype(y[col]):
+                    y[col] = y[col] / x.loc[x['malloc'] == baseline][col].iloc[0]
+            return y
+        return df.groupby(['bench']).apply(apply)
 
 def markdown(s: str):
     display(Markdown(s))
