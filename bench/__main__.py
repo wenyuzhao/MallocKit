@@ -10,7 +10,9 @@ parser.add_argument('-b', '--benchmarks', nargs='*', default=[b.name for b in BE
 parser.add_argument('-i', '--invocations', nargs='?', type=int, default=1)
 parser.add_argument('-e', '--events', '--perf-events', nargs='*')
 parser.add_argument('--build', default=False, action='store_true')
+parser.add_argument('--features', nargs='*')
 parser.add_argument('--debug', default=False, action='store_true')
+parser.add_argument('--test', default=False, action='store_true')
 parser.add_argument('--record', default=False, action='store_true')
 
 args = parser.parse_args()
@@ -18,7 +20,10 @@ args = parser.parse_args()
 if args.build:
     cwd = Path(__file__).parent.parent.absolute()
     flags = '--release' if not args.debug else ''
-    subprocess.check_call(f'cargo build {flags}', shell=True, text=True, cwd=cwd)
+    features = ''
+    if args.features is not None:
+        features = f'--features {" ".join(args.features)}'
+    subprocess.check_call(f'cargo build {flags} {features}', shell=True, text=True, cwd=cwd)
 
 if args.debug:
     BenchmarkSuite.debug = True
@@ -29,6 +34,9 @@ if args.record:
     assert args.invocations == 1, 'Only one invocation is allowed when specifying --record'
     assert args.events is None or len(args.events) <= 1, 'Only one perf-event is allowed when specifying --record'
     Benchmark.record = True
+
+if args.test:
+    Benchmark.test = True
 
 if args.events is not None and len(args.events) > 0:
     BENCHMARK_SUITE.perf = ','.join(args.events)

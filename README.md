@@ -23,7 +23,7 @@ $ cargo test
 ## Benchmarking
 
 ```
-python3 -m bench -a mi hd sys hoard -i 10 --build
+python3 -m bench -a mi hd sys hoard -i 10 -e duration_time cache-misses cache-references dTLB-load-misses dTLB-loads instructions page-faults --build
 ```
 
 Then please use `bench/visual.ipynb` for visualization.
