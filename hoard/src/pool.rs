@@ -59,6 +59,8 @@ impl BlockList {
         }
         self.groups[group] = Some(block);
         debug_assert_ne!(block.prev, Some(block));
+        self.inc_used_bytes(block.used_bytes());
+        self.inc_total_bytes(Block::BYTES);
     }
 
     #[inline(always)]
@@ -75,13 +77,13 @@ impl BlockList {
     #[inline(always)]
     fn pop(&mut self) -> Option<Block> {
         for i in (0..Self::GROUPS - 1).rev() {
-            if let Some(mut block) = self.groups[i] {
+            if let Some(block) = self.groups[i] {
                 self.groups[i] = block.next;
                 if let Some(mut next) = block.next {
                     next.prev = None;
                 }
-                block.prev = None;
-                block.next = None;
+                self.dec_used_bytes(block.used_bytes());
+                self.dec_total_bytes(Block::BYTES);
                 return Some(block);
             }
         }
@@ -99,6 +101,8 @@ impl BlockList {
         if let Some(mut next) = block.next {
             next.prev = block.prev;
         }
+        self.dec_used_bytes(block.used_bytes());
+        self.dec_total_bytes(Block::BYTES);
     }
 
     #[inline(always)]
@@ -134,10 +138,44 @@ impl BlockList {
                 if let Some(mut next) = block.next {
                     next.prev = None;
                 }
+                self.dec_used_bytes(block.used_bytes());
+                self.dec_total_bytes(Block::BYTES);
                 return Some(block);
             }
         }
         None
+    }
+
+    #[inline(always)]
+    fn inc_used_bytes(&self, used_bytes: usize) {
+        self.used_bytes.store(
+            self.used_bytes.load(Ordering::Relaxed) + used_bytes,
+            Ordering::Relaxed,
+        )
+    }
+
+    #[inline(always)]
+    fn dec_used_bytes(&self, used_bytes: usize) {
+        self.used_bytes.store(
+            self.used_bytes.load(Ordering::Relaxed) - used_bytes,
+            Ordering::Relaxed,
+        )
+    }
+
+    #[inline(always)]
+    fn inc_total_bytes(&self, total_bytes: usize) {
+        self.total_bytes.store(
+            self.total_bytes.load(Ordering::Relaxed) + total_bytes,
+            Ordering::Relaxed,
+        )
+    }
+
+    #[inline(always)]
+    fn dec_total_bytes(&self, total_bytes: usize) {
+        self.total_bytes.store(
+            self.total_bytes.load(Ordering::Relaxed) - total_bytes,
+            Ordering::Relaxed,
+        )
     }
 }
 
@@ -199,16 +237,8 @@ impl Pool {
     pub fn push(&self, size_class: SizeClass, mut block: Block) {
         debug_assert!(!block.is_full());
         let mut blocks = self.lock_blocks(size_class);
-        blocks.push(block, false);
         block.owner = self.static_ref();
-        blocks.used_bytes.store(
-            blocks.used_bytes.load(Ordering::Relaxed) + block.used_bytes(),
-            Ordering::Relaxed,
-        );
-        blocks.total_bytes.store(
-            blocks.total_bytes.load(Ordering::Relaxed) + Block::BYTES,
-            Ordering::Relaxed,
-        );
+        blocks.push(block, false);
     }
 
     #[inline(always)]
@@ -216,14 +246,6 @@ impl Pool {
         debug_assert!(self.global);
         let mut blocks = self.lock_blocks(size_class);
         if let Some(block) = blocks.pop() {
-            blocks.used_bytes.store(
-                blocks.used_bytes.load(Ordering::Relaxed) - block.used_bytes(),
-                Ordering::Relaxed,
-            );
-            blocks.total_bytes.store(
-                blocks.total_bytes.load(Ordering::Relaxed) - Block::BYTES,
-                Ordering::Relaxed,
-            );
             debug_assert!(block.is_owned_by(self));
             return Some((block, blocks));
         }
@@ -240,18 +262,8 @@ impl Pool {
         // Get a block from global pool
         let block = space
             .acquire_block(size_class, self, |mut block| {
-                blocks.push(block, true);
                 block.owner = self.static_ref();
-                blocks.used_bytes.store(
-                    blocks.used_bytes.load(Ordering::Relaxed)
-                        + block.used_bytes()
-                        + size_class.bytes(),
-                    Ordering::Relaxed,
-                );
-                blocks.total_bytes.store(
-                    blocks.total_bytes.load(Ordering::Relaxed) + Block::BYTES,
-                    Ordering::Relaxed,
-                );
+                blocks.push(block, true);
             })
             .unwrap();
         debug_assert!(!block.is_full());
@@ -283,10 +295,7 @@ impl Pool {
         };
         // Alloc a cell from the block
         let cell = block.alloc_cell().unwrap();
-        blocks.used_bytes.store(
-            blocks.used_bytes.load(Ordering::Relaxed) + size_class.bytes(),
-            Ordering::Relaxed,
-        );
+        blocks.inc_used_bytes(size_class.bytes());
         Some(cell)
     }
 
@@ -313,10 +322,7 @@ impl Pool {
     ) {
         let block = Block::containing(cell);
         block.free_cell(cell);
-        blocks.used_bytes.store(
-            blocks.used_bytes.load(Ordering::Relaxed) - block.size_class.bytes(),
-            Ordering::Relaxed,
-        );
+        blocks.dec_used_bytes(block.size_class.bytes());
         if block.is_empty() {
             blocks.remove(block);
             space.release_block(block);
@@ -342,14 +348,6 @@ impl Pool {
         if let Some(mostly_empty_block) = blocks.pop_mostly_empty_block() {
             debug_assert!(!mostly_empty_block.is_full());
             debug_assert!(mostly_empty_block.is_owned_by(self));
-            blocks.used_bytes.store(
-                blocks.used_bytes.load(Ordering::Relaxed) - mostly_empty_block.used_bytes(),
-                Ordering::Relaxed,
-            );
-            blocks.total_bytes.store(
-                blocks.total_bytes.load(Ordering::Relaxed) - Block::BYTES,
-                Ordering::Relaxed,
-            );
             space.flush_block(size_class, mostly_empty_block);
             debug_assert!(!mostly_empty_block.is_owned_by(self));
         }

@@ -89,14 +89,14 @@ impl HoardSpace {
 /// Thread-local heap
 pub struct HoardAllocator {
     space: Lazy<&'static HoardSpace, Local>,
-    local: Pool,
+    local: Lazy<Box<Pool>, Local>,
 }
 
 impl HoardAllocator {
     pub const fn new(space: Lazy<&'static HoardSpace, Local>, _space_id: SpaceId) -> Self {
         Self {
             space,
-            local: Pool::new(false),
+            local: Lazy::new(|| Box::new(Pool::new(false))),
         }
     }
 }
