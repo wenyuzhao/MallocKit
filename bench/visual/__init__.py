@@ -11,8 +11,10 @@ import numpy as np
 
 class Pipeline:
     @staticmethod
-    def load_results(runid='latest') -> pd.DataFrame:
-        return pd.read_csv(f'./results/{runid}/results.csv')
+    def load_results(runid='latest') -> Tuple[pd.DataFrame, str]:
+        with open(f'./results/{runid}/runid', 'r') as f:
+            runid = f.read().strip()
+        return pd.read_csv(f'./results/{runid}/results.csv'), runid
 
     @staticmethod
     def mean_over_invocation(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
