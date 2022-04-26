@@ -30,18 +30,8 @@ impl AlignedBlockConfig for BlockConfig {
 
 pub type Block = AlignedBlock<BlockConfig>;
 
-pub trait BlockExt: Sized {
-    const DATA_BYTES: usize = Block::BYTES - Block::HEADER_BYTES;
-    fn init(self, local: &'static Pool, sc: SizeClass);
-    fn alloc_cell(self) -> Option<Address>;
-    fn free_cell(self, cell: Address);
-    fn is_empty(self) -> bool;
-    fn is_full(self) -> bool;
-    fn is_owned_by(self, owner: &Pool) -> bool;
-    fn used_bytes(self) -> usize;
-}
-
-impl BlockExt for Block {
+#[extension(pub trait BlockExt)]
+impl Block {
     #[inline(always)]
     fn init(mut self, _local: &'static Pool, size_class: SizeClass) {
         debug_assert_eq!(Block::HEADER_BYTES, Address::BYTES * 6);

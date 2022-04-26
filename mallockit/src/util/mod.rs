@@ -26,7 +26,6 @@ mod lab;
 mod layout_utils;
 mod lazy;
 pub mod memory;
-pub mod memory_chunk;
 mod page;
 pub mod size_class;
 
