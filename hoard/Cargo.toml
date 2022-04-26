@@ -12,3 +12,4 @@ crate-type = ["cdylib", "staticlib"]
 [dependencies]
 mallockit = { path = "../mallockit" }
 spin = { version="0.9", features = ["std"] }
+array-const-fn-init = "0.1.1"

@@ -10,9 +10,9 @@
 #[macro_use]
 extern crate mallockit;
 
-mod block;
 mod hoard_space;
 mod pool;
+mod super_block;
 
 use core::alloc::Layout;
 use hoard_space::*;

@@ -1,23 +1,20 @@
+use crate::{
+    hoard_space::HoardSpace,
+    super_block::{BlockExt, SuperBlock},
+};
+use array_const_fn_init::array_const_fn_init;
+use mallockit::util::{size_class::SizeClass, Address, Lazy, Local};
+use spin::{relax::Yield, MutexGuard};
 use std::{
     intrinsics::likely,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use mallockit::util::{size_class::SizeClass, Address, Lazy, Local};
-use spin::{relax::Yield, MutexGuard};
-
 type Mutex<T> = spin::mutex::Mutex<T, Yield>;
 
-use crate::{
-    block::{Block, BlockExt},
-    hoard_space::HoardSpace,
-};
-
-pub type BlockLists = [Mutex<BlockList>; 32];
-
 pub struct BlockList {
-    cache: Option<Block>,
-    groups: [Option<Block>; Self::GROUPS], // fullnesss groups: <25%, <50%, <75%, <100%, FULL
+    cache: Option<SuperBlock>,
+    groups: [Option<SuperBlock>; Self::GROUPS], // fullnesss groups: <25%, <50%, <75%, <100%, FULL
     used_bytes: AtomicUsize,
     total_bytes: AtomicUsize,
 }
@@ -39,22 +36,22 @@ impl BlockList {
         const EMPTINESS_CLASSES: usize = 8;
         let u = self.used_bytes.load(Ordering::Relaxed);
         let a = self.total_bytes.load(Ordering::Relaxed);
-        u + ((2 * Block::BYTES) >> log_obj_size) < a
+        u + ((2 * SuperBlock::BYTES) >> log_obj_size) < a
             && (EMPTINESS_CLASSES * u) < ((EMPTINESS_CLASSES - 1) * a)
     }
 
     #[inline(always)]
-    fn group(block: Block, alloc: bool) -> usize {
+    fn group(block: SuperBlock, alloc: bool) -> usize {
         let u = block.used_bytes()
             + if alloc { block.size_class.bytes() } else { 0 }
-            + (Address::ZERO + Block::HEADER_BYTES)
+            + (Address::ZERO + SuperBlock::HEADER_BYTES)
                 .align_up(block.size_class.bytes())
                 .as_usize();
-        (u << 2) >> Block::LOG_BYTES
+        (u << 2) >> SuperBlock::LOG_BYTES
     }
 
     #[inline(always)]
-    fn push(&mut self, mut block: Block, alloc: bool, update_stats: bool) {
+    fn push(&mut self, mut block: SuperBlock, alloc: bool, update_stats: bool) {
         if alloc && self.cache.is_some() {
             let cache = self.cache.unwrap();
             self.cache = Some(block);
@@ -72,12 +69,12 @@ impl BlockList {
         debug_assert_ne!(block.prev, Some(block));
         if update_stats {
             self.inc_used_bytes(block.used_bytes());
-            self.inc_total_bytes(Block::BYTES);
+            self.inc_total_bytes(SuperBlock::BYTES);
         }
     }
 
     #[cold]
-    fn find_slow(&mut self) -> Option<Block> {
+    fn find_slow(&mut self) -> Option<SuperBlock> {
         if let Some(block) = self.cache {
             self.cache = None;
             self.push(block, false, false)
@@ -95,7 +92,7 @@ impl BlockList {
     }
 
     #[inline(always)]
-    fn find(&mut self) -> Option<Block> {
+    fn find(&mut self) -> Option<SuperBlock> {
         if let Some(block) = self.cache {
             if !block.is_full() {
                 return Some(block);
@@ -105,7 +102,7 @@ impl BlockList {
     }
 
     #[inline(always)]
-    fn pop(&mut self) -> Option<Block> {
+    fn pop(&mut self) -> Option<SuperBlock> {
         if let Some(block) = self.cache.take() {
             return Some(block);
         }
@@ -116,7 +113,7 @@ impl BlockList {
                     next.prev = None;
                 }
                 self.dec_used_bytes(block.used_bytes());
-                self.dec_total_bytes(Block::BYTES);
+                self.dec_total_bytes(SuperBlock::BYTES);
                 return Some(block);
             }
         }
@@ -124,7 +121,7 @@ impl BlockList {
     }
 
     #[inline(always)]
-    fn remove(&mut self, block: Block, update_stats: bool) {
+    fn remove(&mut self, block: SuperBlock, update_stats: bool) {
         if self.cache == Some(block) {
             self.cache = None;
             return;
@@ -140,12 +137,12 @@ impl BlockList {
         }
         if update_stats {
             self.dec_used_bytes(block.used_bytes());
-            self.dec_total_bytes(Block::BYTES);
+            self.dec_total_bytes(SuperBlock::BYTES);
         }
     }
 
     #[cold]
-    fn move_to_front_slow(&mut self, mut block: Block, alloc: bool) {
+    fn move_to_front_slow(&mut self, mut block: SuperBlock, alloc: bool) {
         if likely(Some(block) == self.cache) {
             return;
         }
@@ -173,7 +170,7 @@ impl BlockList {
     }
 
     #[inline(always)]
-    fn move_to_front(&mut self, block: Block, alloc: bool) {
+    fn move_to_front(&mut self, block: SuperBlock, alloc: bool) {
         if likely(Some(block) == self.cache) {
             return;
         }
@@ -181,7 +178,7 @@ impl BlockList {
     }
 
     #[inline(always)]
-    fn pop_mostly_empty_block(&mut self) -> Option<Block> {
+    fn pop_mostly_empty_block(&mut self) -> Option<SuperBlock> {
         for i in 0..Self::GROUPS / 2 {
             if let Some(block) = self.groups[i] {
                 self.groups[i] = block.next;
@@ -189,7 +186,7 @@ impl BlockList {
                     next.prev = None;
                 }
                 self.dec_used_bytes(block.used_bytes());
-                self.dec_total_bytes(Block::BYTES);
+                self.dec_total_bytes(SuperBlock::BYTES);
                 return Some(block);
             }
         }
@@ -231,54 +228,25 @@ impl BlockList {
 
 pub struct Pool {
     pub global: bool,
-    blocks: BlockLists,
-    cache: [Address; 32],
+    blocks: [Mutex<BlockList>; Self::MAX_BINS],
+    cache: [Address; Self::MAX_BINS],
     local_bytes: usize,
 }
 
 impl Pool {
+    const MAX_BINS: usize = 32;
+    const LOCAL_HEAP_THRESHOLD: usize = 16 * 1024 * 1024;
+    const LARGEST_SMALL_OBJECT: usize = 1024;
+
     pub const fn new(global: bool) -> Self {
-        const fn b() -> Mutex<BlockList> {
+        const fn create_block_list(_: usize) -> Mutex<BlockList> {
             Mutex::new(BlockList::new())
         }
         Self {
             global,
-            cache: [Address::ZERO; 32],
+            cache: [Address::ZERO; Self::MAX_BINS],
             local_bytes: 0,
-            blocks: [
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-                b(),
-            ],
+            blocks: array_const_fn_init![create_block_list; 32],
         }
     }
 
@@ -288,7 +256,7 @@ impl Pool {
     }
 
     #[inline(always)]
-    pub fn push(&self, size_class: SizeClass, mut block: Block) {
+    pub fn push(&self, size_class: SizeClass, mut block: SuperBlock) {
         debug_assert!(!block.is_full());
         let mut blocks = self.lock_blocks(size_class);
         block.owner = self.static_ref();
@@ -296,7 +264,7 @@ impl Pool {
     }
 
     #[inline(always)]
-    pub fn pop(&self, size_class: SizeClass) -> Option<(Block, MutexGuard<BlockList>)> {
+    pub fn pop(&self, size_class: SizeClass) -> Option<(SuperBlock, MutexGuard<BlockList>)> {
         debug_assert!(self.global);
         let mut blocks = self.lock_blocks(size_class);
         if let Some(block) = blocks.pop() {
@@ -312,7 +280,7 @@ impl Pool {
         size_class: SizeClass,
         blocks: &mut BlockList,
         space: &Lazy<&'static HoardSpace, Local>,
-    ) -> Block {
+    ) -> SuperBlock {
         // Get a block from global pool
         let block = space
             .acquire_block(size_class, self, |mut block| {
@@ -382,12 +350,9 @@ impl Pool {
         Some(cell)
     }
 
-    const LOCAL_HEAP_THRESHOLD: usize = 16 * 1024 * 1024;
-    const LARGEST_SMALL_OBJECT: usize = 1024;
-
     #[inline(always)]
     pub fn free_cell(&mut self, cell: Address, space: &Lazy<&'static HoardSpace, Local>) {
-        let block = Block::containing(cell);
+        let block = SuperBlock::containing(cell);
         let size = block.size_class.bytes();
         if likely(
             size <= Self::LARGEST_SMALL_OBJECT
@@ -401,7 +366,7 @@ impl Pool {
 
     #[cold]
     fn free_cell_slow(&self, cell: Address, space: &Lazy<&'static HoardSpace, Local>) {
-        let block = Block::containing(cell);
+        let block = SuperBlock::containing(cell);
         let mut owner = block.owner;
         let mut blocks = owner.lock_blocks(block.size_class);
         while !block.is_owned_by(owner) {
@@ -420,7 +385,7 @@ impl Pool {
         space: &Lazy<&'static HoardSpace, Local>,
         blocks: &mut BlockList,
     ) {
-        let block = Block::containing(cell);
+        let block = SuperBlock::containing(cell);
         block.free_cell(cell);
         blocks.dec_used_bytes(block.size_class.bytes());
         if block.is_empty() {

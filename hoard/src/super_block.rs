@@ -13,8 +13,8 @@ use super::Address;
 pub struct BlockMeta {
     bump_cursor: u32,
     used_bytes: u32,
-    pub prev: Option<Block>,
-    pub next: Option<Block>,
+    pub prev: Option<SuperBlock>,
+    pub next: Option<SuperBlock>,
     pub size_class: SizeClass,
     pub group: u8,
     head_cell: Address,
@@ -28,13 +28,13 @@ impl AlignedBlockConfig for BlockConfig {
     type Header = BlockMeta;
 }
 
-pub type Block = AlignedBlock<BlockConfig>;
+pub type SuperBlock = AlignedBlock<BlockConfig>;
 
 #[extension(pub trait BlockExt)]
-impl Block {
+impl SuperBlock {
     #[inline(always)]
     fn init(mut self, _local: &'static Pool, size_class: SizeClass) {
-        debug_assert_eq!(Block::HEADER_BYTES, Address::BYTES * 6);
+        debug_assert_eq!(SuperBlock::HEADER_BYTES, Address::BYTES * 6);
         self.size_class = size_class;
         let size = size_class.bytes();
         self.head_cell = Address::ZERO;
