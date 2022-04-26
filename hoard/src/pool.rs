@@ -229,14 +229,10 @@ impl BlockList {
 pub struct Pool {
     pub global: bool,
     blocks: [Mutex<BlockList>; Self::MAX_BINS],
-    cache: [Address; Self::MAX_BINS],
-    local_bytes: usize,
 }
 
 impl Pool {
     const MAX_BINS: usize = 32;
-    const LOCAL_HEAP_THRESHOLD: usize = 16 * 1024 * 1024;
-    const LARGEST_SMALL_OBJECT: usize = 1024;
 
     pub const fn new(global: bool) -> Self {
         const fn create_block_list(_: usize) -> Mutex<BlockList> {
@@ -244,8 +240,6 @@ impl Pool {
         }
         Self {
             global,
-            cache: [Address::ZERO; Self::MAX_BINS],
-            local_bytes: 0,
             blocks: array_const_fn_init![create_block_list; 32],
         }
     }
@@ -293,43 +287,12 @@ impl Pool {
     }
 
     #[inline(always)]
-    fn add_to_cache(&mut self, size_class: SizeClass, cell: Address) {
-        unsafe { cell.store(self.cache[size_class.as_usize()]) };
-        self.cache[size_class.as_usize()] = cell;
-        self.local_bytes += size_class.bytes();
-    }
-
-    #[inline(always)]
-    fn remove_from_cache(&mut self, size_class: SizeClass) -> Option<Address> {
-        let cell = self.cache[size_class.as_usize()];
-        if cell.is_zero() {
-            return None;
-        }
-        self.cache[size_class.as_usize()] = unsafe { cell.load() };
-        self.local_bytes -= size_class.bytes();
-        return Some(cell);
-    }
-
-    #[inline(always)]
     pub fn lock_blocks(&self, size_class: SizeClass) -> MutexGuard<BlockList> {
         self.blocks[size_class.as_usize()].lock()
     }
 
-    #[inline(always)]
-    pub fn alloc_cell(
-        &mut self,
-        size_class: SizeClass,
-        space: &Lazy<&'static HoardSpace, Local>,
-    ) -> Option<Address> {
-        debug_assert!(!self.global);
-        if let Some(cell) = self.remove_from_cache(size_class) {
-            return Some(cell);
-        }
-        self.alloc_cell_slow(size_class, space)
-    }
-
     #[cold]
-    fn alloc_cell_slow(
+    pub fn alloc_cell(
         &mut self,
         size_class: SizeClass,
         space: &Lazy<&'static HoardSpace, Local>,
@@ -344,28 +307,11 @@ impl Pool {
         };
         let cell = block.alloc_cell().unwrap();
         blocks.inc_used_bytes(size_class.bytes());
-        // if let Some(cell) = block.alloc_cell() {
-        //     Self::add_to_cache(&mut self.cache, block.size_class, cell)
-        // }
         Some(cell)
     }
 
-    #[inline(always)]
-    pub fn free_cell(&mut self, cell: Address, space: &Lazy<&'static HoardSpace, Local>) {
-        let block = SuperBlock::containing(cell);
-        let size = block.size_class.bytes();
-        if likely(
-            size <= Self::LARGEST_SMALL_OBJECT
-                && size + self.local_bytes <= Self::LOCAL_HEAP_THRESHOLD,
-        ) {
-            self.add_to_cache(block.size_class, cell);
-        } else {
-            self.free_cell_slow(cell, space);
-        }
-    }
-
     #[cold]
-    fn free_cell_slow(&self, cell: Address, space: &Lazy<&'static HoardSpace, Local>) {
+    pub fn free_cell(&self, cell: Address, space: &Lazy<&'static HoardSpace, Local>) {
         let block = SuperBlock::containing(cell);
         let mut owner = block.owner;
         let mut blocks = owner.lock_blocks(block.size_class);

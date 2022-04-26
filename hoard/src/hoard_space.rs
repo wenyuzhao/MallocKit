@@ -1,9 +1,11 @@
+use std::intrinsics::likely;
+
 use super::{page_resource::BlockPageResource, Allocator, Space, SpaceId};
 use crate::{
     pool::Pool,
     super_block::{BlockExt, SuperBlock},
 };
-use mallockit::util::{size_class::SizeClass, *};
+use mallockit::util::{discrete_tlab::DiscreteTLAB, size_class::SizeClass, *};
 
 /// Global heap
 pub struct HoardSpace {
@@ -90,13 +92,18 @@ impl HoardSpace {
 pub struct HoardAllocator {
     space: Lazy<&'static HoardSpace, Local>,
     local: Lazy<Box<Pool>, Local>,
+    tlab: DiscreteTLAB<{ SuperBlock::LOG_BYTES }>,
 }
 
 impl HoardAllocator {
+    const LOCAL_HEAP_THRESHOLD: usize = 16 * 1024 * 1024;
+    const LARGEST_SMALL_OBJECT: usize = 1024;
+
     pub const fn new(space: Lazy<&'static HoardSpace, Local>, _space_id: SpaceId) -> Self {
         Self {
             space,
             local: Lazy::new(|| Box::new(Pool::new(false))),
+            tlab: DiscreteTLAB::new(),
         }
     }
 }
@@ -105,11 +112,23 @@ impl Allocator for HoardAllocator {
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let size_class = SizeClass::from_layout(layout);
+        if let Some(cell) = self.tlab.pop(size_class) {
+            return Some(cell);
+        }
         self.local.alloc_cell(size_class, &self.space)
     }
 
     #[inline(always)]
-    fn dealloc(&mut self, ptr: Address) {
-        self.local.free_cell(ptr, &self.space);
+    fn dealloc(&mut self, cell: Address) {
+        let block = SuperBlock::containing(cell);
+        let size = block.size_class.bytes();
+        if likely(
+            size <= Self::LARGEST_SMALL_OBJECT
+                && size + self.tlab.free_bytes() <= Self::LOCAL_HEAP_THRESHOLD,
+        ) {
+            self.tlab.push(block.size_class, cell);
+        } else {
+            self.local.free_cell(cell, &self.space);
+        }
     }
 }
