@@ -6,8 +6,8 @@ use std::intrinsics::unlikely;
 
 #[doc(hidden)]
 #[inline(never)]
-pub fn _print(args: fmt::Arguments<'_>, new_line: bool) {
-    let mut log = LOG.lock();
+pub fn _print(args: fmt::Arguments<'_>, new_line: bool, stderr: bool) {
+    let mut log = if stderr { ERR.lock() } else { LOG.lock() };
     log.write_fmt(args).unwrap();
     if new_line {
         log.put_char('\n' as _);
@@ -18,27 +18,44 @@ pub fn _print(args: fmt::Arguments<'_>, new_line: bool) {
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => {{
-        $crate::log::_print(format_args!($($arg)*), false);
+        $crate::log::_print(format_args!($($arg)*), false, false);
     }};
 }
 
 #[macro_export]
 macro_rules! println {
     ($($arg:tt)*) => {{
-        $crate::log::_print(format_args!($($arg)*), true);
+        $crate::log::_print(format_args!($($arg)*), true, false);
     }};
 }
 
-static LOG: Mutex<Log> = Mutex::new(Log::new());
+#[macro_export]
+macro_rules! eprint {
+    ($($arg:tt)*) => {{
+        $crate::log::_print(format_args!($($arg)*), false, true);
+    }};
+}
+
+#[macro_export]
+macro_rules! eprintln {
+    ($($arg:tt)*) => {{
+        $crate::log::_print(format_args!($($arg)*), true, true);
+    }};
+}
+
+static LOG: Mutex<Log> = Mutex::new(Log::new(false));
+static ERR: Mutex<Log> = Mutex::new(Log::new(true));
 
 struct Log {
+    stderr: bool,
     cursor: usize,
     buffer: [u8; 80],
 }
 
 impl Log {
-    const fn new() -> Self {
+    const fn new(stderr: bool) -> Self {
         Self {
+            stderr,
             cursor: 0,
             buffer: [0; 80],
         }
@@ -47,7 +64,11 @@ impl Log {
     #[cold]
     fn flush(&mut self) {
         unsafe {
-            libc::write(1, self.buffer.as_ptr() as _, self.cursor);
+            if self.stderr {
+                libc::write(2, self.buffer.as_ptr() as _, self.cursor);
+            } else {
+                libc::write(1, self.buffer.as_ptr() as _, self.cursor);
+            }
         }
         self.cursor = 0;
     }

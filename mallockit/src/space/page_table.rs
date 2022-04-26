@@ -1,7 +1,8 @@
 use crate::space::meta::Meta;
 use crate::util::bits::{BitField, BitFieldSlot};
 use crate::util::*;
-use spin::RwLock;
+use spin::rwlock::RwLock;
+use spin::Yield;
 use std::iter::Step;
 use std::{
     marker::PhantomData,
@@ -351,7 +352,7 @@ impl PageTable<L4> {
 }
 
 pub struct PageRegistry {
-    p4: RwLock<PageTable<L4>>,
+    p4: RwLock<PageTable<L4>, Yield>,
     committed_size: AtomicUsize,
 }
 

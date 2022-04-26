@@ -3,7 +3,8 @@ use super::PageResource;
 use crate::util::freelist::page_freelist::PageFreeList;
 use crate::util::memory::RawMemory;
 use crate::util::*;
-use spin::Mutex;
+use spin::mutex::Mutex;
+use spin::Yield;
 use std::iter::Step;
 use std::{
     ops::Range,
@@ -14,7 +15,7 @@ const NUM_SIZE_CLASS: usize = SpaceId::LOG_MAX_SPACE_SIZE - Page::<Size4K>::LOG_
 
 pub struct FreelistPageResource {
     pub id: SpaceId,
-    freelist: Mutex<PageFreeList<{ NUM_SIZE_CLASS }>>,
+    freelist: Mutex<PageFreeList<{ NUM_SIZE_CLASS }>, Yield>,
     reserved_bytes: AtomicUsize,
 }
 

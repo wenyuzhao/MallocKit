@@ -165,7 +165,7 @@ impl<P: Plan> MallocAPI<P> {
         if unlikely(alignment < std::mem::size_of::<usize>() || !alignment.is_power_of_two()) {
             return libc::EINVAL;
         }
-        match self.alloc(size, alignment) {
+        match self.alloc(size, usize::max(alignment, Self::MIN_ALIGNMENT)) {
             Ok(ptr) => {
                 *result = ptr.unwrap_or(0 as _);
                 0

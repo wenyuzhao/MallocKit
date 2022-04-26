@@ -18,22 +18,23 @@ macro_rules! name_list {
 }
 
 mod address;
+pub mod aligned_block;
+pub mod allocation_area;
 pub mod arena;
 pub mod bits;
+pub mod discrete_tlab;
 pub mod freelist;
-mod lab;
 mod layout_utils;
 mod lazy;
 pub mod memory;
-pub mod memory_chunk;
 mod page;
+pub mod size_class;
 
 #[cfg(target_os = "macos")]
 pub(crate) mod macos_malloc_zone;
 
 pub use address::*;
 pub use core::alloc::Layout;
-pub use lab::*;
 pub use layout_utils::*;
 pub use lazy::*;
 pub use page::*;

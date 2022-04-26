@@ -21,8 +21,13 @@
 #![feature(adt_const_params)]
 #![feature(generic_const_exprs)]
 #![feature(type_alias_impl_trait)]
+#![feature(specialization)]
 
 extern crate mallockit_proc_macro;
+
+extern crate extension_traits;
+
+pub use extension_traits::extension;
 
 #[macro_use]
 pub mod log;
