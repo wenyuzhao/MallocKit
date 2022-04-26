@@ -64,7 +64,7 @@ impl<S: PageSize> LargeObjectAllocator<S> {
 }
 
 impl<S: PageSize> Allocator for LargeObjectAllocator<S> {
-    #[inline(always)]
+    #[cold]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let size = layout.size();
         let pages = (size + Page::<S>::MASK) >> Page::<S>::LOG_BYTES;
