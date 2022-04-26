@@ -43,6 +43,10 @@ class Pipeline:
         return (df, invocations)
 
     @staticmethod
+    def filter(df: pd.DataFrame, select: pd.DataFrame) -> pd.DataFrame:
+        return df[select]
+
+    @staticmethod
     def normalize(df: pd.DataFrame, baseline: str) -> pd.DataFrame:
         def apply(x):
             y = x.copy()
@@ -51,6 +55,29 @@ class Pipeline:
                     y[col] = y[col] / x.loc[x['malloc'] == baseline][col].iloc[0]
             return y
         return df.groupby(['bench']).apply(apply)
+
+    @staticmethod
+    def plot_bar(df: pd.DataFrame, series: str, pivot: str, value: str) -> pd.DataFrame:
+        pivot = pd.pivot_table(df, values=value, index=pivot, columns=series)
+        # Calculate min/max/mean/geomean
+        min = pivot.apply(lambda x: np.min(x), axis=0)
+        max = pivot.apply(lambda x: np.max(x), axis=0)
+        mean = pivot.apply(lambda x: np.mean(x), axis=0)
+        geomean = pivot.apply(lambda x: np.exp(np.mean(np.log(x))), axis=0)
+        pivot.loc['.'] = pivot.apply(lambda x: 0, axis=0)
+        pivot.loc['min'] = min
+        pivot.loc['max'] = max
+        pivot.loc['mean'] = mean
+        pivot.loc['geomean'] = geomean
+        # Plot
+        pivot.plot(kind="bar", figsize=(20, 5), rot=45)
+        # Format table for output
+        pivot.loc['.'] = pivot.apply(lambda x: '', axis=0)
+        pivot.loc['min'] = min
+        pivot.loc['max'] = max
+        pivot.loc['mean'] = mean
+        pivot.loc['geomean'] = geomean
+        return pivot
 
 
 def markdown(s: str):
