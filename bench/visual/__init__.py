@@ -1,5 +1,5 @@
 import subprocess
-from typing import Tuple
+from typing import List, Optional, Tuple
 from IPython.display import Markdown, display
 import pandas as pd
 import platform
@@ -11,8 +11,8 @@ import numpy as np
 
 class Pipeline:
     @staticmethod
-    def load_results() -> pd.DataFrame:
-        return pd.read_csv('./_logs/results.csv')
+    def load_results(runid='latest') -> pd.DataFrame:
+        return pd.read_csv(f'./results/{runid}/results.csv')
 
     @staticmethod
     def mean_over_invocation(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
@@ -57,8 +57,13 @@ class Pipeline:
         return df.groupby(['bench']).apply(apply)
 
     @staticmethod
-    def plot_bar(df: pd.DataFrame, series: str, pivot: str, value: str) -> pd.DataFrame:
+    def plot_bar(df: pd.DataFrame, series: str, pivot: str, value: str, column_order: Optional[List[str]] = None) -> pd.DataFrame:
         pivot = pd.pivot_table(df, values=value, index=pivot, columns=series)
+
+        if column_order is not None:
+            column_order = [
+                x for x in column_order if x in pivot.columns.values]
+            pivot = pivot[column_order]
         # Calculate min/max/mean/geomean
         min = pivot.apply(lambda x: np.min(x), axis=0)
         max = pivot.apply(lambda x: np.max(x), axis=0)
@@ -70,7 +75,7 @@ class Pipeline:
         pivot.loc['mean'] = mean
         pivot.loc['geomean'] = geomean
         # Plot
-        pivot.plot(kind="bar", figsize=(20, 5), rot=45)
+        pivot.plot(kind="bar", figsize=(20, 9), rot=45)
         # Format table for output
         pivot.loc['.'] = pivot.apply(lambda x: '', axis=0)
         pivot.loc['min'] = min

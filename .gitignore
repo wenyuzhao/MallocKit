@@ -4,6 +4,7 @@ a.out
 .DS_Store
 /*.txt
 /bench/*.txt
+/bench/results
 
 /_*
 /*.log

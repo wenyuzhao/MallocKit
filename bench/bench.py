@@ -2,15 +2,19 @@ import subprocess
 from typing import List, Optional
 from os import path
 import pandas as pd
+from datetime import datetime
+import socket
 
 BENCH_DIR = path.dirname(path.abspath(__file__))
 DEFAULT_BENCH_CWD = f'{BENCH_DIR}/mimalloc-bench/out/bench'
 MIMALLOC_BENCH_SRC_DIR = f'{BENCH_DIR}/mimalloc-bench/bench'
-BENCH_LOGS_DIR = f'{BENCH_DIR}/_logs'
 MIMALLOC_BENCH_EXTERN_DIR = f'{BENCH_DIR}/mimalloc-bench/extern'
+PROJECT_DIR = path.dirname(BENCH_DIR)
+
+RUNID = socket.gethostname() + '-' + datetime.now().strftime("%Y-%m-%d-%H%M%S")
+BENCH_LOGS_DIR = f'{BENCH_DIR}/results/{RUNID}'
 TEMP_REPORT_FILE = f'{BENCH_LOGS_DIR}/.temp.csv'
 RESULTS_FILE = f'{BENCH_LOGS_DIR}/results.csv'
-PROJECT_DIR = path.dirname(BENCH_DIR)
 
 
 class Benchmark:
@@ -46,7 +50,6 @@ class Benchmark:
         return subprocess.check_call(cmd, shell=True, text=True, cwd=cwd)
 
     def __measure_record(self, cmd: str, env: List[str] = [], cwd: str = DEFAULT_BENCH_CWD, infile: Optional[str] = None):
-        self.exec(f'mkdir -p {BENCH_LOGS_DIR}')
         assert Benchmark.record
         # Prepare commands
         perf_wrapper = f'perf record -o {PROJECT_DIR}/perf.data'
@@ -59,7 +62,6 @@ class Benchmark:
         command = f'{perf_wrapper} {env_wrapper} {cmd}'
         # Run
         print(f'🚀 [{self.name}] #{self.current_invocation} {self.current_malloc}')
-        self.exec('mkdir -p _logs', cwd=BENCH_DIR)
         print(f'>  {command}')
         if infile is not None:
             with open(infile, 'r') as infile:
@@ -70,7 +72,6 @@ class Benchmark:
         print(f'Please run `perf report`.')
 
     def __measure_test(self, cmd: str, env: List[str] = [], cwd: str = DEFAULT_BENCH_CWD, infile: Optional[str] = None):
-        self.exec(f'mkdir -p {BENCH_LOGS_DIR}')
         assert Benchmark.test or Benchmark.lldb
         # Prepare commands
         env_wrapper = 'env'
@@ -79,7 +80,6 @@ class Benchmark:
         command = f'rust-lldb -o "{env_wrapper}" -- {cmd}' if Benchmark.lldb else f'{env_wrapper} {cmd}'
         # Run
         print(f'🚀 [{self.name}] #{self.current_invocation} {self.current_malloc}')
-        self.exec('mkdir -p _logs', cwd=BENCH_DIR)
         print(f'>  {command}')
         if infile is not None:
             with open(infile, 'r') as infile:
@@ -93,7 +93,6 @@ class Benchmark:
             return self.__measure_record(cmd, env, cwd, infile)
         if Benchmark.test or Benchmark.lldb:
             return self.__measure_test(cmd, env, cwd, infile)
-        self.exec(f'mkdir -p {BENCH_LOGS_DIR}')
         # Prepare commands
         perf_wrapper = f'perf stat --no-scale -o {TEMP_REPORT_FILE} -x ,'
         if self.perf is not None:
@@ -106,7 +105,6 @@ class Benchmark:
         command = f'{perf_wrapper} {wrapper} {env_wrapper} {cmd}'
         # Run
         print(f'🚀 [{self.name}] #{self.current_invocation} {self.current_malloc}')
-        self.exec('mkdir -p _logs', cwd=BENCH_DIR)
         success = True
         with open(f'{BENCH_LOGS_DIR}/{self.name}-{self.current_malloc}.log', 'a') as file:
             file.write(
@@ -187,9 +185,16 @@ class BenchmarkSuite:
             bm.clear_invocation_info()
 
     def run(self, algorithms: List[str] = ['sys'], benchmarks=['cfrac'], invocations: int = 1):
-        subprocess.check_call(f'rm -rf {BENCH_LOGS_DIR}', shell=True)
+        if not (Benchmark.test or Benchmark.lldb or Benchmark.record):
+            subprocess.check_call(f'mkdir -p {BENCH_LOGS_DIR}', shell=True)
+            subprocess.check_call(
+                f'rm {BENCH_DIR}/results/latest && ln -s {BENCH_LOGS_DIR} {BENCH_DIR}/results/latest', shell=True)
+            subprocess.check_call(
+                f'echo {RUNID} > {BENCH_LOGS_DIR}/runid', shell=True)
+            print(f'🟢 [{RUNID}] Benchmark Start 🟢')
         for bm in self.benchmarks:
             if bm.name not in benchmarks:
                 continue
             for i in range(invocations):
                 self.__run_bm(bm, algorithms, i)
+        print(f'🟢 [{RUNID}] Benchmark Finished 🟢')
