@@ -12,6 +12,7 @@ TEMP_REPORT_FILE = f'{BENCH_LOGS_DIR}/.temp.csv'
 RESULTS_FILE = f'{BENCH_LOGS_DIR}/results.csv'
 PROJECT_DIR = path.dirname(BENCH_DIR)
 
+
 class Benchmark:
     name = None
     record = False
@@ -62,7 +63,8 @@ class Benchmark:
         print(f'>  {command}')
         if infile is not None:
             with open(infile, 'r') as infile:
-                subprocess.check_call(command, shell=True, text=True, cwd=cwd, stdin=infile)
+                subprocess.check_call(
+                    command, shell=True, text=True, cwd=cwd, stdin=infile)
         else:
             subprocess.check_call(command, shell=True, text=True, cwd=cwd)
         print(f'Please run `perf report`.')
@@ -74,20 +76,23 @@ class Benchmark:
         env_wrapper = 'env'
         for e in env:
             env_wrapper += f' {e}'
-        command = f'rust-lldb -o "{env_wrapper}" -- {cmd}' if Benchmark.lldb else  f'{env_wrapper} {cmd}'
+        command = f'rust-lldb -o "{env_wrapper}" -- {cmd}' if Benchmark.lldb else f'{env_wrapper} {cmd}'
         # Run
         print(f'🚀 [{self.name}] #{self.current_invocation} {self.current_malloc}')
         self.exec('mkdir -p _logs', cwd=BENCH_DIR)
         print(f'>  {command}')
         if infile is not None:
             with open(infile, 'r') as infile:
-                subprocess.check_call(command, shell=True, text=True, cwd=cwd, stdin=infile)
+                subprocess.check_call(
+                    command, shell=True, text=True, cwd=cwd, stdin=infile)
         else:
             subprocess.check_call(command, shell=True, text=True, cwd=cwd)
 
     def measure(self, cmd: str, env: List[str] = [], cwd: str = DEFAULT_BENCH_CWD, infile: Optional[str] = None):
-        if Benchmark.record: return self.__measure_record(cmd, env, cwd, infile)
-        if Benchmark.test or Benchmark.lldb: return self.__measure_test(cmd, env, cwd, infile)
+        if Benchmark.record:
+            return self.__measure_record(cmd, env, cwd, infile)
+        if Benchmark.test or Benchmark.lldb:
+            return self.__measure_test(cmd, env, cwd, infile)
         self.exec(f'mkdir -p {BENCH_LOGS_DIR}')
         # Prepare commands
         perf_wrapper = f'perf stat --no-scale -o {TEMP_REPORT_FILE} -x ,'
@@ -104,15 +109,18 @@ class Benchmark:
         self.exec('mkdir -p _logs', cwd=BENCH_DIR)
         success = True
         with open(f'{BENCH_LOGS_DIR}/{self.name}-{self.current_malloc}.log', 'a') as file:
-            file.write(f'---------- Invocation #{self.current_invocation} ----------\n\n')
+            file.write(
+                f'---------- Invocation #{self.current_invocation} ----------\n\n')
             file.write(f'> {command}\n\n')
             file.flush()
             try:
                 if infile is not None:
                     with open(infile, 'r') as infile:
-                        subprocess.check_call(command, shell=True, text=True, cwd=cwd, stdout=file, stderr=file, stdin=infile)
+                        subprocess.check_call(
+                            command, shell=True, text=True, cwd=cwd, stdout=file, stderr=file, stdin=infile)
                 else:
-                    subprocess.check_call(command, shell=True, text=True, cwd=cwd, stdout=file, stderr=file)
+                    subprocess.check_call(
+                        command, shell=True, text=True, cwd=cwd, stdout=file, stderr=file)
             except Exception as e:
                 file.write(f'\n\nERROR\n\n')
                 print(f'❌ {self.name} did not complete successfully.')
@@ -126,14 +134,18 @@ class Benchmark:
             self.exec(f"sed -i '1,2d' {TEMP_REPORT_FILE}")
             df = pd.read_csv(TEMP_REPORT_FILE, header=None)
             df = df.iloc[:, [0, 2]].T
-            df.iloc[[0,1], :] = df.iloc[[1,0], :]
-            df.insert(loc=0, column='malloc', value=['malloc', self.current_malloc])
+            df.iloc[[0, 1], :] = df.iloc[[1, 0], :]
+            df.insert(loc=0, column='malloc', value=[
+                      'malloc', self.current_malloc])
             df.insert(loc=0, column='bench', value=['bench', self.name])
-            df.insert(loc=0, column='invocation', value=['invocation', self.current_invocation])
+            df.insert(loc=0, column='invocation', value=[
+                      'invocation', self.current_invocation])
             if not path.isfile(RESULTS_FILE):
                 df.loc[[0]].to_csv(RESULTS_FILE, header=False, index=False)
-            df.loc[[2]].to_csv(RESULTS_FILE, header=False, index=False, mode='a')
+            df.loc[[2]].to_csv(RESULTS_FILE, header=False,
+                               index=False, mode='a')
             print(df.to_string(header=False, index=False))
+
 
 class BenchmarkSuite:
     debug = False
@@ -152,7 +164,8 @@ class BenchmarkSuite:
     def __init__(self, benchmarks: List[Benchmark]):
         self.perf = None
         self.benchmarks = benchmarks
-        self.algorithms = ['sys'] + [x for x in self.non_mallockit_algorithms.keys()]
+        self.algorithms = ['sys'] + \
+            [x for x in self.non_mallockit_algorithms.keys()]
 
     def run(self, algorithms: List[str] = ['sys']):
         for bm in self.benchmarks:
@@ -173,9 +186,10 @@ class BenchmarkSuite:
             bm.run([env])
             bm.clear_invocation_info()
 
-    def run(self, algorithms: List[str] = ['sys'], benchmarks = ['cfrac'], invocations: int = 1):
+    def run(self, algorithms: List[str] = ['sys'], benchmarks=['cfrac'], invocations: int = 1):
         subprocess.check_call(f'rm -rf {BENCH_LOGS_DIR}', shell=True)
         for bm in self.benchmarks:
-            if bm.name not in benchmarks: continue
+            if bm.name not in benchmarks:
+                continue
             for i in range(invocations):
                 self.__run_bm(bm, algorithms, i)
