@@ -110,7 +110,6 @@ impl Allocator for HoardAllocator {
 
     #[inline(always)]
     fn dealloc(&mut self, ptr: Address) {
-        let block = Block::containing(ptr);
-        block.owner.free_cell(ptr, &self.space);
+        self.local.free_cell(ptr, &self.space);
     }
 }
