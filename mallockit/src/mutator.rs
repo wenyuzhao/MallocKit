@@ -97,11 +97,11 @@ pub trait TLS: Sized {
 
 #[cfg(target_os = "macos")]
 mod macos_tls {
-    use spin::Mutex;
+    use spin::{mutex::Mutex, Yield};
     use std::arch::asm;
 
     use super::*;
-    use crate::util::{memory::RawMemory, AllocationArea, Page, Size4K};
+    use crate::util::{allocation_area::AllocationArea, memory::RawMemory, Page, Size4K};
 
     const SLOT: usize = 89;
     const OFFSET: usize = SLOT * std::mem::size_of::<usize>();
@@ -155,7 +155,7 @@ mod macos_tls {
     }
 
     fn alloc_tls<T>() -> *mut T {
-        static ALLOC_BUFFER: Mutex<AllocationArea> = Mutex::new(AllocationArea::EMPTY);
+        static ALLOC_BUFFER: Mutex<AllocationArea, Yield> = Mutex::new(AllocationArea::EMPTY);
 
         let layout = Layout::new::<T>();
         if layout.size() > Page::<Size4K>::MASK / 2 {
