@@ -4,7 +4,7 @@ import argparse
 import subprocess
 from pathlib import Path
 
-parser = argparse.ArgumentParser(description='Benchmark runner.\n  - example: python3 -m bench -a mi hd sys buddy -b cfrac espresso barnes lean larson -i 10 -e duration_time cache-misses cache-references dTLB-load-misses dTLB-loads instructions page-faults --build', formatter_class=argparse.RawTextHelpFormatter)
+parser = argparse.ArgumentParser(description='Benchmark runner.\n  - example: python3 -m bench -a mi hd tc je sys buddy hoard -i 10 -e duration_time cycles cache-misses cache-references dTLB-load-misses dTLB-loads instructions page-faults --build', formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument('-a', '--algorithms', nargs='*', default=BENCHMARK_SUITE.algorithms)
 parser.add_argument('-b', '--benchmarks', nargs='*', default=[b.name for b in BENCHMARK_SUITE.benchmarks])
 parser.add_argument('-i', '--invocations', nargs='?', type=int, default=1)

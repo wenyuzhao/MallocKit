@@ -138,6 +138,7 @@ class Benchmark:
 class BenchmarkSuite:
     debug = False
     sys_malloc = 'sys'
+    # Installed allocators: dh, ff, hd, hm, iso, je, mi, mng, rp, scudo, sm, sn, tbb, tc
     non_mallockit_algorithms = {
         'je': f'{MIMALLOC_BENCH_EXTERN_DIR}/jemalloc/lib/libjemalloc.so',
         'tc': f'{MIMALLOC_BENCH_EXTERN_DIR}/gperftools/.libs/libtcmalloc_minimal.so',
