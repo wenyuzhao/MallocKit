@@ -1,4 +1,4 @@
-use self::{page_resource::PageResource, page_table::PageRegistry};
+use self::page_resource::PageResource;
 use crate::util::*;
 use std::ops::Range;
 use std::ptr;
@@ -8,8 +8,6 @@ pub mod large_object_space;
 pub mod meta;
 pub mod page_resource;
 pub(crate) mod page_table;
-
-pub static PAGE_REGISTRY: PageRegistry = PageRegistry::new();
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

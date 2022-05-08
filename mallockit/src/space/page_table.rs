@@ -1,14 +1,8 @@
 use crate::space::meta::Meta;
 use crate::util::bits::{BitField, BitFieldSlot};
 use crate::util::*;
-use spin::rwlock::RwLock;
-use spin::Yield;
 use std::iter::Step;
-use std::{
-    marker::PhantomData,
-    mem,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::{marker::PhantomData, mem};
 
 #[repr(transparent)]
 struct PageTableEntry<L: PageTableLevel>(usize, PhantomData<L>);
@@ -296,11 +290,6 @@ impl PageTable<L4> {
     }
 
     #[inline(always)]
-    pub fn is_allocated(&self, address: Address) -> bool {
-        self.get(address).is_some()
-    }
-
-    #[inline(always)]
     pub fn get_pointer_meta(&self, start: Address) -> Address {
         self.get(start).unwrap().pointer_meta
     }
@@ -313,39 +302,5 @@ impl PageTable<L4> {
         let l2 = l3.get_next_page_table(address);
         let l1 = l2.get_next_page_table(address);
         l1.set_pointer_meta(address, pointer_meta);
-    }
-}
-
-pub struct PageRegistry {
-    p4: RwLock<PageTable<L4>, Yield>,
-    committed_size: AtomicUsize,
-}
-
-impl PageRegistry {
-    pub(crate) const fn new() -> Self {
-        Self {
-            p4: RwLock::new(PageTable::new()),
-            committed_size: AtomicUsize::new(0),
-        }
-    }
-
-    #[inline(always)]
-    pub fn committed_size(&self) -> usize {
-        self.committed_size.load(Ordering::SeqCst)
-    }
-
-    #[inline(always)]
-    pub fn is_allocated(&self, address: Address) -> bool {
-        self.p4.read().is_allocated(address)
-    }
-
-    #[inline(always)]
-    pub fn get_pointer_meta(&self, start: Address) -> Address {
-        self.p4.read().get_pointer_meta(start)
-    }
-
-    #[inline(always)]
-    pub fn set_pointer_meta(&self, start: Address, pointer_meta: Address) {
-        self.p4.write().set_pointer_meta(start, pointer_meta)
     }
 }
