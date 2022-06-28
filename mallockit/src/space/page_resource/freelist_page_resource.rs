@@ -90,6 +90,7 @@ impl PageResource for FreelistPageResource {
     }
 
     fn acquire_pages<S: PageSize>(&self, pages: usize) -> Option<Range<Page<S>>> {
+        let pages = pages.next_power_of_two(); // FIXME
         let units = pages << (S::LOG_BYTES - Size4K::LOG_BYTES);
         let start = self.freelist.lock().allocate_cell(units)?.start;
         let start = Page::<S>::new(start);
