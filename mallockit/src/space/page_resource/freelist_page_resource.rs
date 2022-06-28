@@ -8,7 +8,7 @@ use spin::rwlock::RwLock;
 use spin::Yield;
 use std::intrinsics::unlikely;
 use std::iter::Step;
-use std::sync::atomic::AtomicU8;
+use std::sync::atomic::AtomicU32;
 use std::{
     ops::Range,
     sync::atomic::{AtomicUsize, Ordering},
@@ -20,7 +20,7 @@ pub struct FreelistPageResource {
     pub id: SpaceId,
     freelist: Mutex<PageFreeList<{ NUM_SIZE_CLASS }>, Yield>,
     reserved_bytes: AtomicUsize,
-    meta: RwLock<Vec<AtomicU8>, Yield>,
+    meta: RwLock<Vec<AtomicU32>, Yield>,
 }
 
 impl FreelistPageResource {
@@ -63,24 +63,23 @@ impl FreelistPageResource {
 
     #[inline(always)]
     fn set_meta<S: PageSize>(&self, start: Page<S>, pages: usize) {
+        debug_assert!(pages <= u32::MAX as usize);
         let index = (start.start() - self.id.address_space().start) >> Page::<Size4K>::LOG_BYTES;
-        let log_pages = pages.next_power_of_two().trailing_zeros() as u8;
         let meta = self.meta.upgradeable_read();
         if unlikely(index >= meta.len()) {
             let mut meta = meta.upgrade();
-            let len = meta.len();
-            meta.resize_with(len << 1, AtomicU8::default);
-            meta[index].store(log_pages, Ordering::Relaxed);
+            let len = usize::max(meta.len(), index).next_power_of_two();
+            meta.resize_with(len << 1, Default::default);
+            meta[index].store(pages as _, Ordering::Relaxed);
         } else {
-            meta[index].store(log_pages, Ordering::Relaxed);
+            meta[index].store(pages as _, Ordering::Relaxed);
         }
     }
 
     #[inline(always)]
     fn get_meta<S: PageSize>(&self, start: Page<S>) -> usize {
         let index = (start.start() - self.id.address_space().start) >> Page::<Size4K>::LOG_BYTES;
-        let log_pages = self.meta.read()[index].load(Ordering::Relaxed);
-        1usize << log_pages
+        self.meta.read()[index].load(Ordering::Relaxed) as _
     }
 }
 
