@@ -22,6 +22,8 @@ $ cargo test
 
 ## Benchmarking
 
+[[_Latest benchmark results_]](https://github.com/wenyuzhao/MallocKit/blob/main/bench/visual.ipynb)
+
 Please use a linux distribution (e.g. Ubuntu or Fedora) and run `cd bench && make setup` to fetch and build all the benchmarks and third-party malloc algorithms.
 
 ```
