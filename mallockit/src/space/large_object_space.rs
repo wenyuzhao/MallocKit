@@ -157,7 +157,7 @@ where
             let sc = size_class::<S>(aligned_size);
             unsafe { ptr.store(self.bins[sc]) }
             self.bins[sc] = ptr;
-            self.live -= aligned_size;
+            self.live -= usize::min(aligned_size, self.live);
             let crossed_threshold = self.max_live > self.live + (self.live >> 2);
             if THRESHOLD_SLOP != 0
                 && self.live > THRESHOLD_SLOP

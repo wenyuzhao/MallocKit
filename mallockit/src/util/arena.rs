@@ -56,7 +56,7 @@ impl<T: Sized> Arena<T> {
             _ => self.alloc_slow(),
         };
         let ptr = unsafe { cell.as_mut() };
-        *ptr = t;
+        unsafe { std::ptr::write(ptr, t) }
         ptr
     }
 
