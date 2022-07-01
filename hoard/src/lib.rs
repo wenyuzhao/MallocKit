@@ -52,7 +52,7 @@ impl Plan for Hoard {
 #[mallockit::mutator]
 struct HoardMutator {
     hoard: HoardAllocator,
-    los: LargeObjectAllocator<Size4K>,
+    los: LargeObjectAllocator<Size4K, { 1 << 31 }, { 16 << 20 }>,
 }
 
 impl HoardMutator {
