@@ -230,6 +230,12 @@ macro_rules! impl_aligned_block {
         }
 
         impl const Copy for $t {}
+
+        impl std::fmt::Debug for $t {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}({:?})", std::any::type_name::<Self>(), self.start())
+            }
+        }
     };
 }
 

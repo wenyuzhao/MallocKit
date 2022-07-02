@@ -18,7 +18,6 @@ pub struct BlockMeta {
     pub owner: &'static Pool,
 }
 
-#[derive(Debug)]
 #[mallockit::aligned_block]
 pub struct SuperBlock(NonZeroUsize);
 

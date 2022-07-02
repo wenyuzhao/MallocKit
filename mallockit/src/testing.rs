@@ -24,7 +24,11 @@ fn run_cmd(env: &str, dylib: &str, cmd: &str) {
         .unwrap();
     std::println!("{}", String::from_utf8(output.stdout).unwrap());
     std::eprintln!("{}", String::from_utf8(output.stderr).unwrap());
-    assert!(output.status.success());
+    assert!(
+        output.status.success(),
+        "FAILED {}",
+        format!("> env {}={} {} {}", env, dylib, prog, args.join(" "))
+    );
 }
 
 pub fn test(malloc: &str, script: &str) {

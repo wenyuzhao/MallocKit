@@ -61,6 +61,6 @@ impl<W: Worker> WorkerGroup<W> {
 
 impl<W: Worker> Default for WorkerGroup<W> {
     fn default() -> Self {
-        Self::new(num_cpus::get())
+        Self::new(num_cpus::get() / 4)
     }
 }

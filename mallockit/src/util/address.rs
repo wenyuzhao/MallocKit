@@ -1,8 +1,12 @@
 use std::cmp::Ordering;
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::iter::Step;
 use std::mem;
 use std::ops::{Add, AddAssign, Deref, Sub, SubAssign};
+
+use atomic::Atomic;
 
 #[repr(transparent)]
 pub struct Address(pub(crate) usize);
@@ -80,6 +84,11 @@ impl Address {
     pub const unsafe fn store<T: 'static + Copy>(&self, value: T) {
         debug_assert!(!self.is_zero());
         *self.as_mut() = value
+    }
+
+    #[inline(always)]
+    pub const unsafe fn atomic<T: 'static>(&self) -> &Atomic<T> {
+        self.as_ref()
     }
 }
 
@@ -387,5 +396,12 @@ impl const Step for Address {
     #[inline(always)]
     unsafe fn backward_unchecked(start: Self, count: usize) -> Self {
         Step::backward(start, count)
+    }
+}
+
+impl Hash for Address {
+    #[inline(always)]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
     }
 }
