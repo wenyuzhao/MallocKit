@@ -70,15 +70,13 @@ impl Mutator for HoardMutator {
 
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
-        let x = if likely(HoardSpace::can_allocate(layout)) {
+        if likely(HoardSpace::can_allocate(layout)) {
             mallockit::stat::track_allocation(layout, false);
             self.hoard.alloc(layout)
         } else {
             mallockit::stat::track_allocation(layout, true);
             self.los.alloc(layout)
-        };
-        debug_assert!(x.is_some());
-        x
+        }
     }
 
     #[inline(always)]
