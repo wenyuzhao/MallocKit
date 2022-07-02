@@ -10,7 +10,6 @@
 #![feature(allocator_api)]
 #![feature(never_type)]
 #![feature(box_syntax)]
-#![feature(const_ptr_offset)]
 #![feature(const_maybe_uninit_assume_init)]
 #![feature(const_ptr_write)]
 #![feature(associated_type_defaults)]
