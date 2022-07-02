@@ -11,6 +11,7 @@ macro_rules! impl_aligned_block {
             pub const HEADER_BYTES: usize = std::mem::size_of::<
                 <Self as $crate::util::aligned_block::AlignedBlockConfig>::Header,
             >();
+            pub const WORDS: usize = Self::BYTES >> 3;
 
             #[inline(always)]
             pub const fn new(address: Address) -> Self {
@@ -177,7 +178,10 @@ macro_rules! impl_aligned_block {
 
             #[inline(always)]
             fn forward(start: Self, count: usize) -> Self {
-                Self::forward_checked(start, count).unwrap()
+                match Self::forward_checked(start, count) {
+                    Some(x) => x,
+                    _ => unreachable!(),
+                }
             }
 
             #[inline(always)]
@@ -187,7 +191,10 @@ macro_rules! impl_aligned_block {
 
             #[inline(always)]
             fn backward(start: Self, count: usize) -> Self {
-                Self::backward_checked(start, count).unwrap()
+                match Self::backward_checked(start, count) {
+                    Some(x) => x,
+                    _ => unreachable!(),
+                }
             }
 
             #[inline(always)]

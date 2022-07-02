@@ -53,22 +53,22 @@ impl SuperBlock {
     }
 
     #[inline(always)]
-    pub fn used_bytes(self) -> usize {
+    pub const fn used_bytes(self) -> usize {
         self.used_bytes as _
     }
 
     #[inline(always)]
-    pub fn is_empty(self) -> bool {
+    pub const fn is_empty(self) -> bool {
         self.used_bytes == 0
     }
 
     #[inline(always)]
-    pub fn is_full(self) -> bool {
+    pub const fn is_full(self) -> bool {
         self.bump_cursor >= Self::BYTES as u32 && self.head_cell.is_zero()
     }
 
     #[inline(always)]
-    pub fn alloc_cell(mut self) -> Option<Address> {
+    pub const fn alloc_cell(mut self) -> Option<Address> {
         let cell = if unlikely(self.head_cell.is_zero()) {
             if self.bump_cursor < Self::BYTES as u32 {
                 let cell = self.start() + (self.bump_cursor as usize);
@@ -87,7 +87,7 @@ impl SuperBlock {
     }
 
     #[inline(always)]
-    pub fn free_cell(mut self, cell: Address) {
+    pub const fn free_cell(mut self, cell: Address) {
         unsafe {
             cell.store(self.head_cell);
         }

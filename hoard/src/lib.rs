@@ -4,7 +4,7 @@
 #![feature(const_mut_refs)]
 #![feature(const_trait_impl)]
 #![feature(step_trait)]
-#![feature(const_option)]
+#![feature(const_likely)]
 
 #[allow(unused)]
 #[macro_use]
