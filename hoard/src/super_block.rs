@@ -1,9 +1,6 @@
-use std::intrinsics::unlikely;
+use std::{intrinsics::unlikely, num::NonZeroUsize};
 
-use mallockit::util::{
-    aligned_block::{AlignedBlock, AlignedBlockConfig},
-    size_class::SizeClass,
-};
+use mallockit::util::{aligned_block::AlignedBlockConfig, size_class::SizeClass};
 
 use crate::pool::Pool;
 
@@ -21,19 +18,30 @@ pub struct BlockMeta {
     pub owner: &'static Pool,
 }
 
-pub struct BlockConfig;
+#[derive(Debug)]
+#[mallockit::aligned_block]
+pub struct SuperBlock(NonZeroUsize);
 
-impl AlignedBlockConfig for BlockConfig {
-    const LOG_BYTES: usize = 18;
+impl const AlignedBlockConfig for SuperBlock {
     type Header = BlockMeta;
+    const LOG_BYTES: usize = 18;
+
+    #[inline(always)]
+    fn from_address(address: Address) -> Self {
+        debug_assert!(!address.is_zero());
+        debug_assert!(Self::is_aligned(address));
+        Self(unsafe { NonZeroUsize::new_unchecked(usize::from(address)) })
+    }
+
+    #[inline(always)]
+    fn into_address(self) -> Address {
+        Address::from(self.0.get())
+    }
 }
 
-pub type SuperBlock = AlignedBlock<BlockConfig>;
-
-#[extension(pub trait BlockExt)]
 impl SuperBlock {
     #[inline(always)]
-    fn init(mut self, _local: &'static Pool, size_class: SizeClass) {
+    pub fn init(mut self, _local: &'static Pool, size_class: SizeClass) {
         debug_assert_eq!(SuperBlock::HEADER_BYTES, Address::BYTES * 6);
         self.size_class = size_class;
         let size = size_class.bytes();
@@ -45,22 +53,22 @@ impl SuperBlock {
     }
 
     #[inline(always)]
-    fn used_bytes(self) -> usize {
+    pub fn used_bytes(self) -> usize {
         self.used_bytes as _
     }
 
     #[inline(always)]
-    fn is_empty(self) -> bool {
+    pub fn is_empty(self) -> bool {
         self.used_bytes == 0
     }
 
     #[inline(always)]
-    fn is_full(self) -> bool {
+    pub fn is_full(self) -> bool {
         self.bump_cursor >= Self::BYTES as u32 && self.head_cell.is_zero()
     }
 
     #[inline(always)]
-    fn alloc_cell(mut self) -> Option<Address> {
+    pub fn alloc_cell(mut self) -> Option<Address> {
         let cell = if unlikely(self.head_cell.is_zero()) {
             if self.bump_cursor < Self::BYTES as u32 {
                 let cell = self.start() + (self.bump_cursor as usize);
@@ -79,7 +87,7 @@ impl SuperBlock {
     }
 
     #[inline(always)]
-    fn free_cell(mut self, cell: Address) {
+    pub fn free_cell(mut self, cell: Address) {
         unsafe {
             cell.store(self.head_cell);
         }
@@ -88,7 +96,7 @@ impl SuperBlock {
     }
 
     #[inline(always)]
-    fn is_owned_by(self, owner: &Pool) -> bool {
+    pub fn is_owned_by(self, owner: &Pool) -> bool {
         self.owner as *const _ == owner as *const _
     }
 }

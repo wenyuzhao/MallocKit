@@ -1,10 +1,7 @@
 use std::intrinsics::likely;
 
 use super::{page_resource::BlockPageResource, Allocator, Space, SpaceId};
-use crate::{
-    pool::Pool,
-    super_block::{BlockExt, SuperBlock},
-};
+use crate::{pool::Pool, super_block::SuperBlock};
 use mallockit::util::{discrete_tlab::DiscreteTLAB, size_class::SizeClass, *};
 
 /// Global heap

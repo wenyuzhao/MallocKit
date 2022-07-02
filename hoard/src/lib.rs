@@ -1,10 +1,10 @@
 #![allow(incomplete_features)]
-#![feature(type_alias_impl_trait)]
 #![feature(thread_local)]
 #![feature(core_intrinsics)]
 #![feature(const_mut_refs)]
-#![feature(const_ptr_offset)]
-#![feature(generic_const_exprs)]
+#![feature(const_trait_impl)]
+#![feature(step_trait)]
+#![feature(const_option)]
 
 #[allow(unused)]
 #[macro_use]

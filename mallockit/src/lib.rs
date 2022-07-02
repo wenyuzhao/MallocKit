@@ -22,6 +22,7 @@
 #![feature(generic_const_exprs)]
 #![feature(type_alias_impl_trait)]
 #![feature(specialization)]
+#![feature(const_for)]
 
 extern crate mallockit_proc_macro;
 

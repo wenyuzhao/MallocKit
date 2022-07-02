@@ -94,3 +94,15 @@ pub fn interpose(_attr: TokenStream, item: TokenStream) -> TokenStream {
     };
     result.into()
 }
+
+#[proc_macro_attribute]
+pub fn aligned_block(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = syn::parse_macro_input!(item as syn::DeriveInput);
+    let name = &input.ident;
+    let result = quote! {
+        #input
+
+        mallockit::impl_aligned_block!(#name);
+    };
+    result.into()
+}

@@ -1,7 +1,4 @@
-use crate::{
-    hoard_space::HoardSpace,
-    super_block::{BlockExt, SuperBlock},
-};
+use crate::{hoard_space::HoardSpace, super_block::SuperBlock};
 use array_const_fn_init::array_const_fn_init;
 use mallockit::util::{size_class::SizeClass, Address, Lazy, Local};
 use spin::{relax::Yield, MutexGuard};

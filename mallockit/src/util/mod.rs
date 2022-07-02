@@ -18,6 +18,7 @@ macro_rules! name_list {
 }
 
 mod address;
+#[macro_use]
 pub mod aligned_block;
 pub mod allocation_area;
 pub mod arena;
