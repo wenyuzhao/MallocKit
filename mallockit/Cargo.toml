@@ -20,10 +20,10 @@ shell-words = { workspace = true }
 mallockit_proc_macro = { path = "./proc_macro" }
 
 [build-dependencies]
-yaml-rust = "0.4.5"
+yaml-rust = { workspace = true }
 
 [dev-dependencies]
-concat-idents = "1.1.2"
+concat-idents = { workspace = true }
 
 [features]
 default = [ "transparent_huge_page" ]
