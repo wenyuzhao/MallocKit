@@ -26,7 +26,6 @@ libc = "0.2"
 errno = "0.2.8"
 spin = { version="0.9.3", features = ["std"] }
 ctor = "0.1"
-mallockit_proc_macro = { path = "./proc_macro" }
 num_cpus = "1.13.1"
 crossbeam = "0.8.1"
 atomic = "0.5.1"
