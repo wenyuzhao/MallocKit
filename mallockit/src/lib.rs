@@ -25,10 +25,6 @@
 
 extern crate mallockit_proc_macro;
 
-extern crate extension_traits;
-
-pub use extension_traits::extension;
-
 #[macro_use]
 pub mod log;
 #[macro_use]
