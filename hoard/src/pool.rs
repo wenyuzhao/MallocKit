@@ -295,14 +295,14 @@ impl Pool {
         space: &Lazy<&'static HoardSpace, Local>,
     ) -> Option<Address> {
         debug_assert!(!self.global);
-        let mut blocks = self.blocks[size_class.as_usize()].lock();
+        let mut blocks = unsafe { self.blocks.get_unchecked(size_class.as_usize()).lock() };
         let block = if let Some(block) = blocks.find() {
             blocks.move_to_front(block, true);
             block
         } else {
             self.acquire_block_slow(size_class, &mut blocks, space)
         };
-        let cell = block.alloc_cell().unwrap();
+        let cell = unsafe { block.alloc_cell().unwrap_unchecked() };
         blocks.inc_used_bytes(size_class.bytes());
         Some(cell)
     }

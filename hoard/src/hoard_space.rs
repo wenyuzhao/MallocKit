@@ -88,8 +88,8 @@ impl HoardSpace {
 /// Thread-local heap
 pub struct HoardAllocator {
     space: Lazy<&'static HoardSpace, Local>,
+    tlab: DiscreteTLAB<{ SizeClass::<4>::from_bytes(Self::LARGEST_SMALL_OBJECT).as_usize() + 1 }>,
     local: Lazy<Box<Pool>, Local>,
-    tlab: DiscreteTLAB<{ SuperBlock::LOG_BYTES }>,
 }
 
 impl HoardAllocator {
@@ -99,8 +99,8 @@ impl HoardAllocator {
     pub const fn new(space: Lazy<&'static HoardSpace, Local>, _space_id: SpaceId) -> Self {
         Self {
             space,
-            local: Lazy::new(|| Box::new(Pool::new(false))),
             tlab: DiscreteTLAB::new(),
+            local: Lazy::new(|| Box::new(Pool::new(false))),
         }
     }
 }
@@ -109,8 +109,10 @@ impl Allocator for HoardAllocator {
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let size_class = SizeClass::from_layout(layout);
-        if let Some(cell) = self.tlab.pop(size_class) {
-            return Some(cell);
+        if likely(layout.size() <= Self::LARGEST_SMALL_OBJECT) {
+            if let Some(cell) = self.tlab.pop(size_class) {
+                return Some(cell);
+            }
         }
         self.local.alloc_cell(size_class, &self.space)
     }
