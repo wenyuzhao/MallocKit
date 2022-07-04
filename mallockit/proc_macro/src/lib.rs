@@ -34,6 +34,7 @@ pub fn mutator(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::DeriveInput);
     let name = &input.ident;
     let result = quote! {
+        #[repr(align(256))]
         #input
 
         #[cfg(not(target_os = "macos"))]
