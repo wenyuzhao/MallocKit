@@ -8,6 +8,10 @@ members = [
     "sanity",
 ]
 
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
 [profile.dev]
 panic = "abort"
 
@@ -16,3 +20,18 @@ panic = "abort"
 lto = true
 codegen-units = 1
 debug = true
+
+[workspace.dependencies]
+libc = "0.2"
+errno = "0.2.8"
+spin = { version="0.9.3", features = ["std"] }
+ctor = "0.1"
+num_cpus = "1.13.1"
+crossbeam = "0.8.1"
+atomic = "0.5.1"
+quote = "1.0.20"
+syn = "1.0.98"
+array-const-fn-init = "0.1.1"
+shell-words = "1.1.0"
+yaml-rust = "0.4.5"
+concat-idents = "1.1.3"
