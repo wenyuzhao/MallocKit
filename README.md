@@ -40,11 +40,11 @@ _Other usages of the benchmark tool:_
 
 ## TODO
 
-- [x] Linux support (x86_64)
-- [x] MacOS support (x86_64)
-- [ ] Windows support (x86_64)
+- [x] Linux/x86_64 support
+- [x] MacOS/x86_64 support
+- [ ] Windows/x86_64 support
 - [ ] Performance
-- [ ] Linux support (aarch64)
-- [ ] MacOS support (aarch64)
-- [ ] Windows support (aarch64)
+- [x] Linux/aarch64 support
+- [ ] MacOS/aarch64 support
+- [ ] Windows/aarch64 support
 - [ ] Rust allocator interface
