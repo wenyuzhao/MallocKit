@@ -49,11 +49,16 @@ use space::meta::Meta;
 #[cfg(not(target_pointer_width = "64"))]
 const ERROR: ! = "32-bit is not supported";
 
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
-const ERROR: ! = "Unsupported OS";
-
-#[cfg(not(target_arch = "x86_64"))]
-const ERROR: ! = "Unsupported Architecture";
+#[cfg(not(any(
+    all(target_os = "linux", target_arch = "x86_64"),
+    all(target_os = "macos", target_arch = "x86_64"),
+    all(target_os = "linux", target_arch = "aarch64"),
+)))]
+const ERROR: ! = r#"
+    ❌ Unsupported Platform.
+    Only the following platforms are supported:
+        Linux (x86_64), macOS (x86_64), Linux (aarch64).
+"#;
 
 #[global_allocator]
 static META: Meta = Meta;
