@@ -9,7 +9,7 @@ jobs:
       - name: Install Ubuntu Packages
         run: |
           sudo apt update
-          sudo apt install -y g++ clang iputils-ping python
+          sudo apt install -y g++ clang iputils-ping python3
       - name: Checkout MallocKit Workspace
         uses: actions/checkout@v2
       - name: Install Rust Toolchain (Nightly)

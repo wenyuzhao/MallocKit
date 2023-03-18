@@ -5,4 +5,4 @@ tests:
   gcc: g++ ./mallockit/tests/test.cpp -std=c++14 -O3 -o /dev/null
   ls: ls -al
   ping: ping -i 0.2 -c 8 localhost
-  python: python ./mallockit/tests/test.py
+  python: python3 ./mallockit/tests/test.py
