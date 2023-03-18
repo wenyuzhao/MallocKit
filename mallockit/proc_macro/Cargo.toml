@@ -1,5 +1,3 @@
-cargo-features = ["workspace-inheritance"]
-
 [package]
 name = "mallockit_proc_macro"
 version = { workspace = true }

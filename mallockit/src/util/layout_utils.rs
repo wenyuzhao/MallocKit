@@ -1,5 +1,6 @@
 use std::alloc::Layout;
 
+#[const_trait]
 pub trait LayoutUtils: Sized {
     fn layout(&self) -> Layout;
 

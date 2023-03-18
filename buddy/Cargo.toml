@@ -1,5 +1,3 @@
-cargo-features = ["workspace-inheritance"]
-
 [package]
 name = "buddy"
 version = { workspace = true }

@@ -65,8 +65,8 @@ macro_rules! impl_aligned_block {
             }
         }
 
-        unsafe impl const Send for $t {}
-        unsafe impl const Sync for $t {}
+        unsafe impl Send for $t {}
+        unsafe impl Sync for $t {}
 
         impl const PartialEq for $t {
             #[inline(always)]
@@ -80,7 +80,7 @@ macro_rules! impl_aligned_block {
             }
         }
 
-        impl const Eq for $t {
+        impl Eq for $t {
             fn assert_receiver_is_total_eq(&self) {}
         }
 
@@ -156,7 +156,7 @@ macro_rules! impl_aligned_block {
             }
         }
 
-        impl const std::iter::Step for $t {
+        impl std::iter::Step for $t {
             #[inline(always)]
             fn steps_between(start: &Self, end: &Self) -> Option<usize> {
                 if start.0.get() > end.0.get() {
@@ -229,7 +229,7 @@ macro_rules! impl_aligned_block {
             }
         }
 
-        impl const Copy for $t {}
+        impl Copy for $t {}
 
         impl std::fmt::Debug for $t {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -239,6 +239,7 @@ macro_rules! impl_aligned_block {
     };
 }
 
+#[const_trait]
 pub trait AlignedBlockConfig: Sized {
     type Header: Sized = ();
 

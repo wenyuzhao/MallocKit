@@ -33,7 +33,7 @@ impl<W: Worker> WorkerGroup<W> {
 
     pub fn wait(&self, _: &mut W) {
         let should_wake_up = self.monitor.1.lock().unwrap();
-        let _ = self.monitor.0.wait(should_wake_up).unwrap();
+        let _guard = self.monitor.0.wait(should_wake_up).unwrap();
     }
 
     fn spawn_one(&'static self, ctx: &'static W) {

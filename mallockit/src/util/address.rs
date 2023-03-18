@@ -92,8 +92,8 @@ impl Address {
     }
 }
 
-unsafe impl const Send for Address {}
-unsafe impl const Sync for Address {}
+unsafe impl Send for Address {}
+unsafe impl Sync for Address {}
 
 impl const Clone for Address {
     #[inline(always)]
@@ -107,7 +107,7 @@ impl const Clone for Address {
     }
 }
 
-impl const Copy for Address {}
+impl Copy for Address {}
 
 impl const From<usize> for Address {
     #[inline(always)]
@@ -186,7 +186,7 @@ impl const PartialEq for Address {
     }
 }
 
-impl const Eq for Address {
+impl Eq for Address {
     fn assert_receiver_is_total_eq(&self) {}
 }
 
@@ -358,7 +358,7 @@ impl fmt::Debug for Address {
     }
 }
 
-impl const Step for Address {
+impl Step for Address {
     #[inline(always)]
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
         if start.0 > end.0 {

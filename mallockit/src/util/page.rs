@@ -89,8 +89,8 @@ impl<S: PageSize> fmt::Debug for Page<S> {
     }
 }
 
-unsafe impl<S: PageSize> const Send for Page<S> {}
-unsafe impl<S: PageSize> const Sync for Page<S> {}
+unsafe impl<S: PageSize> Send for Page<S> {}
+unsafe impl<S: PageSize> Sync for Page<S> {}
 
 impl<S: PageSize> const Clone for Page<S> {
     fn clone(&self) -> Self {
@@ -102,7 +102,7 @@ impl<S: PageSize> const Clone for Page<S> {
     }
 }
 
-impl<S: PageSize> const Copy for Page<S> {}
+impl<S: PageSize> Copy for Page<S> {}
 
 impl<S: PageSize> const PartialEq for Page<S> {
     fn eq(&self, other: &Self) -> bool {
@@ -114,7 +114,7 @@ impl<S: PageSize> const PartialEq for Page<S> {
     }
 }
 
-impl<S: PageSize> const Eq for Page<S> {
+impl<S: PageSize> Eq for Page<S> {
     fn assert_receiver_is_total_eq(&self) {}
 }
 
@@ -181,7 +181,7 @@ impl<S: PageSize> const Ord for Page<S> {
     }
 }
 
-impl<S: PageSize> const Step for Page<S> {
+impl<S: PageSize> Step for Page<S> {
     fn steps_between(start: &Self, end: &Self) -> Option<usize> {
         if start.0.get() > end.0.get() {
             None
