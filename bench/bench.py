@@ -150,12 +150,12 @@ class BenchmarkSuite:
     sys_malloc = 'sys'
     # Installed allocators: dh, ff, hd, hm, iso, je, mi, mng, rp, scudo, sm, sn, tbb, tc
     non_mallockit_algorithms = {
-        'je': f'{MIMALLOC_BENCH_EXTERN_DIR}/jemalloc/lib/libjemalloc.so',
-        'tc': f'{MIMALLOC_BENCH_EXTERN_DIR}/gperftools/.libs/libtcmalloc_minimal.so',
+        'je': f'{MIMALLOC_BENCH_EXTERN_DIR}/je/lib/libjemalloc.so',
+        'tc': f'{MIMALLOC_BENCH_EXTERN_DIR}/tc/.libs/libtcmalloc_minimal.so',
         'sn': f'{MIMALLOC_BENCH_EXTERN_DIR}/snmalloc/release/libsnmallocshim.so',
-        'mi': f'{MIMALLOC_BENCH_EXTERN_DIR}/mimalloc/out/release/libmimalloc.so',
+        'mi': f'{MIMALLOC_BENCH_EXTERN_DIR}/mi/out/release/libmimalloc.so',
         # 'tbb': f'{BENCH_EXTERN_DIR}/',
-        'hd': f'{MIMALLOC_BENCH_EXTERN_DIR}/Hoard/src/libhoard.so',
+        'hd': f'{MIMALLOC_BENCH_EXTERN_DIR}/hd/src/libhoard.so',
         'sm': f'{MIMALLOC_BENCH_EXTERN_DIR}/SuperMalloc/release/lib/libsupermalloc',
     }
 
@@ -188,7 +188,7 @@ class BenchmarkSuite:
         if not (Benchmark.test or Benchmark.lldb or Benchmark.record):
             subprocess.check_call(f'mkdir -p {BENCH_LOGS_DIR}', shell=True)
             subprocess.check_call(
-                f'rm {BENCH_DIR}/results/latest && ln -s {BENCH_LOGS_DIR} {BENCH_DIR}/results/latest', shell=True)
+                f'rm -f {BENCH_DIR}/results/latest && ln -s {BENCH_LOGS_DIR} {BENCH_DIR}/results/latest', shell=True)
             subprocess.check_call(
                 f'echo {RUNID} > {BENCH_LOGS_DIR}/runid', shell=True)
             print(f'🟢 [{RUNID}] Benchmark Start 🟢')
