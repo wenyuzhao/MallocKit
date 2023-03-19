@@ -33,7 +33,6 @@ impl Plan for Buddy {
         }
     }
 
-    #[inline(always)]
     fn get_layout(ptr: Address) -> Layout {
         debug_assert!(FREELIST_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
         if likely(FREELIST_SPACE.contains(ptr)) {
@@ -66,7 +65,6 @@ impl Mutator for BuddyMutator {
     type Plan = Buddy;
     const NEW: Self = Self::new();
 
-    #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         if likely(FreeListSpace::can_allocate(layout)) {
             mallockit::stat::track_allocation(layout, false);
@@ -77,7 +75,6 @@ impl Mutator for BuddyMutator {
         }
     }
 
-    #[inline(always)]
     fn dealloc(&mut self, ptr: Address) {
         debug_assert!(FREELIST_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
         if likely(FREELIST_SPACE.contains(ptr)) {

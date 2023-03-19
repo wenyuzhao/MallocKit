@@ -18,7 +18,6 @@ impl MetaSpace {
         }
     }
 
-    #[inline(always)]
     pub fn committed_size(&self) -> usize {
         self.committed_size.load(Ordering::SeqCst)
     }

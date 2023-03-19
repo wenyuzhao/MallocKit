@@ -17,7 +17,6 @@ impl<T: Sized> Arena<T> {
         }
     }
 
-    #[inline(always)]
     fn push(&mut self, cell: Address) {
         unsafe {
             cell.store(self.freelist);
@@ -25,7 +24,6 @@ impl<T: Sized> Arena<T> {
         }
     }
 
-    #[inline(always)]
     fn pop(&mut self) -> Option<Address> {
         let cell = self.freelist;
         if likely(!cell.is_zero()) {
@@ -49,7 +47,6 @@ impl<T: Sized> Arena<T> {
         self.pop().unwrap()
     }
 
-    #[inline(always)]
     pub fn alloc(&mut self, t: T) -> &'static mut T {
         let cell = match self.pop() {
             Some(cell) => cell,
@@ -60,7 +57,6 @@ impl<T: Sized> Arena<T> {
         ptr
     }
 
-    #[inline(always)]
     pub fn dealloc(&mut self, obj: &'static mut T) {
         let cell = Address::from(obj);
         self.push(cell)

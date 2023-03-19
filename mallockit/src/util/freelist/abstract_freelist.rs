@@ -44,7 +44,6 @@ impl LazyBst {
         }
     }
 
-    #[inline(always)]
     fn needs_resize(&self, index: BstIndex) -> bool {
         let index = *index;
         let byte_index = index >> 3;
@@ -67,7 +66,6 @@ impl LazyBst {
         }
     }
 
-    #[inline(always)]
     fn get_bit_location(&self, index: BstIndex) -> Option<(Address, usize)> {
         let index = *index;
         let byte_index = index >> 3;
@@ -81,13 +79,11 @@ impl LazyBst {
         Some((addr, bit_offset_in_byte))
     }
 
-    #[inline(always)]
     pub(super) fn get(&self, index: BstIndex) -> Option<bool> {
         let (addr, bit_index) = self.get_bit_location(index)?;
         Some(unsafe { (addr.load::<u8>() & (1 << bit_index)) != 0 })
     }
 
-    #[inline(always)]
     pub(super) fn set(&mut self, index: BstIndex, value: bool) {
         if unlikely(self.needs_resize(index)) {
             self.resize(index);
@@ -130,7 +126,6 @@ pub(super) trait InternalAbstractFreeList: Sized {
     fn push_cell(&mut self, unit: Unit, size_class: usize);
     fn remove_cell(&mut self, unit: Unit, size_class: usize);
 
-    #[inline(always)]
     fn unit_to_index(&self, unit: Unit, size_class: usize) -> BstIndex {
         let start = 1 << (Self::NUM_SIZE_CLASS - size_class - 1);
         let index = *unit >> size_class;
@@ -138,20 +133,17 @@ pub(super) trait InternalAbstractFreeList: Sized {
         BstIndex(start + index)
     }
 
-    #[inline(always)]
     fn push(&mut self, unit: Unit, size_class: usize) {
         self.push_cell(unit, size_class);
         self.set_as_free(unit, size_class);
     }
 
-    #[inline(always)]
     fn pop(&mut self, size_class: usize) -> Option<Unit> {
         let unit = self.pop_cell(size_class)?;
         self.set_as_used(unit, size_class);
         Some(unit)
     }
 
-    #[inline(always)]
     fn remove(&mut self, unit: Unit, size_class: usize) {
         self.remove_cell(unit, size_class);
         self.set_as_used(unit, size_class);
@@ -190,7 +182,6 @@ pub(super) trait InternalAbstractFreeList: Sized {
         None
     }
 
-    #[inline(always)]
     fn allocate_aligned_units(&mut self, size_class: usize) -> Option<Unit> {
         if size_class > Self::NON_COALESCEABLE_SIZE_CLASS_THRESHOLD {
             return None;
@@ -212,7 +203,6 @@ pub(super) trait InternalAbstractFreeList: Sized {
         false
     }
 
-    #[inline(always)]
     fn release_aligned_units(&mut self, mut unit: Unit, mut size_class: usize) {
         loop {
             debug_assert!(unit.is_aligned(size_class));
@@ -246,7 +236,6 @@ pub(super) trait InternalAbstractFreeList: Sized {
         }
     }
 
-    #[inline(always)]
     fn size_class(units: usize) -> usize {
         let a = units.next_power_of_two().trailing_zeros() as _;
         let b = Self::MIN_SIZE_CLASS;
@@ -254,7 +243,6 @@ pub(super) trait InternalAbstractFreeList: Sized {
     }
 
     /// Allocate a cell with a power-of-two size, and aligned to the size.
-    #[inline(always)]
     fn allocate_cell_aligned_size(&mut self, units: usize) -> Option<Range<Unit>> {
         debug_assert!(units.is_power_of_two());
         let size_class = <Self as InternalAbstractFreeList>::size_class(units);
@@ -262,7 +250,6 @@ pub(super) trait InternalAbstractFreeList: Sized {
         Some(start..Unit(*start + units))
     }
 
-    #[inline(always)]
     fn release_cell_aligned_size(&mut self, start: Unit, units: usize) {
         debug_assert!(units.is_power_of_two());
         debug_assert!(*start & (units - 1) == 0);
@@ -271,7 +258,6 @@ pub(super) trait InternalAbstractFreeList: Sized {
     }
 
     /// Allocate a cell with a power-of-two alignment.
-    #[inline(always)]
     fn allocate_cell_unaligned_size(&mut self, units: usize) -> Option<Range<Unit>> {
         let units =
             (units + ((1 << Self::MIN_SIZE_CLASS) - 1)) & !((1 << Self::MIN_SIZE_CLASS) - 1);
@@ -285,7 +271,6 @@ pub(super) trait InternalAbstractFreeList: Sized {
         Some(start..Unit(*start + units))
     }
 
-    #[inline(always)]
     fn release_cell_unaligned_size(&mut self, mut start: Unit, mut units: usize) {
         let limit = Unit(*start + units);
         while *start < *limit {

@@ -18,7 +18,6 @@ pub trait ThreadLocality: Sized {
 pub struct Local;
 impl ThreadLocality for Local {
     const THREAD_LOCAL: bool = true;
-    #[inline(always)]
     fn force_slow<T, F: FnOnce() -> T>(lazy: &Lazy<T, Self, F>) {
         Lazy::force_slow_thread_local(lazy)
     }
@@ -27,7 +26,6 @@ impl ThreadLocality for Local {
 pub struct Shared;
 impl ThreadLocality for Shared {
     const THREAD_LOCAL: bool = false;
-    #[inline(always)]
     fn force_slow<T, F: FnOnce() -> T>(lazy: &Lazy<T, Self, F>) {
         Lazy::force_slow(lazy)
     }
@@ -61,7 +59,7 @@ impl<T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
         self.state.store(INITIALIZED, Ordering::SeqCst);
     }
 
-    #[inline(never)]
+    #[cold]
     fn force_slow(lazy: &Self) {
         let result =
             lazy.state
@@ -84,13 +82,12 @@ impl<T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
         }
     }
 
-    #[inline(never)]
+    #[cold]
     fn force_slow_thread_local(lazy: &Self) {
         lazy.state.store(INITIALIZING, Ordering::Relaxed);
         lazy.force_initialize();
     }
 
-    #[inline(always)]
     pub fn force(lazy: &Self) {
         if likely(INITIALIZED == lazy.state.load(Ordering::Relaxed)) {
             return;
@@ -98,7 +95,6 @@ impl<T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
         TL::force_slow(lazy);
     }
 
-    #[inline(always)]
     pub unsafe fn as_initialized(&self) -> &T {
         &*self.value.as_ptr()
     }
@@ -106,7 +102,6 @@ impl<T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
 
 impl<T, TL: ThreadLocality, F: FnOnce() -> T> Deref for Lazy<T, TL, F> {
     type Target = T;
-    #[inline(always)]
     fn deref(&self) -> &T {
         Lazy::force(self);
         unsafe { &*self.value.as_ptr() }
@@ -114,7 +109,6 @@ impl<T, TL: ThreadLocality, F: FnOnce() -> T> Deref for Lazy<T, TL, F> {
 }
 
 impl<T, TL: ThreadLocality, F: FnOnce() -> T> DerefMut for Lazy<T, TL, F> {
-    #[inline(always)]
     fn deref_mut(&mut self) -> &mut T {
         Lazy::force(self);
         unsafe { &mut *self.value.as_mut_ptr() }
@@ -122,14 +116,12 @@ impl<T, TL: ThreadLocality, F: FnOnce() -> T> DerefMut for Lazy<T, TL, F> {
 }
 
 impl<T, TL: ThreadLocality, F: FnOnce() -> T> AsRef<T> for Lazy<T, TL, F> {
-    #[inline(always)]
     fn as_ref(&self) -> &T {
         self.deref()
     }
 }
 
 impl<T: Default, TL: ThreadLocality> Default for Lazy<T, TL, fn() -> T> {
-    #[inline]
     fn default() -> Self {
         Lazy::new(T::default)
     }

@@ -35,17 +35,14 @@ impl Space for FreeListSpace {
         }
     }
 
-    #[inline(always)]
     fn id(&self) -> SpaceId {
         self.id
     }
 
-    #[inline(always)]
     fn page_resource(&self) -> &Self::PR {
         &self.pr
     }
 
-    #[inline(always)]
     fn get_layout(ptr: Address) -> Layout {
         let cell = Cell::from(ptr);
         let bytes = cell.data_size();
@@ -57,14 +54,12 @@ impl Space for FreeListSpace {
 }
 
 impl FreeListSpace {
-    #[inline(always)]
     pub fn can_allocate(layout: Layout) -> bool {
         let (extended_layout, _) = unsafe { Layout::new::<Cell>().extend_unchecked(layout) };
         extended_layout.padded_size() + IntrusiveFreeList::<AddressSpace>::HEADER_SIZE
             <= FreeListSpace::MAX_ALLOCATION_SIZE
     }
 
-    #[inline(always)]
     fn add_coalesced_page(&self, page: Page<ActivePageSize>) {
         let mut pages = self.pages.lock();
         let head = pages.map(|p| p.start()).unwrap_or(Address::ZERO);
@@ -72,7 +67,6 @@ impl FreeListSpace {
         *pages = Some(page);
     }
 
-    #[inline(always)]
     fn get_coalesced_page(&self) -> Option<Page<ActivePageSize>> {
         let mut pages = self.pages.lock();
         let page = (*pages)?;
@@ -102,7 +96,6 @@ impl Cell {
     const fn from(ptr: Address) -> &'static mut Self {
         unsafe { &mut *ptr.as_mut_ptr::<Self>().sub(1) }
     }
-    #[inline(always)]
     fn set(&mut self, start: Address, size: usize, align: usize) {
         debug_assert!(align.is_power_of_two());
         let log_align = align.trailing_zeros() as usize;
@@ -113,19 +106,15 @@ impl Cell {
         self.word.set(Self::SIZE, size);
         self.word.set(Self::LOG_ALIGN, log_align);
     }
-    #[inline(always)]
     fn start(&self) -> Address {
         Address::from(self) + std::mem::size_of::<Self>() - self.word.get(Self::START_OFFSET)
     }
-    #[inline(always)]
     fn size(&self) -> usize {
         self.word.get(Self::SIZE)
     }
-    #[inline(always)]
     fn data_size(&self) -> usize {
         self.size() - self.word.get(Self::START_OFFSET)
     }
-    #[inline(always)]
     fn align(&self) -> usize {
         1 << self.word.get(Self::LOG_ALIGN)
     }
@@ -154,7 +143,6 @@ impl FreeListAllocator {
         self.alloc_cell(bytes)
     }
 
-    #[inline(always)]
     fn alloc_cell(&mut self, bytes: usize) -> Option<Range<Address>> {
         if let Some(range) = self.freelist.allocate_cell(bytes) {
             return Some(range);
@@ -162,12 +150,10 @@ impl FreeListAllocator {
         self.alloc_cell_slow(bytes)
     }
 
-    #[inline(always)]
     fn dealloc_cell(&mut self, ptr: Address, bytes: usize) {
         self.freelist.release_cell(ptr, bytes);
     }
 
-    #[inline(always)]
     fn get_coalesced_pages(&mut self) -> Option<Page<ActivePageSize>> {
         Some(Page::new(
             self.freelist.pop_raw_cell(ActivePageSize::LOG_BYTES)?,
@@ -176,7 +162,6 @@ impl FreeListAllocator {
 }
 
 impl Allocator for FreeListAllocator {
-    #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let (extended_layout, offset) = unsafe { Layout::new::<Cell>().extend_unchecked(layout) };
         let Range { start, end } = self.alloc_cell(extended_layout.padded_size())?;
@@ -188,7 +173,6 @@ impl Allocator for FreeListAllocator {
         Some(data_start)
     }
 
-    #[inline(always)]
     fn dealloc(&mut self, ptr: Address) {
         let cell = Cell::from(ptr);
         let bytes = cell.size();

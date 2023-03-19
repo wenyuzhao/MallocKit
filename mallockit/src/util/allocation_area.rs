@@ -29,13 +29,11 @@ impl AllocationArea {
         start.align_up(align)
     }
 
-    #[inline(always)]
     pub const fn refill(&mut self, top: Address, limit: Address) {
         self.top = top;
         self.limit = limit;
     }
 
-    #[inline(always)]
     pub const fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let top = self.top;
         let start = Self::align_allocation(top, layout.align());
@@ -53,7 +51,6 @@ impl AllocationArea {
         unsafe { (ptr - mem::size_of::<usize>()).as_mut::<Header>() }
     }
 
-    #[inline(always)]
     pub fn alloc_assume_aligned(&mut self, layout: Layout) -> Option<Address> {
         debug_assert!(layout.align() >= std::mem::size_of::<usize>());
         debug_assert_eq!(self.top, Self::align_allocation(self.top, layout.align()));
@@ -67,7 +64,6 @@ impl AllocationArea {
         }
     }
 
-    #[inline(always)]
     pub fn alloc_with_layout_assume_aligned(&mut self, layout: Layout) -> Option<Address> {
         debug_assert!(layout.align() >= std::mem::size_of::<usize>());
         let (new_layout, _) = unsafe { Self::HEADER.extend_unchecked(layout) };
@@ -78,7 +74,6 @@ impl AllocationArea {
         self.alloc_with_layout(layout)
     }
 
-    #[inline(always)]
     pub fn alloc_with_layout(&mut self, layout: Layout) -> Option<Address> {
         debug_assert!(layout.align() >= std::mem::size_of::<usize>());
         let (new_layout, offset) = unsafe { Self::HEADER.extend_unchecked(layout) };
@@ -100,7 +95,6 @@ impl AllocationArea {
         unsafe { Layout::from_size_align_unchecked(size as _, align as _) }
     }
 
-    #[inline(always)]
     pub fn load_range(ptr: Address) -> Range<Address> {
         let (size, align) = *Self::get_layout_slot(ptr);
         let (new_layout, offset) = unsafe {

@@ -28,14 +28,12 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<NUM_
     const MIN_SIZE_CLASS: usize = 0;
     const NUM_SIZE_CLASS: usize = NUM_SIZE_CLASS;
 
-    #[inline(always)]
     fn is_free(&self, unit: Unit, size_class: usize) -> bool {
         self.bst
             .get(self.unit_to_index(unit, size_class))
             .unwrap_or(false)
     }
 
-    #[inline(always)]
     fn set_as_free(&mut self, unit: Unit, size_class: usize) {
         if cfg!(feature = "slow_assert") {
             debug_assert!(self.is_not_free_slow(unit));
@@ -44,7 +42,6 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<NUM_
         self.bst.set(index, true);
     }
 
-    #[inline(always)]
     fn set_as_used(&mut self, unit: Unit, size_class: usize) {
         debug_assert!(self.is_free(unit, size_class));
         let index = self.unit_to_index(unit, size_class);
@@ -54,7 +51,6 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<NUM_
         }
     }
 
-    #[inline(always)]
     fn push_cell(&mut self, unit: Unit, size_class: usize) {
         let head = self.table[size_class];
         let mut cell = self.arena.alloc(Cell {
@@ -74,7 +70,6 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<NUM_
         self.insert_pages(unit, Address::from(cell))
     }
 
-    #[inline(always)]
     fn pop_cell(&mut self, size_class: usize) -> Option<Unit> {
         let head = self.table[size_class];
         if head.is_none() {
@@ -97,7 +92,6 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<NUM_
         }
     }
 
-    #[inline(always)]
     fn remove_cell(&mut self, unit: Unit, size_class: usize) {
         let mut cell_ptr = self.unit_to_cell(unit);
         let cell = unsafe { cell_ptr.as_mut() };
@@ -124,29 +118,24 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<NUM_
 }
 
 impl<const NUM_SIZE_CLASS: usize> PageFreeList<NUM_SIZE_CLASS> {
-    #[inline(always)]
     fn unit_to_address(&self, unit: Unit) -> Address {
         self.base + (*unit << Size4K::LOG_BYTES)
     }
 
-    #[inline(always)]
     fn address_to_unit(&self, a: Address) -> Unit {
         Unit((a - self.base) >> Size4K::LOG_BYTES)
     }
 
-    #[inline(always)]
     fn unit_to_cell(&self, unit: Unit) -> CellPtr {
         let ptr = self.page_table.get_pointer_meta(self.unit_to_address(unit));
         unsafe { NonNull::new_unchecked(ptr.as_mut_ptr()) }
     }
 
-    #[inline(always)]
     fn delete_pages(&mut self, unit: Unit) {
         self.page_table
             .delete_pages::<Size4K>(Page::new(self.unit_to_address(unit)), 1);
     }
 
-    #[inline(always)]
     fn insert_pages(&mut self, unit: Unit, pointer_meta: Address) {
         let addr = self.unit_to_address(unit);
         self.page_table.insert_pages::<Size4K>(Page::new(addr), 1);
@@ -165,7 +154,6 @@ impl<const NUM_SIZE_CLASS: usize> PageFreeList<NUM_SIZE_CLASS> {
         }
     }
 
-    #[inline(always)]
     pub fn allocate_cell(&mut self, units: usize) -> Option<Range<Address>> {
         let Range { start, end } = self.allocate_cell_unaligned_size(units)?;
         let start = self.unit_to_address(start);
@@ -173,7 +161,6 @@ impl<const NUM_SIZE_CLASS: usize> PageFreeList<NUM_SIZE_CLASS> {
         Some(start..end)
     }
 
-    #[inline(always)]
     pub fn release_cell(&mut self, start: Address, units: usize) {
         let unit = self.address_to_unit(start);
         self.release_cell_unaligned_size(unit, units);

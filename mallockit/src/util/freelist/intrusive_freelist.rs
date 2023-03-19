@@ -17,7 +17,6 @@ impl Cell {
 }
 
 impl PartialEq for Cell {
-    #[inline(always)]
     fn eq(&self, other: &Cell) -> bool {
         self as *const _ == other as *const _
     }
@@ -53,23 +52,19 @@ where
     const NON_COALESCEABLE_SIZE_CLASS_THRESHOLD: usize =
         Config::LOG_MAX_CELL_SIZE - Config::LOG_MIN_ALIGNMENT;
 
-    #[inline(always)]
     fn is_free(&self, unit: Unit, size_class: usize) -> bool {
         let cell = unsafe { self.unit_to_cell(unit).as_ref() };
         cell.is_free == (1, size_class as u32) && cell.owner == self as *const _ as _
     }
 
-    #[inline(always)]
     fn set_as_free(&mut self, unit: Unit, size_class: usize) {
         unsafe { self.unit_to_cell(unit).as_mut().is_free = (1, size_class as u32) }
     }
 
-    #[inline(always)]
     fn set_as_used(&mut self, unit: Unit, _size_class: usize) {
         unsafe { self.unit_to_cell(unit).as_mut().is_free = (0, 0) }
     }
 
-    #[inline(always)]
     fn split_cell(&mut self, parent: Unit, parent_size_class: usize) -> (Unit, Unit) {
         let child_size_class = parent_size_class - 1;
         let unit1 = parent;
@@ -79,7 +74,6 @@ where
         (unit1, unit2)
     }
 
-    #[inline(always)]
     fn push_cell(&mut self, unit: Unit, size_class: usize) {
         let head = self.table[size_class];
         let mut cell_ptr = self.unit_to_cell(unit);
@@ -98,7 +92,6 @@ where
         debug_assert!(self.cell_to_unit(cell_ptr) == unit);
     }
 
-    #[inline(always)]
     fn pop_cell(&mut self, size_class: usize) -> Option<Unit> {
         let head_opt = self.table[size_class];
         if unlikely(head_opt.is_none()) {
@@ -123,7 +116,6 @@ where
         }
     }
 
-    #[inline(always)]
     fn remove_cell(&mut self, unit: Unit, size_class: usize) {
         let mut cell_ptr = self.unit_to_cell(unit);
         let cell = unsafe { cell_ptr.as_mut() };
@@ -173,7 +165,6 @@ where
         Unit((Address::from(cell.as_ptr()) - self.base) >> Config::LOG_MIN_ALIGNMENT)
     }
 
-    #[inline(always)]
     pub fn pop_raw_cell(&mut self, log_size: usize) -> Option<Address> {
         let size_class =
             <Self as InternalAbstractFreeList>::size_class(self.process_input_units(1 << log_size));
@@ -186,12 +177,10 @@ impl<Config: AddressSpaceConfig> IntrusiveFreeList<Config>
 where
     [(); Config::NUM_SIZE_CLASS]: Sized,
 {
-    #[inline(always)]
     fn unit_to_value(&self, unit: Unit) -> Address {
         Address::from(self.unit_to_cell(unit).as_ptr())
     }
 
-    #[inline(always)]
     fn value_to_unit(&self, value: Address) -> Unit {
         self.cell_to_unit(unsafe { NonNull::new_unchecked(value.as_mut_ptr()) })
     }
@@ -200,7 +189,6 @@ where
         units >> Config::LOG_MIN_ALIGNMENT
     }
 
-    #[inline(always)]
     pub fn allocate_cell(&mut self, units: usize) -> Option<Range<Address>> {
         let units = (self.process_input_units(units) + Cell::HEADER_UNITS).next_power_of_two();
         let Range { start, end } = self.allocate_cell_aligned_size(units)?;
@@ -209,7 +197,6 @@ where
         Some(start..end)
     }
 
-    #[inline(always)]
     pub fn release_cell(&mut self, start: Address, units: usize) {
         let units = (self.process_input_units(units) + Cell::HEADER_UNITS).next_power_of_two();
         let unit = self.value_to_unit(start - Cell::HEADER_BYTES);

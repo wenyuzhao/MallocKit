@@ -24,7 +24,6 @@ impl Plan for Sanity {
         }
     }
 
-    #[inline(always)]
     fn get_layout(ptr: Address) -> Layout {
         debug_assert!(LARGE_OBJECT_SPACE.contains(ptr));
         Self::get().large_object_space.get_layout::<Size4K>(ptr)
@@ -48,12 +47,10 @@ impl Mutator for SanityMutator {
     type Plan = Sanity;
     const NEW: Self = Self::new();
 
-    #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         self.los.alloc(layout)
     }
 
-    #[inline(always)]
     fn dealloc(&mut self, ptr: Address) {
         debug_assert!(LARGE_OBJECT_SPACE.contains(ptr));
         self.los.dealloc(ptr)

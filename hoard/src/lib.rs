@@ -38,7 +38,6 @@ impl Plan for Hoard {
         }
     }
 
-    #[inline(always)]
     fn get_layout(ptr: Address) -> Layout {
         debug_assert!(HOARD_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
         if likely(HOARD_SPACE.contains(ptr)) {
@@ -68,7 +67,6 @@ impl Mutator for HoardMutator {
     type Plan = Hoard;
     const NEW: Self = Self::new();
 
-    #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         if likely(HoardSpace::can_allocate(layout)) {
             mallockit::stat::track_allocation(layout, false);
@@ -79,7 +77,6 @@ impl Mutator for HoardMutator {
         }
     }
 
-    #[inline(always)]
     fn dealloc(&mut self, ptr: Address) {
         debug_assert!(HOARD_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
         if likely(HOARD_SPACE.contains(ptr)) {

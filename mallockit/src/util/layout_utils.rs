@@ -4,13 +4,11 @@ use std::alloc::Layout;
 pub trait LayoutUtils: Sized {
     fn layout(&self) -> Layout;
 
-    #[inline(always)]
     fn padded_size(&self) -> usize {
         let layout = self.layout();
         layout.padding_needed_for(layout.align()) + layout.size()
     }
 
-    #[inline(always)]
     unsafe fn pad_to_align_unchecked(&self) -> Layout {
         let layout = self.layout();
         let pad = layout.padding_needed_for(layout.align());
@@ -21,7 +19,6 @@ pub trait LayoutUtils: Sized {
         Layout::from_size_align_unchecked(size, align)
     }
 
-    #[inline(always)]
     unsafe fn extend_unchecked(&self, next: Layout) -> (Layout, usize) {
         let layout = self.layout();
         let new_align = usize::max(layout.align(), next.align());
@@ -37,18 +34,15 @@ pub trait LayoutUtils: Sized {
 }
 
 impl const LayoutUtils for Layout {
-    #[inline(always)]
     fn layout(&self) -> Layout {
         *self
     }
 
-    #[inline(always)]
     fn padded_size(&self) -> usize {
         let layout = self.layout();
         layout.padding_needed_for(layout.align()) + layout.size()
     }
 
-    #[inline(always)]
     unsafe fn pad_to_align_unchecked(&self) -> Layout {
         let layout = self.layout();
         let pad = layout.padding_needed_for(layout.align());
@@ -59,7 +53,6 @@ impl const LayoutUtils for Layout {
         Layout::from_size_align_unchecked(size, align)
     }
 
-    #[inline(always)]
     unsafe fn extend_unchecked(&self, next: Layout) -> (Layout, usize) {
         let layout = self.layout();
         let new_align = if layout.align() > next.align() {

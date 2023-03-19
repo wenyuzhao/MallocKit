@@ -62,12 +62,10 @@ pub trait Space: Sized + 'static {
 
     fn get_layout(ptr: Address) -> Layout;
 
-    #[inline(always)]
     fn contains(&self, address: Address) -> bool {
         SpaceId::from(address) == self.id()
     }
 
-    #[inline(always)]
     fn reserved_bytes(&self) -> usize {
         self.page_resource().reserved_bytes()
     }
@@ -84,7 +82,6 @@ pub trait Space: Sized + 'static {
 pub trait Allocator {
     fn alloc(&mut self, layout: Layout) -> Option<Address>;
 
-    #[inline(always)]
     fn alloc_zeroed(&mut self, layout: Layout) -> Option<Address> {
         let size = layout.size();
         let ptr = self.alloc(layout);

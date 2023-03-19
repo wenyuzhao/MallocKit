@@ -61,7 +61,6 @@ impl FreelistPageResource {
             .fetch_sub(pages << S::LOG_BYTES, Ordering::SeqCst);
     }
 
-    #[inline(always)]
     fn set_meta<S: PageSize>(&self, start: Page<S>, pages: usize) {
         debug_assert!(pages <= u32::MAX as usize);
         let index = (start.start() - self.id.address_space().start) >> Page::<Size4K>::LOG_BYTES;
@@ -76,7 +75,6 @@ impl FreelistPageResource {
         }
     }
 
-    #[inline(always)]
     fn get_meta<S: PageSize>(&self, start: Page<S>) -> usize {
         let index = (start.start() - self.id.address_space().start) >> Page::<Size4K>::LOG_BYTES;
         self.meta.read()[index].load(Ordering::Relaxed) as _
@@ -84,7 +82,6 @@ impl FreelistPageResource {
 }
 
 impl PageResource for FreelistPageResource {
-    #[inline(always)]
     fn reserved_bytes(&self) -> usize {
         self.reserved_bytes.load(Ordering::Relaxed)
     }

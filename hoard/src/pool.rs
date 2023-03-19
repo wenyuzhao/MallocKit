@@ -28,7 +28,6 @@ impl BlockList {
         }
     }
 
-    #[inline(always)]
     fn should_flush(&self, log_obj_size: usize) -> bool {
         const EMPTINESS_CLASSES: usize = 8;
         let u = self.used_bytes.load(Ordering::Relaxed);
@@ -37,7 +36,6 @@ impl BlockList {
             && (EMPTINESS_CLASSES * u) < ((EMPTINESS_CLASSES - 1) * a)
     }
 
-    #[inline(always)]
     fn group(block: SuperBlock, alloc: bool) -> usize {
         let u = block.used_bytes()
             + if alloc { block.size_class.bytes() } else { 0 }
@@ -47,7 +45,6 @@ impl BlockList {
         (u << 2) >> SuperBlock::LOG_BYTES
     }
 
-    #[inline(always)]
     fn push(&mut self, mut block: SuperBlock, alloc: bool, update_stats: bool) {
         if alloc && self.cache.is_some() {
             let cache = self.cache.unwrap();
@@ -88,7 +85,6 @@ impl BlockList {
         None
     }
 
-    #[inline(always)]
     fn find(&mut self) -> Option<SuperBlock> {
         if let Some(block) = self.cache {
             if !block.is_full() {
@@ -98,7 +94,6 @@ impl BlockList {
         self.find_slow()
     }
 
-    #[inline(always)]
     fn pop(&mut self) -> Option<SuperBlock> {
         if let Some(block) = self.cache.take() {
             return Some(block);
@@ -117,7 +112,6 @@ impl BlockList {
         None
     }
 
-    #[inline(always)]
     fn remove(&mut self, block: SuperBlock, update_stats: bool) {
         if self.cache == Some(block) {
             self.cache = None;
@@ -166,7 +160,6 @@ impl BlockList {
         self.groups[group] = Some(block);
     }
 
-    #[inline(always)]
     fn move_to_front(&mut self, block: SuperBlock, alloc: bool) {
         if likely(Some(block) == self.cache) {
             return;
@@ -174,7 +167,6 @@ impl BlockList {
         self.move_to_front_slow(block, alloc)
     }
 
-    #[inline(always)]
     fn pop_mostly_empty_block(&mut self) -> Option<SuperBlock> {
         for i in 0..Self::GROUPS / 2 {
             if let Some(block) = self.groups[i] {
@@ -190,7 +182,6 @@ impl BlockList {
         None
     }
 
-    #[inline(always)]
     fn inc_used_bytes(&self, used_bytes: usize) {
         self.used_bytes.store(
             self.used_bytes.load(Ordering::Relaxed) + used_bytes,
@@ -198,7 +189,6 @@ impl BlockList {
         )
     }
 
-    #[inline(always)]
     fn dec_used_bytes(&self, used_bytes: usize) {
         self.used_bytes.store(
             self.used_bytes.load(Ordering::Relaxed) - used_bytes,
@@ -206,7 +196,6 @@ impl BlockList {
         )
     }
 
-    #[inline(always)]
     fn inc_total_bytes(&self, total_bytes: usize) {
         self.total_bytes.store(
             self.total_bytes.load(Ordering::Relaxed) + total_bytes,
@@ -214,7 +203,6 @@ impl BlockList {
         )
     }
 
-    #[inline(always)]
     fn dec_total_bytes(&self, total_bytes: usize) {
         self.total_bytes.store(
             self.total_bytes.load(Ordering::Relaxed) - total_bytes,
@@ -241,12 +229,10 @@ impl Pool {
         }
     }
 
-    #[inline(always)]
     pub const fn static_ref(&self) -> &'static Self {
         unsafe { &*(self as *const Self) }
     }
 
-    #[inline(always)]
     pub fn push(&self, size_class: SizeClass, mut block: SuperBlock) {
         debug_assert!(!block.is_full());
         let mut blocks = self.lock_blocks(size_class);
@@ -254,7 +240,6 @@ impl Pool {
         blocks.push(block, false, true);
     }
 
-    #[inline(always)]
     pub fn pop(&self, size_class: SizeClass) -> Option<(SuperBlock, MutexGuard<BlockList>)> {
         debug_assert!(self.global);
         let mut blocks = self.lock_blocks(size_class);
@@ -283,7 +268,6 @@ impl Pool {
         block
     }
 
-    #[inline(always)]
     pub fn lock_blocks(&self, size_class: SizeClass) -> MutexGuard<BlockList> {
         self.blocks[size_class.as_usize()].lock()
     }
@@ -321,7 +305,6 @@ impl Pool {
         owner.free_cell_slow_impl(cell, space, &mut blocks)
     }
 
-    #[inline(always)]
     fn free_cell_slow_impl(
         &self,
         cell: Address,

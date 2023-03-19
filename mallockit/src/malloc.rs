@@ -38,7 +38,6 @@ impl<P: Plan> MallocAPI<P> {
         P::Mutator::NEW
     }
 
-    #[inline(always)]
     pub fn mutator(&self) -> &'static mut P::Mutator {
         P::Mutator::current()
     }
@@ -52,12 +51,10 @@ impl<P: Plan> MallocAPI<P> {
         (value + mask) & !mask
     }
 
-    #[inline(always)]
     pub fn set_error(e: i32) {
         errno::set_errno(errno::Errno(e));
     }
 
-    #[inline(always)]
     pub unsafe fn malloc_size(&self, ptr: Address) -> usize {
         let ptr = Address::from(ptr);
         #[cfg(target_os = "macos")]
@@ -67,7 +64,6 @@ impl<P: Plan> MallocAPI<P> {
         P::get_layout(ptr).size()
     }
 
-    #[inline(always)]
     pub unsafe fn alloc(&self, size: usize, align: usize) -> Result<Option<*mut u8>, i32> {
         if cfg!(target_os = "linux") && unlikely(size == 0) {
             return Ok(None);
@@ -80,7 +76,6 @@ impl<P: Plan> MallocAPI<P> {
         }
     }
 
-    #[inline(always)]
     pub unsafe fn alloc_or_enomem(&self, size: usize, align: usize) -> *mut u8 {
         match self.alloc(size, align) {
             Ok(ptr) => ptr.unwrap_or(0 as _),
@@ -91,7 +86,6 @@ impl<P: Plan> MallocAPI<P> {
         }
     }
 
-    #[inline(always)]
     pub unsafe fn free(&self, ptr: *mut u8) {
         if unlikely(ptr.is_null()) {
             return;
@@ -103,7 +97,6 @@ impl<P: Plan> MallocAPI<P> {
         self.mutator().dealloc(ptr.into());
     }
 
-    #[inline(always)]
     pub unsafe fn reallocate_or_enomem(
         &self,
         ptr: *mut u8,
@@ -155,7 +148,6 @@ impl<P: Plan> MallocAPI<P> {
         }
     }
 
-    #[inline(always)]
     pub unsafe fn posix_memalign(
         &self,
         result: *mut *mut u8,
@@ -174,7 +166,6 @@ impl<P: Plan> MallocAPI<P> {
         }
     }
 
-    #[inline(always)]
     pub unsafe fn memalign(&self, alignment: usize, size: usize) -> *mut u8 {
         let mut result = ptr::null_mut();
         let errno = self.posix_memalign(&mut result, alignment, size);
@@ -184,7 +175,6 @@ impl<P: Plan> MallocAPI<P> {
         result
     }
 
-    #[inline(always)]
     pub unsafe fn aligned_alloc(
         &self,
         size: usize,

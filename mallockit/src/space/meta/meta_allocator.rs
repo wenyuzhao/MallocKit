@@ -21,7 +21,6 @@ impl MetaLocal {
         }
     }
 
-    #[inline(always)]
     fn current() -> &'static mut Self {
         &mut crate::mutator::InternalTLS::current().meta
     }
@@ -46,24 +45,20 @@ impl MetaLocal {
         META_SPACE.unmap(start, pages)
     }
 
-    #[inline(always)]
     const fn request_large(padded_size: usize) -> bool {
         padded_size > Self::MAX_NON_LARGE_ALLOC_SIZE
     }
 
-    #[inline(always)]
     fn update_layout(l: Layout) -> Layout {
         let align = usize::max(16, l.align());
         let size = (l.size() + 0b1111) & !0b1111;
         unsafe { Layout::from_size_align_unchecked(size, align) }
     }
 
-    #[inline(always)]
     const fn size_class(size: usize) -> usize {
         size.next_power_of_two().trailing_zeros() as _
     }
 
-    #[inline(always)]
     fn pop_cell(&mut self, size_class: usize) -> Option<Address> {
         let cell = self.freelist[size_class];
         if likely(!cell.is_zero()) {
@@ -75,7 +70,6 @@ impl MetaLocal {
         }
     }
 
-    #[inline(always)]
     fn push_cell(&mut self, cell: Address, size_class: usize) {
         unsafe { cell.store(self.freelist[size_class]) };
         self.freelist[size_class] = cell;
@@ -104,7 +98,6 @@ impl MetaLocal {
         self.allocate_cell_slow(request_size_class, true)
     }
 
-    #[inline(always)]
     fn allocate_cell(&mut self, size_class: usize) -> Result<Address, AllocError> {
         if let Some(cell) = self.pop_cell(size_class) {
             Ok(cell)
@@ -113,7 +106,6 @@ impl MetaLocal {
         }
     }
 
-    #[inline(always)]
     fn allocate(&mut self, layout: Layout) -> Result<Address, AllocError> {
         let layout = Self::update_layout(layout);
         let padded_size = layout.padded_size();
@@ -127,7 +119,6 @@ impl MetaLocal {
         }
     }
 
-    #[inline(always)]
     fn deallocate(&mut self, ptr: Address, layout: Layout) {
         let layout = Self::update_layout(layout);
         let padded_size = layout.padded_size();
@@ -144,28 +135,24 @@ impl MetaLocal {
 pub struct Meta;
 
 unsafe impl Allocator for Meta {
-    #[inline(always)]
     fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
         let start = MetaLocal::current().allocate(layout)?;
         let slice = unsafe { slice::from_raw_parts_mut(start.as_mut() as *mut u8, layout.size()) };
         Ok(NonNull::from(slice))
     }
 
-    #[inline(always)]
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
         MetaLocal::current().deallocate(ptr.as_ptr().into(), layout)
     }
 }
 
 unsafe impl GlobalAlloc for Meta {
-    #[inline(always)]
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         MetaLocal::current()
             .allocate(layout)
             .unwrap_or(Address::ZERO)
             .into()
     }
-    #[inline(always)]
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         MetaLocal::current().deallocate(ptr.into(), layout)
     }

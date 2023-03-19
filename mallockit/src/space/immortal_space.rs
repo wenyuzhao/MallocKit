@@ -16,17 +16,14 @@ impl Space for ImmortalSpace {
         }
     }
 
-    #[inline(always)]
     fn id(&self) -> SpaceId {
         self.id
     }
 
-    #[inline(always)]
     fn page_resource(&self) -> &Self::PR {
         &self.pr
     }
 
-    #[inline(always)]
     fn get_layout(ptr: Address) -> Layout {
         AllocationArea::load_layout(ptr)
     }
@@ -68,7 +65,6 @@ impl BumpAllocator {
 }
 
 impl Allocator for BumpAllocator {
-    #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         if let Some(ptr) = self.allocation_area.alloc_with_layout(layout) {
             return Some(ptr);
@@ -76,6 +72,5 @@ impl Allocator for BumpAllocator {
         self.alloc_slow(layout)
     }
 
-    #[inline(always)]
     fn dealloc(&mut self, _: Address) {}
 }

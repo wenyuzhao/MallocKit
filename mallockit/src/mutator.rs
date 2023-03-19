@@ -10,19 +10,16 @@ pub trait Mutator: Sized + 'static + TLS {
     type Plan: Plan<Mutator = Self>;
     const NEW: Self;
 
-    #[inline(always)]
     fn current() -> &'static mut Self {
         <Self as TLS>::current()
     }
 
-    #[inline(always)]
     fn plan() -> &'static Self::Plan {
         Self::Plan::get()
     }
 
     fn alloc(&mut self, layout: Layout) -> Option<Address>;
 
-    #[inline(always)]
     fn alloc_zeroed(&mut self, layout: Layout) -> Option<Address> {
         let size = layout.size();
         let ptr = self.alloc(layout);
@@ -34,7 +31,6 @@ pub trait Mutator: Sized + 'static + TLS {
 
     fn dealloc(&mut self, ptr: Address);
 
-    #[inline(always)]
     fn realloc(&mut self, ptr: Address, new_size: usize) -> Option<Address> {
         let layout = Self::Plan::get_layout(ptr);
         if unlikely(layout.size() >= new_size) {
@@ -89,7 +85,6 @@ pub trait TLS: Sized {
     fn current() -> &'static mut Self;
 
     #[cfg(target_os = "macos")]
-    #[inline(always)]
     fn current() -> &'static mut Self {
         unsafe { &mut *macos_tls::get_tls::<Self>() }
     }
@@ -120,7 +115,6 @@ mod macos_tls {
         get_tls::<u8>()
     }
 
-    #[inline(always)]
     #[allow(unused)]
     fn _get_tls<T>() -> *mut T {
         unsafe {
@@ -130,7 +124,6 @@ mod macos_tls {
         }
     }
 
-    #[inline(always)]
     #[allow(unused)]
     pub(super) fn get_internal_tls() -> *mut InternalTLS {
         let mut tls = _get_tls::<InternalTLS>();
@@ -144,7 +137,6 @@ mod macos_tls {
         tls
     }
 
-    #[inline(always)]
     #[allow(unused)]
     pub(super) fn get_tls<T: TLS>() -> *mut T {
         let mut tls = _get_tls::<(InternalTLS, T)>();

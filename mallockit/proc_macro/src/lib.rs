@@ -15,8 +15,7 @@ pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
         }
 
         impl mallockit::plan::Singleton for #name {
-            #[inline(always)]
-            fn singleton() -> &'static Self {
+                        fn singleton() -> &'static Self {
                 unsafe { &__mallockit_plan::PLAN }
             }
         }
@@ -47,8 +46,7 @@ pub fn mutator(_attr: TokenStream, item: TokenStream) -> TokenStream {
             const NEW: Self = <Self as mallockit::Mutator>::NEW;
 
             #[cfg(not(target_os = "macos"))]
-            #[inline(always)]
-            fn current() -> &'static mut Self {
+                        fn current() -> &'static mut Self {
                 unsafe { &mut __mallockit_mutator::MUTATOR }
             }
         }

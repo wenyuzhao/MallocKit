@@ -13,19 +13,16 @@ impl<const MAX_SIZE_CLASS: usize> DiscreteTLAB<MAX_SIZE_CLASS> {
         }
     }
 
-    #[inline(always)]
     pub fn free_bytes(&self) -> usize {
         self.bytes
     }
 
-    #[inline(always)]
     pub fn push(&mut self, size_class: SizeClass, cell: Address) {
         unsafe { cell.store(self.bins[size_class.as_usize()]) };
         self.bins[size_class.as_usize()] = cell;
         self.bytes += size_class.bytes();
     }
 
-    #[inline(always)]
     pub fn pop(&mut self, size_class: SizeClass) -> Option<Address> {
         let cell = self.bins[size_class.as_usize()];
         if cell.is_zero() {

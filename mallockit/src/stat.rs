@@ -68,7 +68,6 @@ static SIZES: [Counter; 22] = [
 ];
 static OTHER_SIZE: Counter = Counter::new("");
 
-#[inline(always)]
 pub fn run(block: impl Fn()) {
     if cfg!(not(feature = "stat")) {
         return;
@@ -76,7 +75,6 @@ pub fn run(block: impl Fn()) {
     block()
 }
 
-#[inline(always)]
 pub fn track_allocation(layout: Layout, is_large: bool) {
     run(|| {
         let i = layout.align().trailing_zeros() as usize;
@@ -98,7 +96,6 @@ pub fn track_allocation(layout: Layout, is_large: bool) {
     })
 }
 
-#[inline(always)]
 pub fn track_deallocation(is_large: bool) {
     run(|| {
         if is_large {
@@ -114,12 +111,10 @@ impl Counter {
     pub const fn new(name: &'static str) -> Self {
         Self(name, AtomicUsize::new(0))
     }
-    #[inline(always)]
     pub fn get(&self) -> usize {
         assert!(cfg!(feature = "stat"));
         self.1.load(Ordering::SeqCst)
     }
-    #[inline(always)]
     pub fn inc(&self, delta: usize) {
         assert!(cfg!(feature = "stat"));
         self.1.fetch_add(delta, Ordering::SeqCst);

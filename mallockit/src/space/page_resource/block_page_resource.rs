@@ -77,7 +77,6 @@ impl BlockPageResource {
 }
 
 impl PageResource for BlockPageResource {
-    #[inline(always)]
     fn reserved_bytes(&self) -> usize {
         self.reserved_bytes.load(Ordering::Relaxed)
     }

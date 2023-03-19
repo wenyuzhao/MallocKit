@@ -23,7 +23,6 @@ impl Plan for Bump {
         }
     }
 
-    #[inline(always)]
     fn get_layout(ptr: Address) -> Layout {
         debug_assert!(IMMORTAL_SPACE.contains(ptr));
         ImmortalSpace::get_layout(ptr)
@@ -47,11 +46,9 @@ impl Mutator for BumpMutator {
     type Plan = Bump;
     const NEW: Self = Self::new();
 
-    #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         self.bump.alloc(layout)
     }
 
-    #[inline(always)]
     fn dealloc(&mut self, _: Address) {}
 }

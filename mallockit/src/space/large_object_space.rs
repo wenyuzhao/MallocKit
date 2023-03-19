@@ -21,12 +21,10 @@ impl Space for LargeObjectSpace {
         }
     }
 
-    #[inline(always)]
     fn id(&self) -> SpaceId {
         self.id
     }
 
-    #[inline(always)]
     fn page_resource(&self) -> &Self::PR {
         &self.pr
     }
@@ -37,7 +35,6 @@ impl Space for LargeObjectSpace {
 }
 
 impl LargeObjectSpace {
-    #[inline(always)]
     pub fn get_layout<S: PageSize>(&self, ptr: Address) -> Layout {
         let pages = self
             .page_resource()
@@ -91,7 +88,6 @@ where
         }
     }
 
-    #[inline(always)]
     fn space(&self) -> &'static LargeObjectSpace {
         *self.space
     }
@@ -150,7 +146,6 @@ where
         }
     }
 
-    #[inline(always)]
     fn dealloc(&mut self, ptr: Address) {
         let aligned_size = self.space.get_layout::<S>(ptr).size().next_power_of_two();
         if Self::CACHE_ENABLED && aligned_size <= MAX_CACHEABLE_SIZE {

@@ -23,17 +23,14 @@ impl Space for HoardSpace {
         }
     }
 
-    #[inline(always)]
     fn id(&self) -> SpaceId {
         self.id
     }
 
-    #[inline(always)]
     fn page_resource(&self) -> &Self::PR {
         &self.pr
     }
 
-    #[inline(always)]
     fn get_layout(ptr: Address) -> Layout {
         let block = SuperBlock::containing(ptr);
         block.size_class.layout()
@@ -41,14 +38,12 @@ impl Space for HoardSpace {
 }
 
 impl HoardSpace {
-    #[inline(always)]
     pub fn can_allocate(layout: Layout) -> bool {
         let layout = unsafe { layout.pad_to_align_unchecked() };
         let size = layout.size().next_power_of_two();
         size <= Self::MAX_ALLOCATION_SIZE
     }
 
-    #[inline(always)]
     pub fn acquire_block(
         &self,
         size_class: SizeClass,
@@ -106,7 +101,6 @@ impl HoardAllocator {
 }
 
 impl Allocator for HoardAllocator {
-    #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let size_class = SizeClass::from_layout(layout);
         if likely(layout.size() <= Self::LARGEST_SMALL_OBJECT) {
@@ -117,7 +111,6 @@ impl Allocator for HoardAllocator {
         self.local.alloc_cell(size_class, &self.space)
     }
 
-    #[inline(always)]
     fn dealloc(&mut self, cell: Address) {
         let block = SuperBlock::containing(cell);
         let size = block.size_class.bytes();

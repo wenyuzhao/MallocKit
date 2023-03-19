@@ -32,7 +32,6 @@ impl<L: PageTableLevel> PageTableEntry<L> {
         self.0 = 0;
     }
 
-    #[inline(always)]
     const fn get(&self) -> Option<PageTableEntryData<L::NextLevel>> {
         let value = self.0;
         if value.get(Self::PRESENT) == 0 {
@@ -48,7 +47,6 @@ impl<L: PageTableLevel> PageTableEntry<L> {
         }
     }
 
-    #[inline(always)]
     fn set_next_page_table(&mut self, table: &'static mut PageTable<L::NextLevel>) {
         debug_assert!(self.0 == 0);
         self.0.set(Self::PRESENT, 1);
@@ -59,21 +57,18 @@ impl<L: PageTableLevel> PageTableEntry<L> {
         self.0 = self.0 | word;
     }
 
-    #[inline(always)]
     fn set_next_page(&mut self, _pages: Option<usize>) {
         debug_assert!(self.0 == 0);
         self.0.set(Self::PRESENT, 1);
         self.0.set(Self::IS_PAGE_TABLE, 0);
     }
 
-    #[inline(always)]
     const fn delta_entries(&mut self, entries: i32) -> usize {
         self.0.delta(Self::PAGE_TABLE_USED_ENTRIES, entries as _)
     }
 }
 
 impl PageTableEntry<L1> {
-    #[inline(always)]
     const fn set_pointer_meta(&mut self, ptr: Address) {
         debug_assert!(self.0.get(Self::PRESENT) != 0);
         debug_assert!(self.0.get(Self::IS_PAGE_TABLE) == 0);
@@ -86,7 +81,6 @@ pub(crate) trait PageTableLevel: 'static {
     const SHIFT: usize = Self::NextLevel::SHIFT + 9;
     const MASK: usize = 0b1_1111_1111 << Self::SHIFT;
 
-    #[inline(always)]
     fn get_index(addr: Address) -> usize {
         (usize::from(addr) & Self::MASK) >> Self::SHIFT
     }
@@ -132,12 +126,10 @@ pub(crate) struct PageTable<L: PageTableLevel = L4> {
 }
 
 impl<L: PageTableLevel> PageTable<L> {
-    #[inline(always)]
     fn get_entry(&self, address: Address) -> Option<PageTableEntryData<L::NextLevel>> {
         self.table[L::get_index(address)].get()
     }
 
-    #[inline(always)]
     fn get_next_page_table(&self, address: Address) -> &'static mut PageTable<L::NextLevel> {
         match self.table[L::get_index(address)].get() {
             Some(PageTableEntryData::NextLevelPageTable { table, .. }) => table,
@@ -145,7 +137,6 @@ impl<L: PageTableLevel> PageTable<L> {
         }
     }
 
-    #[inline(always)]
     fn get_or_allocate_next_page_table(
         &mut self,
         address: Address,
@@ -169,7 +160,6 @@ impl<L: PageTableLevel> PageTable<L> {
 }
 
 impl PageTable<L1> {
-    #[inline(always)]
     fn set_pointer_meta(&mut self, address: Address, pointer_meta: Address) {
         self.table[L1::get_index(address)].set_pointer_meta(pointer_meta);
     }
@@ -183,7 +173,6 @@ impl PageTable<L4> {
         }
     }
 
-    #[inline(always)]
     fn get(&self, address: Address) -> Option<PageMeta> {
         let l3 = match self.get_entry(address)? {
             PageTableEntryData::NextLevelPageTable { table, .. } => table,
@@ -203,7 +192,6 @@ impl PageTable<L4> {
         }
     }
 
-    #[inline(always)]
     fn insert_one_page<S: PageSize>(&mut self, start_page: Page<S>, num_pages: Option<usize>) {
         let start = start_page.start();
         let l4 = self;
@@ -238,7 +226,6 @@ impl PageTable<L4> {
         }
     }
 
-    #[inline(always)]
     fn decrease_used_entries<S: PageSize, L: PageTableLevel>(
         parent_table: &mut PageTable<L>,
         page: Page<S>,
@@ -251,7 +238,6 @@ impl PageTable<L4> {
         entries
     }
 
-    #[inline(always)]
     fn delete_one_page<S: PageSize>(&mut self, start_page: Page<S>) {
         let start = start_page.start();
         let l4 = self;
@@ -289,12 +275,10 @@ impl PageTable<L4> {
         }
     }
 
-    #[inline(always)]
     pub fn get_pointer_meta(&self, start: Address) -> Address {
         self.get(start).unwrap().pointer_meta
     }
 
-    #[inline(always)]
     pub fn set_pointer_meta(&mut self, address: Address, pointer_meta: Address) {
         debug_assert!(usize::from(pointer_meta) & !(((1 << 45) - 1) << 3) == 0);
         let l4 = self;

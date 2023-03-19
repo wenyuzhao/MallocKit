@@ -5,7 +5,7 @@ use std::fmt::Write;
 use std::intrinsics::unlikely;
 
 #[doc(hidden)]
-#[inline(never)]
+#[cold]
 pub fn _print(args: fmt::Arguments<'_>, new_line: bool, stderr: bool) {
     let mut log = if stderr { ERR.lock() } else { LOG.lock() };
     log.write_fmt(args).unwrap();
@@ -73,7 +73,6 @@ impl Log {
         self.cursor = 0;
     }
 
-    #[inline(always)]
     fn put_char(&mut self, c: u8) {
         self.buffer[self.cursor] = c;
         self.cursor += 1;
