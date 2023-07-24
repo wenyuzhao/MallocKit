@@ -36,12 +36,12 @@ impl SpaceId {
         self.0 == 0 || self.0 == 15
     }
 
-    pub const fn from(addr: Address) -> Self {
+    pub fn from(addr: Address) -> Self {
         let id = (usize::from(addr) & Self::MASK) >> Self::SHIFT;
         Self(id as u8)
     }
 
-    pub const fn contains(&self, addr: Address) -> bool {
+    pub fn contains(&self, addr: Address) -> bool {
         Self::from(addr).0 == self.0
     }
 

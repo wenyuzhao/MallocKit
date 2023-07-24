@@ -156,12 +156,12 @@ where
         }
     }
 
-    const fn unit_to_cell(&self, unit: Unit) -> CellPtr {
+    fn unit_to_cell(&self, unit: Unit) -> CellPtr {
         let ptr = self.base + (*unit << Config::LOG_MIN_ALIGNMENT);
         unsafe { NonNull::new_unchecked(ptr.as_mut_ptr()) }
     }
 
-    const fn cell_to_unit(&self, cell: CellPtr) -> Unit {
+    fn cell_to_unit(&self, cell: CellPtr) -> Unit {
         Unit((Address::from(cell.as_ptr()) - self.base) >> Config::LOG_MIN_ALIGNMENT)
     }
 

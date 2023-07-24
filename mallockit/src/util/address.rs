@@ -82,7 +82,7 @@ impl Address {
 unsafe impl Send for Address {}
 unsafe impl Sync for Address {}
 
-impl const Clone for Address {
+impl Clone for Address {
     fn clone(&self) -> Self {
         Self(self.0)
     }
@@ -94,55 +94,55 @@ impl const Clone for Address {
 
 impl Copy for Address {}
 
-impl const From<usize> for Address {
+impl From<usize> for Address {
     fn from(value: usize) -> Self {
         Self(value)
     }
 }
 
-impl<T> const From<*const T> for Address {
+impl<T> From<*const T> for Address {
     fn from(value: *const T) -> Self {
         unsafe { Self(mem::transmute(value)) }
     }
 }
 
-impl<T> const From<*mut T> for Address {
+impl<T> From<*mut T> for Address {
     fn from(value: *mut T) -> Self {
         unsafe { Self(mem::transmute(value)) }
     }
 }
 
-impl<T> const From<&T> for Address {
+impl<T> From<&T> for Address {
     fn from(value: &T) -> Self {
         unsafe { Self(mem::transmute(value as *const T)) }
     }
 }
 
-impl<T> const From<&mut T> for Address {
+impl<T> From<&mut T> for Address {
     fn from(value: &mut T) -> Self {
         unsafe { Self(mem::transmute(value as *const T)) }
     }
 }
 
-impl const From<Address> for usize {
+impl From<Address> for usize {
     fn from(value: Address) -> usize {
         value.0
     }
 }
 
-impl<T> const From<Address> for *const T {
+impl<T> From<Address> for *const T {
     fn from(value: Address) -> *const T {
         value.0 as _
     }
 }
 
-impl<T> const From<Address> for *mut T {
+impl<T> From<Address> for *mut T {
     fn from(value: Address) -> *mut T {
         value.0 as _
     }
 }
 
-impl const Deref for Address {
+impl Deref for Address {
     type Target = usize;
 
     fn deref(&self) -> &Self::Target {
@@ -150,7 +150,7 @@ impl const Deref for Address {
     }
 }
 
-impl const PartialEq for Address {
+impl PartialEq for Address {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
@@ -164,7 +164,7 @@ impl Eq for Address {
     fn assert_receiver_is_total_eq(&self) {}
 }
 
-impl const PartialOrd for Address {
+impl PartialOrd for Address {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -192,7 +192,7 @@ impl const PartialOrd for Address {
     }
 }
 
-impl const Ord for Address {
+impl Ord for Address {
     fn cmp(&self, other: &Self) -> Ordering {
         match (self.0, other.0) {
             (x, y) if x == y => Ordering::Equal,
@@ -227,7 +227,7 @@ impl const Ord for Address {
     }
 }
 
-impl const Add<usize> for Address {
+impl Add<usize> for Address {
     type Output = Self;
 
     fn add(self, other: usize) -> Self::Output {
@@ -235,13 +235,13 @@ impl const Add<usize> for Address {
     }
 }
 
-impl const AddAssign<usize> for Address {
+impl AddAssign<usize> for Address {
     fn add_assign(&mut self, other: usize) {
         *self = *self + other
     }
 }
 
-impl const Add<Self> for Address {
+impl Add<Self> for Address {
     type Output = Self;
 
     fn add(self, other: Self) -> Self::Output {
@@ -249,13 +249,13 @@ impl const Add<Self> for Address {
     }
 }
 
-impl const AddAssign<Self> for Address {
+impl AddAssign<Self> for Address {
     fn add_assign(&mut self, other: Self) {
         *self = *self + other
     }
 }
 
-impl const Add<isize> for Address {
+impl Add<isize> for Address {
     type Output = Self;
 
     fn add(self, other: isize) -> Self::Output {
@@ -263,13 +263,13 @@ impl const Add<isize> for Address {
     }
 }
 
-impl const AddAssign<isize> for Address {
+impl AddAssign<isize> for Address {
     fn add_assign(&mut self, other: isize) {
         *self = *self + other
     }
 }
 
-impl const Add<i32> for Address {
+impl Add<i32> for Address {
     type Output = Self;
 
     fn add(self, other: i32) -> Self::Output {
@@ -277,13 +277,13 @@ impl const Add<i32> for Address {
     }
 }
 
-impl const AddAssign<i32> for Address {
+impl AddAssign<i32> for Address {
     fn add_assign(&mut self, other: i32) {
         *self = *self + other
     }
 }
 
-impl const Sub<Self> for Address {
+impl Sub<Self> for Address {
     type Output = usize;
 
     fn sub(self, other: Self) -> Self::Output {
@@ -292,7 +292,7 @@ impl const Sub<Self> for Address {
     }
 }
 
-impl const Sub<usize> for Address {
+impl Sub<usize> for Address {
     type Output = Self;
 
     fn sub(self, other: usize) -> Self::Output {
@@ -300,7 +300,7 @@ impl const Sub<usize> for Address {
     }
 }
 
-impl const SubAssign<usize> for Address {
+impl SubAssign<usize> for Address {
     fn sub_assign(&mut self, other: usize) {
         *self = *self - other
     }

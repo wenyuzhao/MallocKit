@@ -51,6 +51,7 @@ impl<T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
     fn force_initialize(&self) {
         let f: F = self.init.replace(None).unwrap();
         let v: T = f();
+        #[allow(cast_ref_to_mut)]
         let me: &mut Self = unsafe { &mut *(self as *const Self as *mut Self) };
         me.value.write(v);
         if !TL::THREAD_LOCAL {

@@ -53,7 +53,7 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<NUM_
 
     fn push_cell(&mut self, unit: Unit, size_class: usize) {
         let head = self.table[size_class];
-        let mut cell = self.arena.alloc(Cell {
+        let cell = self.arena.alloc(Cell {
             prev: None,
             next: None,
             unit,

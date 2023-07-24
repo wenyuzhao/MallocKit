@@ -34,7 +34,7 @@ impl AllocationArea {
         self.limit = limit;
     }
 
-    pub const fn alloc(&mut self, layout: Layout) -> Option<Address> {
+    pub fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let top = self.top;
         let start = Self::align_allocation(top, layout.align());
         let end = start + layout.size();
@@ -46,7 +46,7 @@ impl AllocationArea {
         }
     }
 
-    const fn get_layout_slot(ptr: Address) -> &'static mut Header {
+    fn get_layout_slot(ptr: Address) -> &'static mut Header {
         debug_assert!(mem::size_of::<Header>() == mem::size_of::<usize>());
         unsafe { (ptr - mem::size_of::<usize>()).as_mut::<Header>() }
     }
@@ -90,7 +90,7 @@ impl AllocationArea {
         }
     }
 
-    pub const fn load_layout(ptr: Address) -> Layout {
+    pub fn load_layout(ptr: Address) -> Layout {
         let (size, align) = *Self::get_layout_slot(ptr);
         unsafe { Layout::from_size_align_unchecked(size as _, align as _) }
     }

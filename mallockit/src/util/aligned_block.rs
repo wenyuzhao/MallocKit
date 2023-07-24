@@ -13,38 +13,38 @@ macro_rules! impl_aligned_block {
             >();
             pub const WORDS: usize = Self::BYTES >> 3;
 
-            pub const fn new(address: Address) -> Self {
+            pub fn new(address: Address) -> Self {
                 <Self as $crate::util::aligned_block::AlignedBlockConfig>::from_address(address)
             }
 
-            pub const fn start(&self) -> Address {
+            pub fn start(&self) -> Address {
                 <Self as $crate::util::aligned_block::AlignedBlockConfig>::into_address(*self)
             }
 
-            pub const fn end(&self) -> Address {
+            pub fn end(&self) -> Address {
                 self.start() + Self::BYTES
             }
 
-            pub const fn align(address: Address) -> Address {
+            pub fn align(address: Address) -> Address {
                 Address::from(usize::from(address) & !Self::MASK)
             }
 
-            pub const fn containing(address: Address) -> Self {
+            pub fn containing(address: Address) -> Self {
                 Self::new(Self::align(address))
             }
 
-            pub const fn is_aligned(address: Address) -> bool {
+            pub fn is_aligned(address: Address) -> bool {
                 (usize::from(address) & Self::MASK) == 0
             }
 
-            pub const fn range(&self) -> std::ops::Range<Address> {
+            pub fn range(&self) -> std::ops::Range<Address> {
                 std::ops::Range {
                     start: self.start(),
                     end: self.end(),
                 }
             }
 
-            pub const fn is_zeroed(&self) -> bool {
+            pub fn is_zeroed(&self) -> bool {
                 let std::ops::Range { start, end } = self.range();
                 let mut a = start;
                 while a < end {
@@ -60,7 +60,7 @@ macro_rules! impl_aligned_block {
         unsafe impl Send for $t {}
         unsafe impl Sync for $t {}
 
-        impl const PartialEq for $t {
+        impl PartialEq for $t {
             fn eq(&self, other: &Self) -> bool {
                 self.0.get() == other.0.get()
             }
@@ -74,7 +74,7 @@ macro_rules! impl_aligned_block {
             fn assert_receiver_is_total_eq(&self) {}
         }
 
-        impl const PartialOrd for $t {
+        impl PartialOrd for $t {
             fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
                 Some(self.cmp(other))
             }
@@ -102,7 +102,7 @@ macro_rules! impl_aligned_block {
             }
         }
 
-        impl const Ord for $t {
+        impl Ord for $t {
             fn cmp(&self, other: &Self) -> std::cmp::Ordering {
                 match (self.0, other.0) {
                     (x, y) if x.get() == y.get() => std::cmp::Ordering::Equal,
@@ -177,7 +177,7 @@ macro_rules! impl_aligned_block {
             }
         }
 
-        impl const std::ops::Deref for $t {
+        impl std::ops::Deref for $t {
             type Target = <Self as $crate::util::aligned_block::AlignedBlockConfig>::Header;
 
             fn deref(&self) -> &Self::Target {
@@ -185,13 +185,13 @@ macro_rules! impl_aligned_block {
             }
         }
 
-        impl const std::ops::DerefMut for $t {
+        impl std::ops::DerefMut for $t {
             fn deref_mut(&mut self) -> &mut Self::Target {
                 unsafe { &mut *self.start().as_mut_ptr() }
             }
         }
 
-        impl const Clone for $t {
+        impl Clone for $t {
             fn clone(&self) -> Self {
                 Self::new(self.start())
             }

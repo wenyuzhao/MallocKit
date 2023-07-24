@@ -32,7 +32,7 @@ impl<L: PageTableLevel> PageTableEntry<L> {
         self.0 = 0;
     }
 
-    const fn get(&self) -> Option<PageTableEntryData<L::NextLevel>> {
+    fn get(&self) -> Option<PageTableEntryData<L::NextLevel>> {
         let value = self.0;
         if value.get(Self::PRESENT) == 0 {
             return None;
@@ -69,7 +69,7 @@ impl<L: PageTableLevel> PageTableEntry<L> {
 }
 
 impl PageTableEntry<L1> {
-    const fn set_pointer_meta(&mut self, ptr: Address) {
+    fn set_pointer_meta(&mut self, ptr: Address) {
         debug_assert!(self.0.get(Self::PRESENT) != 0);
         debug_assert!(self.0.get(Self::IS_PAGE_TABLE) == 0);
         self.0.set(Self::PAGE_POINTER_META, usize::from(ptr) >> 3);

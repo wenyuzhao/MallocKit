@@ -42,7 +42,7 @@ impl<P: Plan> MallocAPI<P> {
         P::Mutator::current()
     }
 
-    pub const fn zero_spaceid(a: Address) -> bool {
+    pub fn zero_spaceid(a: Address) -> bool {
         SpaceId::from(a).is_invalid()
     }
 

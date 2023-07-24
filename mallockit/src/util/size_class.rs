@@ -28,7 +28,7 @@ impl<const LOG_COVERAGE: u8> SizeClass<LOG_COVERAGE> {
         Self(bytes.trailing_zeros() as u8 - LOG_COVERAGE)
     }
 
-    pub const fn from_layout(layout: Layout) -> Self {
+    pub fn from_layout(layout: Layout) -> Self {
         let layout = unsafe { layout.pad_to_align_unchecked() };
         let size = layout.size().next_power_of_two();
         Self::from_bytes(size)

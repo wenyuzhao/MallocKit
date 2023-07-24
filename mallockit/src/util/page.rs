@@ -37,7 +37,7 @@ impl<S: PageSize> Page<S> {
     pub const BYTES: usize = S::BYTES;
     pub const MASK: usize = S::BYTES - 1;
 
-    pub const fn new(address: Address) -> Self {
+    pub fn new(address: Address) -> Self {
         debug_assert!(!address.is_zero());
         debug_assert!(Self::is_aligned(address));
         Self(
@@ -46,27 +46,27 @@ impl<S: PageSize> Page<S> {
         )
     }
 
-    pub const fn containing(address: Address) -> Self {
+    pub fn containing(address: Address) -> Self {
         Self::new(Self::align(address))
     }
 
-    pub const fn align(address: Address) -> Address {
+    pub fn align(address: Address) -> Address {
         Address::from(usize::from(address) & !Self::MASK)
     }
 
-    pub const fn is_aligned(address: Address) -> bool {
+    pub fn is_aligned(address: Address) -> bool {
         (usize::from(address) & Self::MASK) == 0
     }
 
-    pub const fn start(&self) -> Address {
+    pub fn start(&self) -> Address {
         Address::from(self.0.get())
     }
 
-    pub const fn end(&self) -> Address {
+    pub fn end(&self) -> Address {
         self.start() + Self::BYTES
     }
 
-    pub const fn range(&self) -> Range<Address> {
+    pub fn range(&self) -> Range<Address> {
         Range {
             start: self.start(),
             end: self.end(),
@@ -92,7 +92,7 @@ impl<S: PageSize> fmt::Debug for Page<S> {
 unsafe impl<S: PageSize> Send for Page<S> {}
 unsafe impl<S: PageSize> Sync for Page<S> {}
 
-impl<S: PageSize> const Clone for Page<S> {
+impl<S: PageSize> Clone for Page<S> {
     fn clone(&self) -> Self {
         Self(self.0, PhantomData)
     }
@@ -104,7 +104,7 @@ impl<S: PageSize> const Clone for Page<S> {
 
 impl<S: PageSize> Copy for Page<S> {}
 
-impl<S: PageSize> const PartialEq for Page<S> {
+impl<S: PageSize> PartialEq for Page<S> {
     fn eq(&self, other: &Self) -> bool {
         self.0.get() == other.0.get()
     }
@@ -118,7 +118,7 @@ impl<S: PageSize> Eq for Page<S> {
     fn assert_receiver_is_total_eq(&self) {}
 }
 
-impl<S: PageSize> const PartialOrd for Page<S> {
+impl<S: PageSize> PartialOrd for Page<S> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -146,7 +146,7 @@ impl<S: PageSize> const PartialOrd for Page<S> {
     }
 }
 
-impl<S: PageSize> const Ord for Page<S> {
+impl<S: PageSize> Ord for Page<S> {
     fn cmp(&self, other: &Self) -> Ordering {
         match (self.0, other.0) {
             (x, y) if x.get() == y.get() => Ordering::Equal,

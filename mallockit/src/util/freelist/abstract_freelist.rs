@@ -11,7 +11,7 @@ use std::{
 #[repr(C)]
 pub(super) struct Unit(pub(super) usize);
 
-impl const Deref for Unit {
+impl Deref for Unit {
     type Target = usize;
 
     fn deref(&self) -> &Self::Target {
@@ -105,7 +105,7 @@ impl LazyBst {
 #[repr(C)]
 pub(super) struct BstIndex(usize);
 
-impl const Deref for BstIndex {
+impl Deref for BstIndex {
     type Target = usize;
 
     fn deref(&self) -> &Self::Target {
