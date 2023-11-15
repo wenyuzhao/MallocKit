@@ -151,12 +151,13 @@ impl<P: Plan> MallocAPI<P> {
     pub unsafe fn posix_memalign(
         &self,
         result: *mut *mut u8,
-        alignment: usize,
+        mut alignment: usize,
         size: usize,
     ) -> i32 {
-        if unlikely(alignment < std::mem::size_of::<usize>() || !alignment.is_power_of_two()) {
+        if unlikely(!alignment.is_power_of_two()) {
             return libc::EINVAL;
         }
+        alignment = std::cmp::max(alignment, Self::MIN_ALIGNMENT);
         match self.alloc(size, usize::max(alignment, Self::MIN_ALIGNMENT)) {
             Ok(ptr) => {
                 *result = ptr.unwrap_or(0 as _);
