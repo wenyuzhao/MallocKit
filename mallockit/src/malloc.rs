@@ -64,10 +64,8 @@ impl<P: Plan> MallocAPI<P> {
         P::get_layout(ptr).size()
     }
 
-    pub unsafe fn alloc(&self, size: usize, align: usize) -> Result<Option<*mut u8>, i32> {
-        if cfg!(target_os = "linux") && unlikely(size == 0) {
-            return Ok(None);
-        }
+    pub unsafe fn alloc(&self, mut size: usize, align: usize) -> Result<Option<*mut u8>, i32> {
+        size = std::cmp::max(size, Self::MIN_ALIGNMENT);
         let size = Self::align_up(size, align);
         let layout = Layout::from_size_align_unchecked(size, align);
         match self.mutator().alloc(layout) {
