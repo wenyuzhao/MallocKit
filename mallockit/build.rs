@@ -1,7 +1,7 @@
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use yaml_rust::{Yaml, YamlLoader};
 
 fn target_dir_file(filename: &str) -> PathBuf {
     Path::new(&env::var_os("OUT_DIR").unwrap())
@@ -24,42 +24,33 @@ fn {}() {{
     )
 }
 
-fn generate_tests(meta: &Yaml) {
-    let tests = meta["tests"]
-        .as_hash()
-        .map(|v| {
-            v.iter()
-                .map(|(k, v)| {
-                    (
-                        k.as_str().unwrap().to_owned(),
-                        v.as_str().unwrap().to_owned(),
-                    )
-                })
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
+fn generate_malloc_tests(tests: &HashMap<String, String>) {
     let mut code = "".to_owned();
-    for (t, cmd) in &tests {
+    for (t, cmd) in tests {
         code += &generate_one_test(t, cmd);
     }
     fs::write(&target_dir_file("generated_tests.rs"), code).unwrap();
 }
 
 fn main() {
-    let metadata_file = PathBuf::from(env::var("OUT_DIR").unwrap())
-        .join("..")
-        .join("..")
-        .join("..")
-        .join("..")
-        .join("..")
-        .join("MallocKit.yml")
-        .canonicalize()
-        .unwrap();
-    let meta = &YamlLoader::load_from_str(&fs::read_to_string(&metadata_file).unwrap()).unwrap()[0];
-    generate_tests(meta);
+    let meta = cargo_metadata::MetadataCommand::new().exec().unwrap();
+    let mut malloc_tests = HashMap::new();
+    if let Some(v) = meta
+        .workspace_metadata
+        .as_object()
+        .map(|v| v.get("malloc-tests"))
+        .flatten()
+    {
+        for (name, cmd) in v.as_object().unwrap().iter() {
+            let cmd = cmd.as_str().unwrap();
+            malloc_tests.insert(name.to_owned(), cmd.to_owned());
+        }
+    }
+    generate_malloc_tests(&malloc_tests);
     println!("cargo:rerun-if-changed=build.rs");
+    let manifest_path = meta.workspace_root.as_std_path().join("Cargo.toml");
     println!(
         "cargo:rerun-if-changed={}",
-        metadata_file.to_str().unwrap().to_owned()
+        manifest_path.to_str().unwrap().to_owned()
     );
 }

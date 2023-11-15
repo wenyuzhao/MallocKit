@@ -25,7 +25,7 @@ debug = true
 [workspace.dependencies]
 libc = "0.2"
 errno = "0.2.8"
-spin = { version="0.9.3", features = ["std"] }
+spin = { version = "0.9.3", features = ["std"] }
 ctor = "0.1"
 num_cpus = "1.13.1"
 crossbeam = "0.8.1"
@@ -34,5 +34,13 @@ quote = "1.0.20"
 syn = "1.0.98"
 array-const-fn-init = "0.1.1"
 shell-words = "1.1.0"
-yaml-rust = "0.4.5"
-concat-idents = "1.1.3"
+cargo_metadata = "0.18.1"
+
+[workspace.metadata.malloc-tests]
+sed = "bash ./mallockit/tests/sed.sh"
+zip = "bash ./mallockit/tests/zip.sh"
+clang = "clang++ ./mallockit/tests/test.cpp -std=c++14 -O3 -o /dev/null"
+gcc = "g++ ./mallockit/tests/test.cpp -std=c++14 -O3 -o /dev/null"
+ls = "ls -al"
+ping = "ping -i 0.2 -c 8 localhost"
+python = "python3 ./mallockit/tests/test.py"

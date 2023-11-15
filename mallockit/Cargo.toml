@@ -18,13 +18,10 @@ shell-words = { workspace = true }
 mallockit_proc_macro = { path = "./proc_macro" }
 
 [build-dependencies]
-yaml-rust = { workspace = true }
-
-[dev-dependencies]
-concat-idents = { workspace = true }
+cargo_metadata = { workspace = true }
 
 [features]
-default = [ "transparent_huge_page" ]
+default = ["transparent_huge_page"]
 transparent_huge_page = []
 slow_assert = []
 stat = []
