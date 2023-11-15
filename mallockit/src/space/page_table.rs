@@ -63,7 +63,7 @@ impl<L: PageTableLevel> PageTableEntry<L> {
         self.0.set(Self::IS_PAGE_TABLE, 0);
     }
 
-    const fn delta_entries(&mut self, entries: i32) -> usize {
+    fn delta_entries(&mut self, entries: i32) -> usize {
         self.0.delta(Self::PAGE_TABLE_USED_ENTRIES, entries as _)
     }
 }

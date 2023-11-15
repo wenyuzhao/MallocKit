@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::cell::{Cell, UnsafeCell};
 use std::intrinsics::likely;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
@@ -33,7 +33,7 @@ impl ThreadLocality for Shared {
 
 pub struct Lazy<T, TL: ThreadLocality = Shared, F: FnOnce() -> T = fn() -> T> {
     state: AtomicU8,
-    value: MaybeUninit<T>,
+    value: UnsafeCell<MaybeUninit<T>>,
     init: Cell<Option<F>>,
     phantom: PhantomData<TL>,
 }
@@ -42,7 +42,7 @@ impl<T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
     pub const fn new(f: F) -> Self {
         Self {
             state: AtomicU8::new(UNINITIALIZED),
-            value: MaybeUninit::uninit(),
+            value: UnsafeCell::new(MaybeUninit::uninit()),
             init: Cell::new(Some(f)),
             phantom: PhantomData,
         }
@@ -51,9 +51,7 @@ impl<T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
     fn force_initialize(&self) {
         let f: F = self.init.replace(None).unwrap();
         let v: T = f();
-        #[allow(cast_ref_to_mut)]
-        let me: &mut Self = unsafe { &mut *(self as *const Self as *mut Self) };
-        me.value.write(v);
+        unsafe { (*self.value.get()).write(v) };
         if !TL::THREAD_LOCAL {
             fence(Ordering::SeqCst);
         }
@@ -97,7 +95,7 @@ impl<T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
     }
 
     pub unsafe fn as_initialized(&self) -> &T {
-        &*self.value.as_ptr()
+        &*(*self.value.get()).as_ptr()
     }
 }
 
@@ -105,14 +103,14 @@ impl<T, TL: ThreadLocality, F: FnOnce() -> T> Deref for Lazy<T, TL, F> {
     type Target = T;
     fn deref(&self) -> &T {
         Lazy::force(self);
-        unsafe { &*self.value.as_ptr() }
+        unsafe { self.as_initialized() }
     }
 }
 
 impl<T, TL: ThreadLocality, F: FnOnce() -> T> DerefMut for Lazy<T, TL, F> {
     fn deref_mut(&mut self) -> &mut T {
         Lazy::force(self);
-        unsafe { &mut *self.value.as_mut_ptr() }
+        unsafe { &mut *(*self.value.get()).as_mut_ptr() }
     }
 }
 
