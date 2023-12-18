@@ -99,6 +99,7 @@ mod macos_tls {
     use crate::util::{allocation_area::AllocationArea, memory::RawMemory, Page, Size4K};
 
     const SLOT: usize = 89;
+    #[cfg(target_arch = "x86_64")]
     const OFFSET: usize = SLOT * std::mem::size_of::<usize>();
 
     #[cfg(not(test))]
@@ -116,11 +117,28 @@ mod macos_tls {
     }
 
     #[allow(unused)]
+    #[cfg(target_arch = "x86_64")]
     fn _get_tls<T>() -> *mut T {
         unsafe {
             let mut v: *mut T;
             asm!("mov {0}, gs:{offset}", out(reg) v, offset = const OFFSET);
             v
+        }
+    }
+
+    #[allow(unused)]
+    #[cfg(target_arch = "aarch64")]
+    fn _get_tls<T>() -> *mut T {
+        unsafe {
+            let mut tcb: *mut *mut T;
+            asm! {
+                "
+                mrs {0}, tpidrro_el0
+                bic {0}, {0}, #7
+                ",
+                out(reg) tcb
+            }
+            tcb.add(SLOT).read()
         }
     }
 
@@ -174,7 +192,17 @@ mod macos_tls {
         unsafe {
             (*ptr).0 = InternalTLS::NEW;
             (*ptr).1 = T::NEW;
-            asm!("mov gs:{offset}, {0}", in(reg) ptr, offset = const OFFSET);
+            unsafe {
+                let mut tcb: *mut *mut T;
+                asm! {
+                    "
+                    mrs {0}, tpidrro_el0
+                    bic {0}, {0}, #7
+                    ",
+                    out(reg) tcb
+                }
+                tcb.add(SLOT).write(ptr as *mut T)
+            }
         }
         ptr
     }
