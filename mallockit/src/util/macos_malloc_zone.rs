@@ -14,9 +14,9 @@ pub static mut MALLOCKIT_MALLOC_ZONE: MallocZone = MallocZone {
     realloc: zone_realloc,
     destroy: zone_destroy,
     zone_name: ZONE_NAME.as_ptr(),
-    /// Nullable
+    // Nullable
     batch_malloc: 0 as _,
-    /// Nullable
+    // Nullable
     batch_free: 0 as _,
     introspect: unsafe { &MALLOCKIT_MALLOC_INTROSPECTION },
     version: 9,
