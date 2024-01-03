@@ -11,21 +11,21 @@ import numpy as np
 
 class Pipeline:
     @staticmethod
-    def load_results(runid='latest') -> Tuple[pd.DataFrame, str]:
-        with open(f'./results/{runid}/runid', 'r') as f:
+    def load_results(runid="latest") -> Tuple[pd.DataFrame, str]:
+        with open(f"./results/{runid}/runid", "r") as f:
             runid = f.read().strip()
-        return pd.read_csv(f'./results/{runid}/results.csv'), runid
+        return pd.read_csv(f"./results/{runid}/results.csv"), runid
 
     @staticmethod
     def mean_over_invocation(df: pd.DataFrame) -> Tuple[pd.DataFrame, int]:
         df = df.copy()
-        benchmarks = set(df['bench'])
-        mallocs = set(df['malloc'])
+        benchmarks = set(df["bench"])
+        mallocs = set(df["malloc"])
         # metrics = [c for c in df.columns if c not in ['bench', 'malloc', 'invocation']]
         data = {}
         invocations = 0
         for index, row in df.iterrows():
-            key = (row['malloc'], row['bench'])
+            key = (row["malloc"], row["bench"])
             if key not in data:
                 data[key] = []
             data[key].append(index)
@@ -40,7 +40,7 @@ class Pipeline:
                 df.loc[idx[0], i] = v
                 drop_indexes += idx[1:]
         df.drop(drop_indexes, inplace=True)
-        df.drop(['invocation'], axis=1, inplace=True)
+        df.drop(["invocation"], axis=1, inplace=True)
         df.reset_index(drop=True, inplace=True)
         return (df, invocations)
 
@@ -54,36 +54,44 @@ class Pipeline:
             y = x.copy()
             for col in x.columns.values:
                 if is_numeric_dtype(y[col]):
-                    y[col] = y[col] / x.loc[x['malloc'] == baseline][col].iloc[0]
+                    y[col] = y[col] / x.loc[x["malloc"] == baseline][col].iloc[0]
             return y
-        return df.groupby(['bench']).apply(apply)
+
+        v = df.groupby(["bench"]).apply(apply)
+        v.reset_index(drop=True, inplace=True)
+        return v
 
     @staticmethod
-    def plot_bar(df: pd.DataFrame, series: str, pivot: str, value: str, column_order: Optional[List[str]] = None) -> pd.DataFrame:
+    def plot_bar(
+        df: pd.DataFrame,
+        series: str,
+        pivot: str,
+        value: str,
+        column_order: Optional[List[str]] = None,
+    ) -> pd.DataFrame:
         pivot = pd.pivot_table(df, values=value, index=pivot, columns=series)
 
         if column_order is not None:
-            column_order = [
-                x for x in column_order if x in pivot.columns.values]
+            column_order = [x for x in column_order if x in pivot.columns.values]
             pivot = pivot[column_order]
         # Calculate min/max/mean/geomean
         min = pivot.apply(lambda x: np.min(x), axis=0)
         max = pivot.apply(lambda x: np.max(x), axis=0)
         mean = pivot.apply(lambda x: np.mean(x), axis=0)
         geomean = pivot.apply(lambda x: np.exp(np.mean(np.log(x))), axis=0)
-        pivot.loc['.'] = pivot.apply(lambda x: 0, axis=0)
-        pivot.loc['min'] = min
-        pivot.loc['max'] = max
-        pivot.loc['mean'] = mean
-        pivot.loc['geomean'] = geomean
+        pivot.loc["."] = pivot.apply(lambda x: 0, axis=0)
+        pivot.loc["min"] = min
+        pivot.loc["max"] = max
+        pivot.loc["mean"] = mean
+        pivot.loc["geomean"] = geomean
         # Plot
         pivot.plot(kind="bar", figsize=(20, 9), rot=45)
         # Format table for output
-        pivot.loc['.'] = pivot.apply(lambda x: '', axis=0)
-        pivot.loc['min'] = min
-        pivot.loc['max'] = max
-        pivot.loc['mean'] = mean
-        pivot.loc['geomean'] = geomean
+        pivot.loc["."] = pivot.apply(lambda x: "", axis=0)
+        pivot.loc["min"] = min
+        pivot.loc["max"] = max
+        pivot.loc["mean"] = mean
+        pivot.loc["geomean"] = geomean
         return pivot
 
 
@@ -93,17 +101,21 @@ def markdown(s: str):
 
 def display_meta_info():
     git_revision = subprocess.check_output(
-        ['git', 'rev-parse', '--short', 'HEAD'], text=True).strip()
+        ["git", "rev-parse", "--short", "HEAD"], text=True
+    ).strip()
     uname = platform.uname()
-    os = f'{uname.system} ({uname.release})'
+    os = f"{uname.system} ({uname.release})"
     cpu = subprocess.check_output(
-        "lscpu | grep 'Model name:' | sed -r 's/Model name:\s{1,}//g'", shell=True, text=True).strip()
-    mem = str(math.ceil(psutil.virtual_memory().total / (1024.0 ** 3))) + ' GB'
+        "lscpu | grep 'Model name:' | sed -r 's/Model name:\s{1,}//g'",
+        shell=True,
+        text=True,
+    ).strip()
+    mem = str(math.ceil(psutil.virtual_memory().total / (1024.0**3))) + " GB"
     markdown(
-        f'| Meta          | Value          |\n'
-        f'|:------------- | --------------:|\n'
-        f'| Git revision  | {git_revision} |\n'
-        f'| System        | {os}           |\n'
-        f'| Processor     | {cpu}          |\n'
-        f'| Memory        | {mem}          |\n'
+        f"| Meta          | Value          |\n"
+        f"|:------------- | --------------:|\n"
+        f"| Git revision  | {git_revision} |\n"
+        f"| System        | {os}           |\n"
+        f"| Processor     | {cpu}          |\n"
+        f"| Memory        | {mem}          |\n"
     )
