@@ -1,5 +1,3 @@
-use std::intrinsics::likely;
-
 use super::{page_resource::BlockPageResource, Allocator, Space, SpaceId};
 use crate::{pool::Pool, super_block::SuperBlock};
 use mallockit::util::{discrete_tlab::DiscreteTLAB, size_class::SizeClass, *};
@@ -103,7 +101,7 @@ impl HoardAllocator {
 impl Allocator for HoardAllocator {
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let size_class = SizeClass::from_layout(layout);
-        if likely(layout.size() <= Self::LARGEST_SMALL_OBJECT) {
+        if layout.size() <= Self::LARGEST_SMALL_OBJECT {
             if let Some(cell) = self.tlab.pop(size_class) {
                 return Some(cell);
             }
@@ -114,10 +112,9 @@ impl Allocator for HoardAllocator {
     fn dealloc(&mut self, cell: Address) {
         let block = SuperBlock::containing(cell);
         let size = block.size_class.bytes();
-        if likely(
-            size <= Self::LARGEST_SMALL_OBJECT
-                && size + self.tlab.free_bytes() <= Self::LOCAL_HEAP_THRESHOLD,
-        ) {
+        if size <= Self::LARGEST_SMALL_OBJECT
+            && size + self.tlab.free_bytes() <= Self::LOCAL_HEAP_THRESHOLD
+        {
             self.tlab.push(block.size_class, cell);
         } else {
             self.local.free_cell(cell, &self.space);

@@ -2,10 +2,7 @@ use crate::{hoard_space::HoardSpace, super_block::SuperBlock};
 use array_const_fn_init::array_const_fn_init;
 use mallockit::util::{size_class::SizeClass, Address, Lazy, Local};
 use spin::{relax::Yield, MutexGuard};
-use std::{
-    intrinsics::likely,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 type Mutex<T> = spin::mutex::Mutex<T, Yield>;
 
@@ -134,12 +131,12 @@ impl BlockList {
 
     #[cold]
     fn move_to_front_slow(&mut self, mut block: SuperBlock, alloc: bool) {
-        if likely(Some(block) == self.cache) {
+        if Some(block) == self.cache {
             return;
         }
         let group = Self::group(block, alloc);
         let block_group = block.group as usize;
-        if likely(Some(block) == self.groups[group] || group == block_group) {
+        if Some(block) == self.groups[group] || group == block_group {
             return;
         }
         if self.groups[block_group] == Some(block) {
@@ -161,7 +158,7 @@ impl BlockList {
     }
 
     fn move_to_front(&mut self, block: SuperBlock, alloc: bool) {
-        if likely(Some(block) == self.cache) {
+        if Some(block) == self.cache {
             return;
         }
         self.move_to_front_slow(block, alloc)

@@ -1,10 +1,8 @@
 #![allow(incomplete_features)]
 #![feature(thread_local)]
-#![feature(core_intrinsics)]
 #![feature(const_mut_refs)]
 #![feature(const_trait_impl)]
 #![feature(step_trait)]
-#![feature(const_likely)]
 
 #[allow(unused)]
 #[macro_use]
@@ -14,10 +12,8 @@ mod hoard_space;
 mod pool;
 mod super_block;
 
-use core::alloc::Layout;
 use hoard_space::*;
 use mallockit::{space::large_object_space::*, space::*, util::*, Mutator, Plan};
-use std::intrinsics::likely;
 
 const HOARD_SPACE: SpaceId = SpaceId::DEFAULT;
 const LARGE_OBJECT_SPACE: SpaceId = SpaceId::LARGE_OBJECT_SPACE;
@@ -40,7 +36,7 @@ impl Plan for Hoard {
 
     fn get_layout(ptr: Address) -> Layout {
         debug_assert!(HOARD_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
-        if likely(HOARD_SPACE.contains(ptr)) {
+        if HOARD_SPACE.contains(ptr) {
             HoardSpace::get_layout(ptr)
         } else {
             Self::get().large_object_space.get_layout::<Size4K>(ptr)
@@ -68,7 +64,7 @@ impl Mutator for HoardMutator {
     const NEW: Self = Self::new();
 
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
-        if likely(HoardSpace::can_allocate(layout)) {
+        if HoardSpace::can_allocate(layout) {
             mallockit::stat::track_allocation(layout, false);
             self.hoard.alloc(layout)
         } else {
@@ -79,7 +75,7 @@ impl Mutator for HoardMutator {
 
     fn dealloc(&mut self, ptr: Address) {
         debug_assert!(HOARD_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
-        if likely(HOARD_SPACE.contains(ptr)) {
+        if HOARD_SPACE.contains(ptr) {
             mallockit::stat::track_deallocation(false);
             self.hoard.dealloc(ptr)
         } else {

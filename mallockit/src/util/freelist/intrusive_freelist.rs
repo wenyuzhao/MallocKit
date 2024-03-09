@@ -1,6 +1,6 @@
 use super::abstract_freelist::*;
 use crate::util::*;
-use std::{intrinsics::unlikely, marker::PhantomData, ops::Range, ptr::NonNull};
+use std::{marker::PhantomData, ops::Range, ptr::NonNull};
 
 #[derive(Debug)]
 #[repr(C)]
@@ -41,6 +41,16 @@ where
     base: Address,
     table: [Option<CellPtr>; Config::NUM_SIZE_CLASS],
     phantom: PhantomData<Config>,
+}
+
+unsafe impl<Config: AddressSpaceConfig> Sync for IntrusiveFreeList<Config> where
+    [(); Config::NUM_SIZE_CLASS]: Sized
+{
+}
+
+unsafe impl<Config: AddressSpaceConfig> Send for IntrusiveFreeList<Config> where
+    [(); Config::NUM_SIZE_CLASS]: Sized
+{
 }
 
 impl<Config: AddressSpaceConfig> InternalAbstractFreeList for IntrusiveFreeList<Config>
@@ -94,7 +104,7 @@ where
 
     fn pop_cell(&mut self, size_class: usize) -> Option<Unit> {
         let head_opt = self.table[size_class];
-        if unlikely(head_opt.is_none()) {
+        if head_opt.is_none() {
             return None;
         } else {
             debug_assert!(head_opt.is_some());

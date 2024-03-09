@@ -1,11 +1,11 @@
 #![allow(incomplete_features)]
+#![allow(internal_features)]
 #![feature(core_intrinsics)]
 #![feature(const_trait_impl)]
 #![feature(const_mut_refs)]
 #![feature(const_ptr_is_null)]
 #![feature(type_ascription)]
 #![feature(step_trait)]
-#![feature(const_likely)]
 #![feature(thread_local)]
 #![feature(allocator_api)]
 #![feature(never_type)]
@@ -21,6 +21,7 @@
 #![feature(type_alias_impl_trait)]
 #![feature(specialization)]
 #![feature(const_for)]
+#![feature(effects)]
 
 extern crate mallockit_proc_macro;
 

@@ -4,7 +4,6 @@
 
 extern crate mallockit;
 
-use core::alloc::Layout;
 use mallockit::{space::immortal_space::*, space::*, util::*, Mutator, Plan};
 
 const IMMORTAL_SPACE: SpaceId = SpaceId::DEFAULT;
