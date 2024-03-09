@@ -1,7 +1,4 @@
-#![allow(incomplete_features)]
 #![feature(thread_local)]
-#![feature(const_mut_refs)]
-#![feature(const_trait_impl)]
 #![feature(step_trait)]
 
 #[allow(unused)]

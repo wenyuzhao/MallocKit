@@ -1,5 +1,3 @@
-#![allow(incomplete_features)]
-#![feature(type_alias_impl_trait)]
 #![feature(thread_local)]
 
 extern crate mallockit;
