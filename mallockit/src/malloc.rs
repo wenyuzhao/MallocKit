@@ -52,7 +52,6 @@ impl<P: Plan> MallocAPI<P> {
     }
 
     pub unsafe fn malloc_size(&self, ptr: Address) -> usize {
-        let ptr = ptr;
         #[cfg(target_os = "macos")]
         if !Self::is_in_mallockit_heap(ptr) {
             return crate::util::macos_malloc_zone::external_memory_size(ptr);

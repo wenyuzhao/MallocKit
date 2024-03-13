@@ -84,11 +84,7 @@ unsafe impl Sync for Address {}
 
 impl Clone for Address {
     fn clone(&self) -> Self {
-        Self(self.0)
-    }
-
-    fn clone_from(&mut self, source: &Self) {
-        *self = *source
+        *self
     }
 }
 
@@ -153,10 +149,6 @@ impl Deref for Address {
 impl PartialEq for Address {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
-    }
-
-    fn ne(&self, other: &Self) -> bool {
-        !self.eq(other)
     }
 }
 

@@ -26,8 +26,11 @@ fn run_cmd(env: &str, dylib: &str, cmd: &str) {
     std::eprintln!("{}", String::from_utf8(output.stderr).unwrap());
     assert!(
         output.status.success(),
-        "FAILED {}",
-        format!("> env {}={} {} {}", env, dylib, prog, args.join(" "))
+        "FAILED > env {}={} {} {}",
+        env,
+        dylib,
+        prog,
+        args.join(" ")
     );
 }
 
