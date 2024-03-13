@@ -1,5 +1,6 @@
 use std::alloc::Layout;
 use std::ptr;
+use std::ptr::addr_of_mut;
 
 use crate::plan::Plan;
 use crate::space::meta::MetaLocal;
@@ -66,7 +67,7 @@ impl InternalTLS {
 
     #[cfg(not(target_os = "macos"))]
     pub fn current() -> &'static mut Self {
-        unsafe { &mut *INTERNAL_TLS.get() }
+        unsafe { &mut *addr_of_mut!(INTERNAL_TLS) }
     }
 
     #[cfg(target_os = "macos")]
@@ -78,8 +79,7 @@ impl InternalTLS {
 
 #[cfg(not(target_os = "macos"))]
 #[thread_local]
-static mut INTERNAL_TLS: std::cell::UnsafeCell<InternalTLS> =
-    std::cell::UnsafeCell::new(InternalTLS::new());
+static mut INTERNAL_TLS: InternalTLS = InternalTLS::new();
 
 pub trait TLS: Sized {
     fn new() -> Self;
