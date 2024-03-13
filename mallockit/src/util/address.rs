@@ -54,26 +54,51 @@ impl Address {
         self.0 as _
     }
 
+    /// Cast the pointer to a const reference
+    ///
+    /// # Safety
+    ///
+    /// Ensure that the pointer is valid and properly aligned
     pub const unsafe fn as_ref<T: 'static>(&self) -> &'static T {
         debug_assert!(!self.is_zero());
         &*self.as_ptr()
     }
 
+    /// Cast the pointer to a mutable reference
+    ///
+    /// # Safety
+    ///
+    /// Ensure that the pointer is valid and properly aligned
     pub const unsafe fn as_mut<T: 'static>(&self) -> &'static mut T {
         debug_assert!(!self.is_zero());
         &mut *self.as_mut_ptr()
     }
 
+    /// Load a value from the pointer
+    ///
+    /// # Safety
+    ///
+    /// Ensure that the pointer is valid and properly aligned
     pub const unsafe fn load<T: 'static + Copy>(&self) -> T {
         debug_assert!(!self.is_zero());
         *self.as_ref()
     }
 
+    /// Store a value to the pointer
+    ///
+    /// # Safety
+    ///
+    /// Ensure that the pointer is valid and properly aligned
     pub const unsafe fn store<T: 'static + Copy>(&self, value: T) {
         debug_assert!(!self.is_zero());
         *self.as_mut() = value
     }
 
+    /// Cast the pointer to an atomic reference
+    ///
+    /// # Safety
+    ///
+    /// Ensure that the pointer is valid and properly aligned
     pub const unsafe fn atomic<T: 'static>(&self) -> &Atomic<T> {
         self.as_ref()
     }
