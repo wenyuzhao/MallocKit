@@ -37,11 +37,15 @@ impl Plan for Buddy {
     }
 }
 
-#[mallockit::mutator]
+#[mallockit::mutator(new = Self::new)]
 struct BuddyMutator {
     freelist: FreeListAllocator,
     los: LargeObjectAllocator<Size4K>,
 }
+
+
+#[mallockit::mutator]
+static MUTATOR: BuddyMutator = BuddyMutator::new();
 
 impl ConstNew for BuddyMutator {
     fn new() -> Self {

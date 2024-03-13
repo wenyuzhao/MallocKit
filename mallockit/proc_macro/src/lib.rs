@@ -39,7 +39,7 @@ pub fn mutator(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #[cfg(not(target_os = "macos"))]
         mod __mallockit_mutator {
             #[thread_local]
-            pub(super) static mut MUTATOR: super::#name = <super::#name as mallockit::mutator::NewMutator>::new();
+            pub(super) static mut MUTATOR: super::#name = <super::#name as mallockit::mutator::ConstNew>::new();
         }
 
         impl mallockit::mutator::TLS for #name {
