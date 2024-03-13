@@ -15,7 +15,7 @@ use std::marker::ConstParamTy;
 pub struct SpaceId(pub(crate) u8);
 
 impl SpaceId {
-    pub const LOG_MAX_SPACE_SIZE: usize = 40;
+    pub const LOG_MAX_SPACE_SIZE: usize = 41;
     pub(crate) const SHIFT: usize = Self::LOG_MAX_SPACE_SIZE;
     pub(crate) const MASK: usize = 0b1111 << Self::SHIFT;
 
