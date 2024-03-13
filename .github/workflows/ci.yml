@@ -22,6 +22,11 @@ jobs:
         with:
           command: fmt
           args: -- --check
+      - name: Lint Checks
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
       - name: Test (Debug)
         uses: actions-rs/cargo@v1
         with:
