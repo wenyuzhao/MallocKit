@@ -102,25 +102,25 @@ impl From<usize> for Address {
 
 impl<T> From<*const T> for Address {
     fn from(value: *const T) -> Self {
-        unsafe { Self(value as usize) }
+        Self(value as usize)
     }
 }
 
 impl<T> From<*mut T> for Address {
     fn from(value: *mut T) -> Self {
-        unsafe { Self(value as usize) }
+        Self(value as usize)
     }
 }
 
 impl<T> From<&T> for Address {
     fn from(value: &T) -> Self {
-        unsafe { Self(value as *const T as usize) }
+        Self(value as *const T as usize)
     }
 }
 
 impl<T> From<&mut T> for Address {
     fn from(value: &mut T) -> Self {
-        unsafe { Self(value as *const T as usize) }
+        Self(value as *const T as usize)
     }
 }
 

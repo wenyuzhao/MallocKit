@@ -1,8 +1,6 @@
 #![feature(thread_local)]
 #![feature(step_trait)]
 
-#[allow(unused)]
-#[macro_use]
 extern crate mallockit;
 
 mod hoard_space;
