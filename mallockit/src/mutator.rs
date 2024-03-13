@@ -58,7 +58,7 @@ pub(crate) struct InternalTLS {
 
 impl InternalTLS {
     #[allow(unused)]
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             meta: MetaLocal::new(),
         }
@@ -79,7 +79,7 @@ impl InternalTLS {
 #[cfg(not(target_os = "macos"))]
 #[thread_local]
 static mut INTERNAL_TLS: std::cell::UnsafeCell<InternalTLS> =
-    std::cell::UnsafeCell::new(InternalTLS::NEW);
+    std::cell::UnsafeCell::new(InternalTLS::new());
 
 pub trait TLS: Sized {
     fn new() -> Self;
