@@ -1,0 +1,25 @@
+name: Rust
+
+on: [push, pull_request]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build
+        run: cargo build
+      - name: Run tests
+        run: cargo test
+      - name: Run fmt checks
+        run: cargo fmt -- --check
+      - name: Run lints
+        run: cargo clippy -- -D warnings
+      - name: Test (Debug)
+        run: cargo test
+      - name: Test (Release)
+        run: cargo test --release
