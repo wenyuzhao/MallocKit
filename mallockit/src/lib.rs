@@ -10,6 +10,7 @@
 #![feature(adt_const_params)]
 #![feature(generic_const_exprs)]
 #![feature(effects)]
+#![feature(asm_const)]
 
 extern crate mallockit_proc_macro;
 pub extern crate spin;
@@ -40,8 +41,9 @@ const ERROR: ! = "32-bit is not supported";
 
 #[cfg(not(any(
     all(target_os = "linux", target_arch = "x86_64"),
-    all(target_os = "macos", target_arch = "x86_64"),
     all(target_os = "linux", target_arch = "aarch64"),
+    all(target_os = "macos", target_arch = "x86_64"),
+    all(target_os = "macos", target_arch = "aarch64"),
 )))]
 const ERROR: ! = r#"
     ❌ Unsupported Platform.
