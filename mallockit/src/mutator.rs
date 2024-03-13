@@ -93,6 +93,11 @@ pub trait TLS: Sized {
 
 impl TLS for u8 {
     const NEW: Self = 0;
+
+    #[cfg(not(target_os = "macos"))]
+    fn current() -> &'static mut Self {
+        unreachable!()
+    }
 }
 
 #[cfg(target_os = "macos")]
