@@ -194,6 +194,7 @@ mod macos_tls {
 
     #[cold]
     #[allow(unused)]
+    #[cfg(target_arch = "aarch64")]
     fn init_tls<T: TLS>() -> *mut (InternalTLS, T) {
         let ptr = alloc_tls::<(InternalTLS, T)>();
         unsafe {
@@ -210,6 +211,19 @@ mod macos_tls {
                 }
                 tcb.add(SLOT).write(ptr as *mut T)
             }
+        }
+        ptr
+    }
+
+    #[cold]
+    #[allow(unused)]
+    #[cfg(target_arch = "x86_64")]
+    fn init_tls<T: TLS>() -> *mut (InternalTLS, T) {
+        let ptr = alloc_tls::<(InternalTLS, T)>();
+        unsafe {
+            (*ptr).0 = InternalTLS::NEW;
+            (*ptr).1 = T::NEW;
+            asm!("mov gs:{offset}, {0}", in(reg) ptr, offset = const OFFSET);
         }
         ptr
     }
