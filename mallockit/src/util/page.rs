@@ -79,7 +79,7 @@ impl<S: PageSize> Page<S> {
                 return false;
             }
         }
-        return true;
+        true
     }
 }
 
@@ -94,11 +94,7 @@ unsafe impl<S: PageSize> Sync for Page<S> {}
 
 impl<S: PageSize> Clone for Page<S> {
     fn clone(&self) -> Self {
-        Self(self.0, PhantomData)
-    }
-
-    fn clone_from(&mut self, source: &Self) {
-        *self = source.clone()
+        *self
     }
 }
 
@@ -107,10 +103,6 @@ impl<S: PageSize> Copy for Page<S> {}
 impl<S: PageSize> PartialEq for Page<S> {
     fn eq(&self, other: &Self) -> bool {
         self.0.get() == other.0.get()
-    }
-
-    fn ne(&self, other: &Self) -> bool {
-        !self.eq(other)
     }
 }
 

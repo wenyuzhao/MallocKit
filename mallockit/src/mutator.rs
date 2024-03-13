@@ -1,5 +1,6 @@
 use std::alloc::Layout;
 use std::ptr;
+use std::ptr::addr_of_mut;
 
 use crate::plan::Plan;
 use crate::space::meta::MetaLocal;
@@ -8,7 +9,7 @@ use crate::util::Address;
 pub trait Mutator: Sized + 'static + TLS {
     type Plan: Plan<Mutator = Self>;
 
-    const NEW: Self;
+    fn new() -> Self;
 
     fn current() -> &'static mut Self {
         <Self as TLS>::current()
@@ -58,13 +59,15 @@ pub(crate) struct InternalTLS {
 
 impl InternalTLS {
     #[allow(unused)]
-    const NEW: Self = Self {
-        meta: MetaLocal::new(),
-    };
+    const fn new() -> Self {
+        Self {
+            meta: MetaLocal::new(),
+        }
+    }
 
     #[cfg(not(target_os = "macos"))]
     pub fn current() -> &'static mut Self {
-        unsafe { &mut *INTERNAL_TLS.get() }
+        unsafe { &mut *addr_of_mut!(INTERNAL_TLS) }
     }
 
     #[cfg(target_os = "macos")]
@@ -76,11 +79,10 @@ impl InternalTLS {
 
 #[cfg(not(target_os = "macos"))]
 #[thread_local]
-static mut INTERNAL_TLS: std::cell::UnsafeCell<InternalTLS> =
-    std::cell::UnsafeCell::new(InternalTLS::NEW);
+static mut INTERNAL_TLS: InternalTLS = InternalTLS::new();
 
 pub trait TLS: Sized {
-    const NEW: Self;
+    fn new() -> Self;
 
     #[cfg(not(target_os = "macos"))]
     fn current() -> &'static mut Self;
@@ -92,7 +94,9 @@ pub trait TLS: Sized {
 }
 
 impl TLS for u8 {
-    const NEW: Self = 0;
+    fn new() -> Self {
+        0
+    }
 
     #[cfg(not(target_os = "macos"))]
     fn current() -> &'static mut Self {
@@ -180,7 +184,7 @@ mod macos_tls {
         } else {
             let mut buffer = ALLOC_BUFFER.lock();
             if let Some(a) = buffer.alloc(layout) {
-                return a.into();
+                a.into()
             } else {
                 let size = layout.size() << 4;
                 let size = (size + Page::<Size4K>::MASK) & !Page::<Size4K>::MASK;
@@ -198,8 +202,8 @@ mod macos_tls {
     fn init_tls<T: TLS>() -> *mut (InternalTLS, T) {
         let ptr = alloc_tls::<(InternalTLS, T)>();
         unsafe {
-            (*ptr).0 = InternalTLS::NEW;
-            (*ptr).1 = T::NEW;
+            (*ptr).0 = InternalTLS::new();
+            (*ptr).1 = T::new();
             unsafe {
                 let mut tcb: *mut *mut T;
                 asm! {
@@ -221,8 +225,8 @@ mod macos_tls {
     fn init_tls<T: TLS>() -> *mut (InternalTLS, T) {
         let ptr = alloc_tls::<(InternalTLS, T)>();
         unsafe {
-            (*ptr).0 = InternalTLS::NEW;
-            (*ptr).1 = T::NEW;
+            (*ptr).0 = InternalTLS::new();
+            (*ptr).1 = T::new();
             asm!("mov gs:{offset}, {0}", in(reg) ptr, offset = const OFFSET);
         }
         ptr

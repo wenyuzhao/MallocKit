@@ -54,7 +54,7 @@ impl<L: PageTableLevel> PageTableEntry<L> {
         self.0.set(Self::PAGE_TABLE_USED_ENTRIES, 0);
         let word = table as *mut _ as usize;
         debug_assert!((word & !Self::PAGE_TABLE_POINTER_MASK) == 0);
-        self.0 = self.0 | word;
+        self.0 |= word;
     }
 
     fn set_next_page(&mut self, _pages: Option<usize>) {

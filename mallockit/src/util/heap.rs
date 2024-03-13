@@ -9,7 +9,7 @@ use super::{memory::RawMemory, Address};
 const LOG_HEAP_SIZE: usize = 45;
 const HEAP_SIZE: usize = 1 << LOG_HEAP_SIZE;
 
-pub static HEAP: Lazy<Heap> = Lazy::new(|| Heap::new());
+pub static HEAP: Lazy<Heap> = Lazy::new(Heap::new);
 
 pub struct Heap {
     pub(crate) start: Address,

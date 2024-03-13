@@ -51,9 +51,9 @@ impl BlockPageResource {
             Ok(addr) => {
                 let start = Page::<S>::new(addr);
                 let end = Step::forward(start, pages);
-                return Some(start..end);
+                Some(start..end)
             }
-            Err(_) => return None,
+            Err(_) => None,
         }
     }
 }

@@ -1,8 +1,6 @@
-#![feature(thread_local)]
+#![feature(thread_local, const_trait_impl, effects)]
 #![feature(step_trait)]
 
-#[allow(unused)]
-#[macro_use]
 extern crate mallockit;
 
 mod hoard_space;
@@ -10,7 +8,11 @@ mod pool;
 mod super_block;
 
 use hoard_space::*;
-use mallockit::{space::large_object_space::*, space::*, util::*, Mutator, Plan};
+use mallockit::{
+    space::{large_object_space::*, *},
+    util::*,
+    Mutator, Plan,
+};
 
 const HOARD_SPACE: SpaceId = SpaceId::DEFAULT;
 const LARGE_OBJECT_SPACE: SpaceId = SpaceId::LARGE_OBJECT_SPACE;
@@ -47,18 +49,15 @@ struct HoardMutator {
     los: LargeObjectAllocator<Size4K, { 1 << 31 }, { 16 << 20 }>,
 }
 
-impl HoardMutator {
-    const fn new() -> Self {
+impl Mutator for HoardMutator {
+    type Plan = Hoard;
+
+    fn new() -> Self {
         Self {
             hoard: HoardAllocator::new(Lazy::new(|| &Self::plan().hoard_space), HOARD_SPACE),
             los: LargeObjectAllocator::new(Lazy::new(|| &Self::plan().large_object_space)),
         }
     }
-}
-
-impl Mutator for HoardMutator {
-    type Plan = Hoard;
-    const NEW: Self = Self::new();
 
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         if HoardSpace::can_allocate(layout) {

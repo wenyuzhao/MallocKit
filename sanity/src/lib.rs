@@ -1,8 +1,12 @@
-#![feature(thread_local)]
+#![feature(thread_local, const_trait_impl, effects)]
 
 extern crate mallockit;
 
-use mallockit::{space::large_object_space::*, space::*, util::*, Mutator, Plan};
+use mallockit::{
+    space::{large_object_space::*, *},
+    util::*,
+    Mutator, Plan,
+};
 
 const LARGE_OBJECT_SPACE: SpaceId = SpaceId::LARGE_OBJECT_SPACE;
 
@@ -31,17 +35,14 @@ struct SanityMutator {
     los: LargeObjectAllocator,
 }
 
-impl SanityMutator {
-    const fn new() -> Self {
+impl Mutator for SanityMutator {
+    type Plan = Sanity;
+
+    fn new() -> Self {
         Self {
             los: LargeObjectAllocator::new(Lazy::new(|| &Self::plan().large_object_space)),
         }
     }
-}
-
-impl Mutator for SanityMutator {
-    type Plan = Sanity;
-    const NEW: Self = Self::new();
 
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         self.los.alloc(layout)

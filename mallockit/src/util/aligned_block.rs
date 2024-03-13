@@ -64,10 +64,6 @@ macro_rules! impl_aligned_block {
             fn eq(&self, other: &Self) -> bool {
                 self.0.get() == other.0.get()
             }
-
-            fn ne(&self, other: &Self) -> bool {
-                !self.eq(other)
-            }
         }
 
         impl Eq for $t {
@@ -193,11 +189,7 @@ macro_rules! impl_aligned_block {
 
         impl Clone for $t {
             fn clone(&self) -> Self {
-                Self::new(self.start())
-            }
-
-            fn clone_from(&mut self, source: &Self) {
-                *self = source.clone()
+                *self
             }
         }
 

@@ -18,7 +18,7 @@ impl Cell {
 
 impl PartialEq for Cell {
     fn eq(&self, other: &Cell) -> bool {
-        self as *const _ == other as *const _
+        std::ptr::eq(self, other)
     }
 }
 
@@ -105,7 +105,7 @@ where
     fn pop_cell(&mut self, size_class: usize) -> Option<Unit> {
         let head_opt = self.table[size_class];
         if head_opt.is_none() {
-            return None;
+            None
         } else {
             debug_assert!(head_opt.is_some());
             let mut head_ptr = unsafe { head_opt.unwrap_unchecked() };
@@ -122,7 +122,7 @@ where
             head.is_free = (0, 0);
             head.owner = 0 as _;
             let unit = self.cell_to_unit(head_ptr);
-            return Some(unit);
+            Some(unit)
         }
     }
 

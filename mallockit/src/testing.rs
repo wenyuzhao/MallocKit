@@ -19,15 +19,18 @@ fn run_cmd(env: &str, dylib: &str, cmd: &str) {
     let output = Command::new(prog)
         .current_dir("..")
         .args(args)
-        .env(env, &dylib)
+        .env(env, dylib)
         .output()
         .unwrap();
     std::println!("{}", String::from_utf8(output.stdout).unwrap());
     std::eprintln!("{}", String::from_utf8(output.stderr).unwrap());
     assert!(
         output.status.success(),
-        "FAILED {}",
-        format!("> env {}={} {} {}", env, dylib, prog, args.join(" "))
+        "FAILED > env {}={} {} {}",
+        env,
+        dylib,
+        prog,
+        args.join(" ")
     );
 }
 
@@ -45,9 +48,9 @@ pub fn test(malloc: &str, script: &str) {
     let dylib = fs::canonicalize(&dylib).unwrap();
     let commands = script
         .trim()
-        .split("\n")
+        .split('\n')
         .map(|x| x.trim())
-        .filter(|x| x.len() > 0);
+        .filter(|x| !x.is_empty());
     for cmd in commands {
         run_cmd(env, dylib.to_str().unwrap(), cmd);
     }

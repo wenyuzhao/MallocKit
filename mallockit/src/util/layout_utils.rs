@@ -8,6 +8,11 @@ pub trait LayoutUtils: Sized {
         layout.padding_needed_for(layout.align()) + layout.size()
     }
 
+    /// Pad the layout size to multiple of its alignment.
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe as it does not verify the preconditions from Layout::from_size_align.
     unsafe fn pad_to_align_unchecked(&self) -> Layout {
         let layout = self.layout();
         let pad = layout.padding_needed_for(layout.align());
@@ -18,6 +23,11 @@ pub trait LayoutUtils: Sized {
         Layout::from_size_align_unchecked(size, align)
     }
 
+    /// Extend the layout with another layout.
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe as it does not verify the preconditions from Layout::from_size_align.
     unsafe fn extend_unchecked(&self, next: Layout) -> (Layout, usize) {
         let layout = self.layout();
         let new_align = usize::max(layout.align(), next.align());

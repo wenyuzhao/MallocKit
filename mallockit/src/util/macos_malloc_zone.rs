@@ -2,7 +2,7 @@ use std::ptr::addr_of;
 
 use super::Address;
 
-const ZONE_NAME: &'static [i8] = &[
+const ZONE_NAME: &[i8] = &[
     'm' as _, 'a' as _, 'l' as _, 'l' as _, 'o' as _, 'c' as _, 'k' as _, 'i' as _, 't' as _, 0,
 ];
 

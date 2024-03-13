@@ -54,26 +54,51 @@ impl Address {
         self.0 as _
     }
 
+    /// Cast the pointer to a const reference
+    ///
+    /// # Safety
+    ///
+    /// Ensure that the pointer is valid and properly aligned
     pub const unsafe fn as_ref<T: 'static>(&self) -> &'static T {
         debug_assert!(!self.is_zero());
         &*self.as_ptr()
     }
 
+    /// Cast the pointer to a mutable reference
+    ///
+    /// # Safety
+    ///
+    /// Ensure that the pointer is valid and properly aligned
     pub const unsafe fn as_mut<T: 'static>(&self) -> &'static mut T {
         debug_assert!(!self.is_zero());
         &mut *self.as_mut_ptr()
     }
 
+    /// Load a value from the pointer
+    ///
+    /// # Safety
+    ///
+    /// Ensure that the pointer is valid and properly aligned
     pub const unsafe fn load<T: 'static + Copy>(&self) -> T {
         debug_assert!(!self.is_zero());
         *self.as_ref()
     }
 
+    /// Store a value to the pointer
+    ///
+    /// # Safety
+    ///
+    /// Ensure that the pointer is valid and properly aligned
     pub const unsafe fn store<T: 'static + Copy>(&self, value: T) {
         debug_assert!(!self.is_zero());
         *self.as_mut() = value
     }
 
+    /// Cast the pointer to an atomic reference
+    ///
+    /// # Safety
+    ///
+    /// Ensure that the pointer is valid and properly aligned
     pub const unsafe fn atomic<T: 'static>(&self) -> &Atomic<T> {
         self.as_ref()
     }
@@ -84,11 +109,7 @@ unsafe impl Sync for Address {}
 
 impl Clone for Address {
     fn clone(&self) -> Self {
-        Self(self.0)
-    }
-
-    fn clone_from(&mut self, source: &Self) {
-        *self = source.clone()
+        *self
     }
 }
 
@@ -102,25 +123,25 @@ impl From<usize> for Address {
 
 impl<T> From<*const T> for Address {
     fn from(value: *const T) -> Self {
-        unsafe { Self(mem::transmute(value)) }
+        Self(value as usize)
     }
 }
 
 impl<T> From<*mut T> for Address {
     fn from(value: *mut T) -> Self {
-        unsafe { Self(mem::transmute(value)) }
+        Self(value as usize)
     }
 }
 
 impl<T> From<&T> for Address {
     fn from(value: &T) -> Self {
-        unsafe { Self(mem::transmute(value as *const T)) }
+        Self(value as *const T as usize)
     }
 }
 
 impl<T> From<&mut T> for Address {
     fn from(value: &mut T) -> Self {
-        unsafe { Self(mem::transmute(value as *const T)) }
+        Self(value as *const T as usize)
     }
 }
 
@@ -153,10 +174,6 @@ impl Deref for Address {
 impl PartialEq for Address {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
-    }
-
-    fn ne(&self, other: &Self) -> bool {
-        !self.eq(other)
     }
 }
 

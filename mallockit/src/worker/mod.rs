@@ -1,5 +1,12 @@
-mod worker;
 mod worker_group;
 
-pub use worker::{Worker, WorkerId};
 pub use worker_group::WorkerGroup;
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct WorkerId(pub(super) usize);
+
+pub trait Worker: Sized + 'static {
+    fn new(id: WorkerId) -> Self;
+    fn init(&'static mut self, _group: &'static WorkerGroup<Self>) {}
+    fn run(&'static mut self);
+}

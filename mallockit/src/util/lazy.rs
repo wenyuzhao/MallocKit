@@ -92,6 +92,11 @@ impl<T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
         TL::force_slow(lazy);
     }
 
+    /// Load the value and assume it has been initialized
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because it does not check if the value has been initialized.
     pub unsafe fn as_initialized(&self) -> &T {
         &*(*self.value.get()).as_ptr()
     }
