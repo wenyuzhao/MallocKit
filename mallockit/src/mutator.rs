@@ -7,6 +7,7 @@ use crate::util::Address;
 
 pub trait Mutator: Sized + 'static + TLS {
     type Plan: Plan<Mutator = Self>;
+
     const NEW: Self;
 
     fn current() -> &'static mut Self {
