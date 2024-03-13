@@ -45,6 +45,6 @@ _Other usages of the benchmark tool:_
 - [ ] Windows/x86_64 support
 - [ ] Performance
 - [x] Linux/aarch64 support
-- [ ] MacOS/aarch64 support
+- [x] MacOS/aarch64 support
 - [ ] Windows/aarch64 support
 - [ ] Rust allocator interface

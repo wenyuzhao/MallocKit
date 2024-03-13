@@ -91,6 +91,15 @@ pub trait TLS: Sized {
     }
 }
 
+impl TLS for u8 {
+    const NEW: Self = 0;
+
+    #[cfg(not(target_os = "macos"))]
+    fn current() -> &'static mut Self {
+        unreachable!()
+    }
+}
+
 #[cfg(target_os = "macos")]
 mod macos_tls {
     use spin::{mutex::Mutex, Yield};
@@ -100,6 +109,7 @@ mod macos_tls {
     use crate::util::{allocation_area::AllocationArea, memory::RawMemory, Page, Size4K};
 
     const SLOT: usize = 89;
+    #[cfg(target_arch = "x86_64")]
     const OFFSET: usize = SLOT * std::mem::size_of::<usize>();
 
     #[cfg(not(test))]
@@ -110,18 +120,32 @@ mod macos_tls {
     #[cfg(test)]
     #[no_mangle]
     extern "C" fn mallockit_initialize_macos_tls() -> *mut u8 {
-        impl TLS for u8 {
-            const NEW: Self = 0;
-        }
         get_tls::<u8>()
     }
 
     #[allow(unused)]
+    #[cfg(target_arch = "x86_64")]
     fn _get_tls<T>() -> *mut T {
         unsafe {
             let mut v: *mut T;
             asm!("mov {0}, gs:{offset}", out(reg) v, offset = const OFFSET);
             v
+        }
+    }
+
+    #[allow(unused)]
+    #[cfg(target_arch = "aarch64")]
+    fn _get_tls<T>() -> *mut T {
+        unsafe {
+            let mut tcb: *mut *mut T;
+            asm! {
+                "
+                mrs {0}, tpidrro_el0
+                bic {0}, {0}, #7
+                ",
+                out(reg) tcb
+            }
+            tcb.add(SLOT).read()
         }
     }
 
@@ -170,6 +194,30 @@ mod macos_tls {
 
     #[cold]
     #[allow(unused)]
+    #[cfg(target_arch = "aarch64")]
+    fn init_tls<T: TLS>() -> *mut (InternalTLS, T) {
+        let ptr = alloc_tls::<(InternalTLS, T)>();
+        unsafe {
+            (*ptr).0 = InternalTLS::NEW;
+            (*ptr).1 = T::NEW;
+            unsafe {
+                let mut tcb: *mut *mut T;
+                asm! {
+                    "
+                    mrs {0}, tpidrro_el0
+                    bic {0}, {0}, #7
+                    ",
+                    out(reg) tcb
+                }
+                tcb.add(SLOT).write(ptr as *mut T)
+            }
+        }
+        ptr
+    }
+
+    #[cold]
+    #[allow(unused)]
+    #[cfg(target_arch = "x86_64")]
     fn init_tls<T: TLS>() -> *mut (InternalTLS, T) {
         let ptr = alloc_tls::<(InternalTLS, T)>();
         unsafe {

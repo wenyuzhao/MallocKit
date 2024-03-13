@@ -54,7 +54,7 @@ impl<P: Plan> MallocAPI<P> {
     pub unsafe fn malloc_size(&self, ptr: Address) -> usize {
         let ptr = Address::from(ptr);
         #[cfg(target_os = "macos")]
-        if Self::is_in_mallockit_heap(ptr.into()) {
+        if !Self::is_in_mallockit_heap(ptr.into()) {
             return crate::util::macos_malloc_zone::external_memory_size(ptr);
         }
         P::get_layout(ptr).size()
@@ -85,7 +85,7 @@ impl<P: Plan> MallocAPI<P> {
             return;
         }
         #[cfg(target_os = "macos")]
-        if Self::is_in_mallockit_heap(ptr.into()) {
+        if !Self::is_in_mallockit_heap(ptr.into()) {
             return;
         }
         self.mutator().dealloc(ptr.into());
@@ -108,7 +108,7 @@ impl<P: Plan> MallocAPI<P> {
         let new_size = Self::align_up(new_size, Self::MIN_ALIGNMENT);
 
         #[cfg(target_os = "macos")]
-        if Self::is_in_mallockit_heap(ptr.into()) {
+        if !Self::is_in_mallockit_heap(ptr.into()) {
             let ptr = Address::from(ptr);
             let old_size = crate::util::macos_malloc_zone::external_memory_size(ptr);
             let new_layout =
