@@ -5,13 +5,10 @@ use crate::plan::Plan;
 use crate::space::meta::MetaLocal;
 use crate::util::Address;
 
-#[const_trait]
-pub trait ConstNew: Sized + 'static {
-    fn new() -> Self;
-}
-
-pub trait Mutator: Sized + 'static + TLS + ConstNew {
+pub trait Mutator: Sized + 'static + TLS {
     type Plan: Plan<Mutator = Self>;
+
+    fn new() -> Self;
 
     fn current() -> &'static mut Self {
         <Self as TLS>::current()

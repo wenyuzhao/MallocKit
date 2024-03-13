@@ -11,7 +11,7 @@ use hoard_space::*;
 use mallockit::{
     space::{large_object_space::*, *},
     util::*,
-    ConstNew, Mutator, Plan,
+    Mutator, Plan,
 };
 
 const HOARD_SPACE: SpaceId = SpaceId::DEFAULT;
@@ -49,17 +49,15 @@ struct HoardMutator {
     los: LargeObjectAllocator<Size4K, { 1 << 31 }, { 16 << 20 }>,
 }
 
-impl ConstNew for HoardMutator {
+impl Mutator for HoardMutator {
+    type Plan = Hoard;
+
     fn new() -> Self {
         Self {
             hoard: HoardAllocator::new(Lazy::new(|| &Self::plan().hoard_space), HOARD_SPACE),
             los: LargeObjectAllocator::new(Lazy::new(|| &Self::plan().large_object_space)),
         }
     }
-}
-
-impl Mutator for HoardMutator {
-    type Plan = Hoard;
 
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         if HoardSpace::can_allocate(layout) {

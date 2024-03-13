@@ -5,7 +5,7 @@ extern crate mallockit;
 use mallockit::{
     space::{freelist_space::*, large_object_space::*, *},
     util::*,
-    ConstNew, Mutator, Plan,
+    Mutator, Plan,
 };
 
 const FREELIST_SPACE: SpaceId = SpaceId::DEFAULT;
@@ -37,17 +37,15 @@ impl Plan for Buddy {
     }
 }
 
-#[mallockit::mutator(new = Self::new)]
+#[mallockit::mutator]
 struct BuddyMutator {
     freelist: FreeListAllocator,
     los: LargeObjectAllocator<Size4K>,
 }
 
+impl Mutator for BuddyMutator {
+    type Plan = Buddy;
 
-#[mallockit::mutator]
-static MUTATOR: BuddyMutator = BuddyMutator::new();
-
-impl ConstNew for BuddyMutator {
     fn new() -> Self {
         Self {
             freelist: FreeListAllocator::new::<FREELIST_SPACE>(Lazy::new(|| {
@@ -56,10 +54,6 @@ impl ConstNew for BuddyMutator {
             los: LargeObjectAllocator::new(Lazy::new(|| &Self::plan().large_object_space)),
         }
     }
-}
-
-impl Mutator for BuddyMutator {
-    type Plan = Buddy;
 
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         if FreeListSpace::can_allocate(layout) {

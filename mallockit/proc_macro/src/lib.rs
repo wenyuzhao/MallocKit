@@ -39,17 +39,17 @@ pub fn mutator(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #[cfg(not(target_os = "macos"))]
         mod __mallockit_mutator {
             #[thread_local]
-            pub(super) static mut MUTATOR: super::#name = <super::#name as mallockit::mutator::ConstNew>::new();
+            pub(super) static mut MUTATOR: mallockit::util::Lazy<super::#name, mallockit::util::Local> = mallockit::util::Lazy::new(|| <super::#name as mallockit::Mutator>::new());
         }
 
         impl mallockit::mutator::TLS for #name {
             fn new() -> Self {
-                <Self as mallockit::ConstNew>::new()
+                <Self as mallockit::Mutator>::new()
             }
 
             #[cfg(not(target_os = "macos"))]
             fn current() -> &'static mut Self {
-                unsafe { &mut __mallockit_mutator::MUTATOR }
+                unsafe { &mut *__mallockit_mutator::MUTATOR }
             }
         }
     };

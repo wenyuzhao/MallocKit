@@ -5,7 +5,7 @@ extern crate mallockit;
 use mallockit::{
     space::{immortal_space::*, *},
     util::*,
-    ConstNew, Mutator, Plan,
+    Mutator, Plan,
 };
 
 const IMMORTAL_SPACE: SpaceId = SpaceId::DEFAULT;
@@ -35,16 +35,14 @@ struct BumpMutator {
     bump: BumpAllocator,
 }
 
-impl ConstNew for BumpMutator {
+impl Mutator for BumpMutator {
+    type Plan = Bump;
+
     fn new() -> Self {
         Self {
             bump: BumpAllocator::new(Lazy::new(|| &Self::plan().immortal)),
         }
     }
-}
-
-impl Mutator for BumpMutator {
-    type Plan = Bump;
 
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         self.bump.alloc(layout)
