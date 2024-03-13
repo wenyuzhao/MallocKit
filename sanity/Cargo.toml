@@ -1,5 +1,5 @@
 [package]
-name = "sanity"
+name = "mallockit-sanity"
 version = { workspace = true }
 authors = ["Wenyu Zhao <wenyu.zhao@anu.edu.au>"]
 edition = { workspace = true }
@@ -7,7 +7,12 @@ edition = { workspace = true }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
+name = "sanity"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 mallockit = { path = "../mallockit" }
+
+[features]
+default = []
+no_malloc_api = []

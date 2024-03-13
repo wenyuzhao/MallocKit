@@ -1,0 +1,25 @@
+[package]
+name = "mallockit-rs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mallockit-buddy = { path = "../../buddy", optional = true, features = [
+    "no_malloc_api",
+] }
+mallockit-bump = { path = "../../bump", optional = true, features = [
+    "no_malloc_api",
+] }
+mallockit-hoard = { path = "../../hoard", optional = true, features = [
+    "no_malloc_api",
+] }
+mallockit-sanity = { path = "../../sanity", optional = true, features = [
+    "no_malloc_api",
+] }
+
+[features]
+default = ["hoard"]
+buddy = ["dep:mallockit-buddy"]
+bump = ["dep:mallockit-bump"]
+hoard = ["dep:mallockit-hoard"]
+sanity = ["dep:mallockit-sanity"]

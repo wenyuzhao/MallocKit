@@ -21,20 +21,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
-name = "buddy"
-version = "0.1.0"
-dependencies = [
- "mallockit",
-]
-
-[[package]]
-name = "bump"
-version = "0.1.0"
-dependencies = [
- "mallockit",
-]
-
-[[package]]
 name = "camino"
 version = "1.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -166,15 +152,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
 
 [[package]]
-name = "hoard"
-version = "0.1.0"
-dependencies = [
- "array-const-fn-init",
- "mallockit",
- "spin",
-]
-
-[[package]]
 name = "itoa"
 version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -206,18 +183,58 @@ dependencies = [
  "ctor",
  "errno",
  "libc",
- "mallockit_proc_macro",
+ "mallockit-macros",
  "num_cpus",
  "shell-words",
  "spin",
 ]
 
 [[package]]
-name = "mallockit_proc_macro"
+name = "mallockit-buddy"
+version = "0.1.0"
+dependencies = [
+ "mallockit",
+]
+
+[[package]]
+name = "mallockit-bump"
+version = "0.1.0"
+dependencies = [
+ "mallockit",
+]
+
+[[package]]
+name = "mallockit-hoard"
+version = "0.1.0"
+dependencies = [
+ "array-const-fn-init",
+ "mallockit",
+ "spin",
+]
+
+[[package]]
+name = "mallockit-macros"
 version = "0.1.0"
 dependencies = [
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "mallockit-rs"
+version = "0.1.0"
+dependencies = [
+ "mallockit-buddy",
+ "mallockit-bump",
+ "mallockit-hoard",
+ "mallockit-sanity",
+]
+
+[[package]]
+name = "mallockit-sanity"
+version = "0.1.0"
+dependencies = [
+ "mallockit",
 ]
 
 [[package]]
@@ -249,17 +266,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rs-alloc"
+version = "0.1.0"
+dependencies = [
+ "mallockit-rs",
+]
+
+[[package]]
 name = "ryu"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e86697c916019a8588c99b5fac3cead74ec0b4b819707a682fd4d23fa0ce1ba1"
-
-[[package]]
-name = "sanity"
-version = "0.1.0"
-dependencies = [
- "mallockit",
-]
 
 [[package]]
 name = "scopeguard"

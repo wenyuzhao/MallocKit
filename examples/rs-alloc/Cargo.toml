@@ -1,0 +1,7 @@
+[package]
+name = "rs-alloc"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+mallockit-rs = { path = "../../mallockit/rust_alloc", features = ["hoard"] }

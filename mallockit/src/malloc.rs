@@ -230,7 +230,48 @@ impl<P: Plan> MallocAPI<P> {
 #[macro_export]
 macro_rules! export_malloc_api {
     ($plan: expr, $plan_ty: ty) => {
-        pub mod __mallockit {
+        pub mod __mallockit_rs_alloc {
+            type ConcretePlan = $plan_ty;
+            type Malloc = $crate::malloc::MallocAPI<ConcretePlan>;
+
+            fn adjust_layout(layout: std::alloc::Layout) -> std::alloc::Layout {
+                let size = std::cmp::max(layout.size(), Malloc::MIN_ALIGNMENT);
+                let size = Malloc::align_up(size, layout.align());
+                unsafe { std::alloc::Layout::from_size_align_unchecked(size, layout.align()) }
+            }
+
+            #[no_mangle]
+            pub extern "C" fn mallockit_alloc(layout: std::alloc::Layout) -> *mut u8 {
+                use $crate::Mutator;
+                <<$plan_ty as $crate::Plan>::Mutator as $crate::Mutator>::current()
+                    .alloc(adjust_layout(layout))
+                    .unwrap()
+                    .into()
+            }
+
+            #[no_mangle]
+            pub extern "C" fn mallockit_dealloc(ptr: *mut u8, _layout: std::alloc::Layout) {
+                use $crate::Mutator;
+                <<$plan_ty as $crate::Plan>::Mutator as $crate::Mutator>::current()
+                    .dealloc(ptr.into());
+            }
+
+            #[no_mangle]
+            pub extern "C" fn mallockit_realloc(
+                ptr: *mut u8,
+                _layout: std::alloc::Layout,
+                new_size: usize,
+            ) -> *mut u8 {
+                use $crate::Mutator;
+                <<$plan_ty as $crate::Plan>::Mutator as $crate::Mutator>::current()
+                    .realloc(ptr.into(), new_size)
+                    .unwrap()
+                    .into()
+            }
+        }
+
+        #[cfg(not(feature = "no_malloc_api"))]
+        pub mod __mallockit_malloc {
             use super::*;
             use $crate::Plan;
             type ConcretePlan = $plan_ty;

@@ -1,5 +1,5 @@
 [package]
-name = "hoard"
+name = "mallockit-hoard"
 version = { workspace = true }
 authors = ["Wenyu Zhao <wenyu.zhao@anu.edu.au>"]
 edition = { workspace = true }
@@ -7,9 +7,14 @@ edition = { workspace = true }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
+name = "hoard"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 mallockit = { path = "../mallockit" }
 spin = { workspace = true }
 array-const-fn-init = { workspace = true }
+
+[features]
+default = []
+no_malloc_api = []
