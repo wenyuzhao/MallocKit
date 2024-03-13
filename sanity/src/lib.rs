@@ -1,11 +1,7 @@
-#![allow(incomplete_features)]
-#![feature(type_alias_impl_trait)]
 #![feature(thread_local)]
-#![feature(core_intrinsics)]
 
 extern crate mallockit;
 
-use core::alloc::Layout;
 use mallockit::{space::large_object_space::*, space::*, util::*, Mutator, Plan};
 
 const LARGE_OBJECT_SPACE: SpaceId = SpaceId::LARGE_OBJECT_SPACE;

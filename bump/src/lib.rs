@@ -1,10 +1,7 @@
-#![allow(incomplete_features)]
-#![feature(type_alias_impl_trait)]
 #![feature(thread_local)]
 
 extern crate mallockit;
 
-use core::alloc::Layout;
 use mallockit::{space::immortal_space::*, space::*, util::*, Mutator, Plan};
 
 const IMMORTAL_SPACE: SpaceId = SpaceId::DEFAULT;

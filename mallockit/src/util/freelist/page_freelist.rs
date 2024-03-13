@@ -24,6 +24,9 @@ pub struct PageFreeList<const NUM_SIZE_CLASS: usize> {
     arena: Arena<Cell>,
 }
 
+unsafe impl<const NUM_SIZE_CLASS: usize> Sync for PageFreeList<NUM_SIZE_CLASS> {}
+unsafe impl<const NUM_SIZE_CLASS: usize> Send for PageFreeList<NUM_SIZE_CLASS> {}
+
 impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<NUM_SIZE_CLASS> {
     const MIN_SIZE_CLASS: usize = 0;
     const NUM_SIZE_CLASS: usize = NUM_SIZE_CLASS;

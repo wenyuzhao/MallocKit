@@ -1,12 +1,12 @@
 use super::super::SpaceId;
 use super::PageResource;
 use crate::util::freelist::page_freelist::PageFreeList;
+use crate::util::heap::HEAP;
 use crate::util::memory::RawMemory;
 use crate::util::*;
 use spin::mutex::Mutex;
 use spin::rwlock::RwLock;
 use spin::Yield;
-use std::intrinsics::unlikely;
 use std::iter::Step;
 use std::sync::atomic::AtomicU32;
 use std::{
@@ -21,12 +21,14 @@ pub struct FreelistPageResource {
     freelist: Mutex<PageFreeList<{ NUM_SIZE_CLASS }>, Yield>,
     reserved_bytes: AtomicUsize,
     meta: RwLock<Vec<AtomicU32>, Yield>,
+    base: Address,
 }
 
 impl FreelistPageResource {
     pub fn new(id: SpaceId) -> Self {
         debug_assert!(id.0 < 0b0000_1111);
-        let base = id.address_space().start;
+        let range = HEAP.get_space_range(id);
+        let base = range.start;
         let mut freelist = PageFreeList::new(base);
         freelist.release_cell(base, 1 << (NUM_SIZE_CLASS - 1));
         Self {
@@ -34,38 +36,26 @@ impl FreelistPageResource {
             freelist: Mutex::new(freelist),
             reserved_bytes: AtomicUsize::new(0),
             meta: RwLock::new(unsafe { std::mem::transmute(vec![0u32; 1 << 20]) }),
+            base,
         }
     }
 
-    fn map_pages<S: PageSize>(&self, start: Page<S>, pages: usize) -> bool {
-        let size = pages << S::LOG_BYTES;
-        match RawMemory::map(start.start(), size) {
-            Ok(_) => {
-                #[cfg(target_os = "linux")]
-                if cfg!(feature = "transparent_huge_page") && S::LOG_BYTES != Size4K::LOG_BYTES {
-                    unsafe {
-                        libc::madvise(start.start().as_mut_ptr(), size, libc::MADV_HUGEPAGE);
-                    }
-                }
-                self.reserved_bytes
-                    .fetch_add(pages << S::LOG_BYTES, Ordering::SeqCst);
-                true
-            }
-            _ => false,
-        }
+    fn map_pages<S: PageSize>(&self, _start: Page<S>, pages: usize) {
+        self.reserved_bytes
+            .fetch_add(pages << S::LOG_BYTES, Ordering::SeqCst);
     }
 
     fn unmap_pages<S: PageSize>(&self, start: Page<S>, pages: usize) {
-        RawMemory::unmap(start.start(), pages << S::LOG_BYTES);
+        RawMemory::madv_free(start.start(), pages << S::LOG_BYTES);
         self.reserved_bytes
             .fetch_sub(pages << S::LOG_BYTES, Ordering::SeqCst);
     }
 
     fn set_meta<S: PageSize>(&self, start: Page<S>, pages: usize) {
         debug_assert!(pages <= u32::MAX as usize);
-        let index = (start.start() - self.id.address_space().start) >> Page::<Size4K>::LOG_BYTES;
+        let index = (start.start() - self.base) >> Page::<Size4K>::LOG_BYTES;
         let meta = self.meta.upgradeable_read();
-        if unlikely(index >= meta.len()) {
+        if index >= meta.len() {
             let mut meta = meta.upgrade();
             let len = usize::max(meta.len(), index).next_power_of_two();
             meta.resize_with(len << 1, Default::default);
@@ -76,7 +66,7 @@ impl FreelistPageResource {
     }
 
     fn get_meta<S: PageSize>(&self, start: Page<S>) -> usize {
-        let index = (start.start() - self.id.address_space().start) >> Page::<Size4K>::LOG_BYTES;
+        let index = (start.start() - self.base) >> Page::<Size4K>::LOG_BYTES;
         self.meta.read()[index].load(Ordering::Relaxed) as _
     }
 }
@@ -91,9 +81,7 @@ impl PageResource for FreelistPageResource {
         let units = pages << (S::LOG_BYTES - Size4K::LOG_BYTES);
         let start = self.freelist.lock().allocate_cell(units)?.start;
         let start = Page::<S>::new(start);
-        if !self.map_pages(start, pages) {
-            return self.acquire_pages(pages); // Retry
-        }
+        self.map_pages(start, pages);
         let end = Step::forward(start, pages);
         self.set_meta(start, units);
         Some(start..end)

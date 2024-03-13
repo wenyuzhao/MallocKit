@@ -2,7 +2,6 @@ use super::META_SPACE;
 use crate::util::{Address, LayoutUtils, Page, Size4K};
 use std::{
     alloc::{AllocError, Allocator, GlobalAlloc, Layout},
-    intrinsics::likely,
     ptr::NonNull,
     slice,
 };
@@ -61,7 +60,7 @@ impl MetaLocal {
 
     fn pop_cell(&mut self, size_class: usize) -> Option<Address> {
         let cell = self.freelist[size_class];
-        if likely(!cell.is_zero()) {
+        if !cell.is_zero() {
             let next = unsafe { cell.load::<Address>() };
             self.freelist[size_class] = next;
             Some(cell)
@@ -109,7 +108,7 @@ impl MetaLocal {
     fn allocate(&mut self, layout: Layout) -> Result<Address, AllocError> {
         let layout = Self::update_layout(layout);
         let padded_size = layout.padded_size();
-        if likely(!Self::request_large(padded_size)) {
+        if !Self::request_large(padded_size) {
             let size_class = Self::size_class(padded_size);
             let cell = self.allocate_cell(size_class)?;
             let addr = cell.align_up(layout.align());
@@ -122,7 +121,7 @@ impl MetaLocal {
     fn deallocate(&mut self, ptr: Address, layout: Layout) {
         let layout = Self::update_layout(layout);
         let padded_size = layout.padded_size();
-        if likely(!Self::request_large(padded_size)) {
+        if !Self::request_large(padded_size) {
             let size_class = Self::size_class(padded_size);
             let cell = ptr.align_down(1 << size_class);
             self.push_cell(cell, size_class)

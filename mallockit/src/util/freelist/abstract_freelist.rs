@@ -2,10 +2,7 @@ use crate::{
     space::meta::Meta,
     util::{memory::RawMemory, *},
 };
-use std::{
-    intrinsics::unlikely,
-    ops::{Deref, Range},
-};
+use std::ops::{Deref, Range};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(C)]
@@ -85,7 +82,7 @@ impl LazyBst {
     }
 
     pub(super) fn set(&mut self, index: BstIndex, value: bool) {
-        if unlikely(self.needs_resize(index)) {
+        if self.needs_resize(index) {
             self.resize(index);
         }
         let (addr, bit_index) = self.get_bit_location(index).unwrap();
@@ -209,10 +206,9 @@ pub(super) trait InternalAbstractFreeList: Sized {
             debug_assert!(size_class < Self::NUM_SIZE_CLASS);
             let sibling = unit.sibling(size_class);
             debug_assert!(!self.is_free(unit, size_class));
-            if unlikely(
-                size_class < Self::NON_COALESCEABLE_SIZE_CLASS_THRESHOLD
-                    && self.is_free(sibling, size_class),
-            ) {
+            if size_class < Self::NON_COALESCEABLE_SIZE_CLASS_THRESHOLD
+                && self.is_free(sibling, size_class)
+            {
                 let parent = unit.parent(size_class);
                 debug_assert!(
                     !self.is_free(parent, size_class + 1),
@@ -263,7 +259,7 @@ pub(super) trait InternalAbstractFreeList: Sized {
             (units + ((1 << Self::MIN_SIZE_CLASS) - 1)) & !((1 << Self::MIN_SIZE_CLASS) - 1);
         let size_class = Self::size_class(units);
         let start = self.allocate_aligned_units(size_class)?;
-        if unlikely(units == (1 << size_class)) {
+        if units == (1 << size_class) {
             let free_units = (1 << size_class) - units;
             let free_start = Unit(*start + units);
             self.release_cell_unaligned_size(free_start, free_units);

@@ -1,28 +1,19 @@
 #![allow(incomplete_features)]
-#![feature(core_intrinsics)]
 #![feature(const_trait_impl)]
 #![feature(const_mut_refs)]
-#![feature(const_ptr_is_null)]
-#![feature(type_ascription)]
 #![feature(step_trait)]
-#![feature(const_likely)]
 #![feature(thread_local)]
 #![feature(allocator_api)]
 #![feature(never_type)]
-#![feature(const_maybe_uninit_assume_init)]
-#![feature(const_ptr_write)]
 #![feature(associated_type_defaults)]
 #![feature(alloc_layout_extra)]
-#![feature(const_option)]
-#![feature(const_alloc_layout)]
-#![feature(asm_const)]
 #![feature(adt_const_params)]
 #![feature(generic_const_exprs)]
-#![feature(type_alias_impl_trait)]
-#![feature(specialization)]
-#![feature(const_for)]
+#![feature(effects)]
+#![feature(asm_const)]
 
 extern crate mallockit_proc_macro;
+pub extern crate spin;
 
 #[macro_use]
 pub mod log;
@@ -50,8 +41,9 @@ const ERROR: ! = "32-bit is not supported";
 
 #[cfg(not(any(
     all(target_os = "linux", target_arch = "x86_64"),
-    all(target_os = "macos", target_arch = "x86_64"),
     all(target_os = "linux", target_arch = "aarch64"),
+    all(target_os = "macos", target_arch = "x86_64"),
+    all(target_os = "macos", target_arch = "aarch64"),
 )))]
 const ERROR: ! = r#"
     ❌ Unsupported Platform.

@@ -1,7 +1,4 @@
-use std::{
-    intrinsics::{likely, unlikely},
-    num::NonZeroUsize,
-};
+use std::num::NonZeroUsize;
 
 use mallockit::util::{aligned_block::AlignedBlockConfig, size_class::SizeClass};
 
@@ -64,8 +61,10 @@ impl SuperBlock {
     }
 
     pub fn alloc_cell(mut self) -> Option<Address> {
-        let cell = if unlikely(self.head_cell.is_zero()) {
-            if likely(self.bump_cursor < Self::BYTES as u32) {
+        let cell = if !self.head_cell.is_zero() {
+            self.head_cell
+        } else {
+            if self.bump_cursor < Self::BYTES as u32 {
                 let cell = self.start() + (self.bump_cursor as usize);
                 self.bump_cursor = self.bump_cursor + self.size_class.bytes() as u32;
                 self.used_bytes += self.size_class.bytes() as u32;
@@ -73,8 +72,6 @@ impl SuperBlock {
             } else {
                 return None;
             }
-        } else {
-            self.head_cell
         };
         self.head_cell = unsafe { cell.load::<Address>() };
         self.used_bytes += self.size_class.bytes() as u32;

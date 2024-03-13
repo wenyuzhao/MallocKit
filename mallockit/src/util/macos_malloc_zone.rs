@@ -1,3 +1,5 @@
+use std::ptr::addr_of;
+
 use super::Address;
 
 const ZONE_NAME: &'static [i8] = &[
@@ -18,7 +20,7 @@ pub static mut MALLOCKIT_MALLOC_ZONE: MallocZone = MallocZone {
     batch_malloc: 0 as _,
     // Nullable
     batch_free: 0 as _,
-    introspect: unsafe { &MALLOCKIT_MALLOC_INTROSPECTION },
+    introspect: unsafe { addr_of!(MALLOCKIT_MALLOC_INTROSPECTION) },
     version: 9,
     memalign: zone_memalign,
     free_definite_size: 0 as _,

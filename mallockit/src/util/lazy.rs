@@ -1,10 +1,8 @@
 use std::cell::{Cell, UnsafeCell};
-use std::intrinsics::likely;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::*;
-use std::sync::atomic::{AtomicU8, Ordering};
 
 const UNINITIALIZED: u8 = 0;
 const INITIALIZING: u8 = 1;
@@ -31,7 +29,7 @@ impl ThreadLocality for Shared {
     }
 }
 
-pub struct Lazy<T, TL: ThreadLocality = Shared, F: FnOnce() -> T = fn() -> T> {
+pub struct Lazy<T, TL: ThreadLocality = Shared, F = fn() -> T> {
     state: AtomicU8,
     value: UnsafeCell<MaybeUninit<T>>,
     init: Cell<Option<F>>,
@@ -88,7 +86,7 @@ impl<T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
     }
 
     pub fn force(lazy: &Self) {
-        if likely(INITIALIZED == lazy.state.load(Ordering::Relaxed)) {
+        if INITIALIZED == lazy.state.load(Ordering::Relaxed) {
             return;
         }
         TL::force_slow(lazy);

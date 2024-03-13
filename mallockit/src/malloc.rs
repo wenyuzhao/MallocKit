@@ -1,16 +1,16 @@
 use super::Plan;
-use crate::space::SpaceId;
+use crate::util::heap::HEAP;
 use crate::util::Address;
 use crate::util::Lazy;
 use crate::Mutator;
 use core::{alloc::Layout, ptr};
-use std::intrinsics::unlikely;
+use std::marker::PhantomData;
 
 pub trait GetMutatorType {
     type Mutator: Mutator;
 }
 
-pub struct MallocAPI<P: Plan>(&'static Lazy<P>);
+pub struct MallocAPI<P: Plan>(PhantomData<P>);
 
 impl<P: Plan> GetMutatorType for MallocAPI<P> {
     type Mutator = P::Mutator;
@@ -31,19 +31,15 @@ impl<P: Plan> MallocAPI<P> {
     pub const PAGE_SIZE: usize = 4096;
 
     pub const fn new(plan: &'static Lazy<P>) -> Self {
-        Self(plan)
-    }
-
-    pub const fn new_mutator() -> P::Mutator {
-        P::Mutator::NEW
+        Self(PhantomData)
     }
 
     pub fn mutator(&self) -> &'static mut P::Mutator {
         P::Mutator::current()
     }
 
-    pub fn zero_spaceid(a: Address) -> bool {
-        SpaceId::from(a).is_invalid()
+    pub fn is_in_mallockit_heap(a: Address) -> bool {
+        HEAP.contains(a)
     }
 
     pub const fn align_up(value: usize, align: usize) -> usize {
@@ -58,7 +54,7 @@ impl<P: Plan> MallocAPI<P> {
     pub unsafe fn malloc_size(&self, ptr: Address) -> usize {
         let ptr = Address::from(ptr);
         #[cfg(target_os = "macos")]
-        if unlikely(Self::zero_spaceid(ptr.into())) {
+        if Self::is_in_mallockit_heap(ptr.into()) {
             return crate::util::macos_malloc_zone::external_memory_size(ptr);
         }
         P::get_layout(ptr).size()
@@ -85,11 +81,11 @@ impl<P: Plan> MallocAPI<P> {
     }
 
     pub unsafe fn free(&self, ptr: *mut u8) {
-        if unlikely(ptr.is_null()) {
+        if ptr.is_null() {
             return;
         }
         #[cfg(target_os = "macos")]
-        if unlikely(Self::zero_spaceid(ptr.into())) {
+        if Self::is_in_mallockit_heap(ptr.into()) {
             return;
         }
         self.mutator().dealloc(ptr.into());
@@ -105,14 +101,14 @@ impl<P: Plan> MallocAPI<P> {
         if ptr.is_null() {
             return self.alloc_or_enomem(new_size, Self::MIN_ALIGNMENT);
         }
-        if unlikely(free_if_new_size_is_zero && new_size == 0) {
+        if free_if_new_size_is_zero && new_size == 0 {
             self.free(ptr);
             return ptr::null_mut();
         }
         let new_size = Self::align_up(new_size, Self::MIN_ALIGNMENT);
 
         #[cfg(target_os = "macos")]
-        if unlikely(Self::zero_spaceid(ptr.into())) {
+        if Self::is_in_mallockit_heap(ptr.into()) {
             let ptr = Address::from(ptr);
             let old_size = crate::util::macos_malloc_zone::external_memory_size(ptr);
             let new_layout =
@@ -152,7 +148,7 @@ impl<P: Plan> MallocAPI<P> {
         mut alignment: usize,
         size: usize,
     ) -> i32 {
-        if unlikely(!alignment.is_power_of_two()) {
+        if !alignment.is_power_of_two() {
             return libc::EINVAL;
         }
         alignment = std::cmp::max(alignment, Self::MIN_ALIGNMENT);
@@ -168,7 +164,7 @@ impl<P: Plan> MallocAPI<P> {
     pub unsafe fn memalign(&self, alignment: usize, size: usize) -> *mut u8 {
         let mut result = ptr::null_mut();
         let errno = self.posix_memalign(&mut result, alignment, size);
-        if unlikely(result.is_null()) {
+        if result.is_null() {
             Self::set_error(errno)
         }
         result
@@ -181,11 +177,10 @@ impl<P: Plan> MallocAPI<P> {
         einval_if_size_is_not_aligned: bool,
         einval_if_size_is_zero: bool,
     ) -> *mut u8 {
-        if unlikely(
-            !alignment.is_power_of_two()
-                || (einval_if_size_is_not_aligned && (size & (alignment - 1)) != 0)
-                || (einval_if_size_is_zero && size == 0),
-        ) {
+        if !alignment.is_power_of_two()
+            || (einval_if_size_is_not_aligned && (size & (alignment - 1)) != 0)
+            || (einval_if_size_is_zero && size == 0)
+        {
             Self::set_error(libc::EINVAL);
             return ptr::null_mut();
         }
