@@ -1,7 +1,6 @@
 use super::super::SpaceId;
 use super::PageResource;
 use crate::util::heap::HEAP;
-use crate::util::memory::RawMemory;
 use crate::util::*;
 use atomic::Atomic;
 use crossbeam::queue::SegQueue;
@@ -35,22 +34,6 @@ impl BlockPageResource {
         }
     }
 
-    fn map_pages<S: PageSize>(&self, start: Page<S>, pages: usize) -> bool {
-        let size = pages << S::LOG_BYTES;
-        match RawMemory::map(start.start(), size) {
-            Ok(_) => {
-                #[cfg(target_os = "linux")]
-                if cfg!(feature = "transparent_huge_page") && S::LOG_BYTES != Size4K::LOG_BYTES {
-                    unsafe {
-                        libc::madvise(start.start().as_mut_ptr(), size, libc::MADV_HUGEPAGE);
-                    }
-                }
-                true
-            }
-            _ => false,
-        }
-    }
-
     #[cold]
     fn acquire_block_slow<S: PageSize>(&self, pages: usize) -> Option<Range<Page<S>>> {
         debug_assert!(self.log_bytes >= S::LOG_BYTES);
@@ -67,9 +50,6 @@ impl BlockPageResource {
         match block {
             Ok(addr) => {
                 let start = Page::<S>::new(addr);
-                if !self.map_pages(start, pages) {
-                    return self.acquire_block_slow(pages); // Retry
-                }
                 let end = Step::forward(start, pages);
                 return Some(start..end);
             }

@@ -40,26 +40,13 @@ impl FreelistPageResource {
         }
     }
 
-    fn map_pages<S: PageSize>(&self, start: Page<S>, pages: usize) -> bool {
-        let size = pages << S::LOG_BYTES;
-        match RawMemory::map(start.start(), size) {
-            Ok(_) => {
-                #[cfg(target_os = "linux")]
-                if cfg!(feature = "transparent_huge_page") && S::LOG_BYTES != Size4K::LOG_BYTES {
-                    unsafe {
-                        libc::madvise(start.start().as_mut_ptr(), size, libc::MADV_HUGEPAGE);
-                    }
-                }
-                self.reserved_bytes
-                    .fetch_add(pages << S::LOG_BYTES, Ordering::SeqCst);
-                true
-            }
-            _ => false,
-        }
+    fn map_pages<S: PageSize>(&self, _start: Page<S>, pages: usize) {
+        self.reserved_bytes
+            .fetch_add(pages << S::LOG_BYTES, Ordering::SeqCst);
     }
 
     fn unmap_pages<S: PageSize>(&self, start: Page<S>, pages: usize) {
-        RawMemory::unmap(start.start(), pages << S::LOG_BYTES);
+        RawMemory::madv_free(start.start(), pages << S::LOG_BYTES);
         self.reserved_bytes
             .fetch_sub(pages << S::LOG_BYTES, Ordering::SeqCst);
     }
@@ -94,9 +81,7 @@ impl PageResource for FreelistPageResource {
         let units = pages << (S::LOG_BYTES - Size4K::LOG_BYTES);
         let start = self.freelist.lock().allocate_cell(units)?.start;
         let start = Page::<S>::new(start);
-        if !self.map_pages(start, pages) {
-            return self.acquire_pages(pages); // Retry
-        }
+        self.map_pages(start, pages);
         let end = Step::forward(start, pages);
         self.set_meta(start, units);
         Some(start..end)

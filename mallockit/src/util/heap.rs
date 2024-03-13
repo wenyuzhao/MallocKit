@@ -18,7 +18,7 @@ pub struct Heap {
 
 impl Heap {
     fn new() -> Self {
-        let start = RawMemory::map_anonymous(HEAP_SIZE).unwrap();
+        let start = RawMemory::map_heap(HEAP_SIZE).unwrap();
         let end = start + HEAP_SIZE;
         Self { start, end }
     }
