@@ -1,5 +1,6 @@
 use std::alloc::Layout;
 use std::ptr;
+#[cfg(not(target_os = "macos"))]
 use std::ptr::addr_of_mut;
 
 use crate::plan::Plan;

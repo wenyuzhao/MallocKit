@@ -1,4 +1,4 @@
-#![feature(thread_local, const_trait_impl, effects)]
+#![feature(thread_local)]
 
 extern crate mallockit;
 
