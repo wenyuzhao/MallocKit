@@ -91,6 +91,10 @@ pub trait TLS: Sized {
     }
 }
 
+impl TLS for u8 {
+    const NEW: Self = 0;
+}
+
 #[cfg(target_os = "macos")]
 mod macos_tls {
     use spin::{mutex::Mutex, Yield};
@@ -111,9 +115,6 @@ mod macos_tls {
     #[cfg(test)]
     #[no_mangle]
     extern "C" fn mallockit_initialize_macos_tls() -> *mut u8 {
-        impl TLS for u8 {
-            const NEW: Self = 0;
-        }
         get_tls::<u8>()
     }
 
