@@ -8,7 +8,7 @@ pub fn _print(args: fmt::Arguments<'_>, new_line: bool, stderr: bool) {
     let mut log = if stderr { ERR.lock() } else { LOG.lock() };
     log.write_fmt(args).unwrap();
     if new_line {
-        log.put_char('\n' as _);
+        log.put_char(b'\n');
     }
     log.flush();
 }

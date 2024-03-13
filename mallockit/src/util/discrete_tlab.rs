@@ -30,6 +30,6 @@ impl<const MAX_SIZE_CLASS: usize> DiscreteTLAB<MAX_SIZE_CLASS> {
         }
         self.bins[size_class.as_usize()] = unsafe { cell.load() };
         self.bytes -= size_class.bytes();
-        return Some(cell);
+        Some(cell)
     }
 }

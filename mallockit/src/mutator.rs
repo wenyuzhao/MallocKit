@@ -180,7 +180,7 @@ mod macos_tls {
         } else {
             let mut buffer = ALLOC_BUFFER.lock();
             if let Some(a) = buffer.alloc(layout) {
-                return a.into();
+                a.into()
             } else {
                 let size = layout.size() << 4;
                 let size = (size + Page::<Size4K>::MASK) & !Page::<Size4K>::MASK;

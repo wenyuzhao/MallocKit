@@ -79,7 +79,7 @@ impl<S: PageSize> Page<S> {
                 return false;
             }
         }
-        return true;
+        true
     }
 }
 
@@ -98,7 +98,7 @@ impl<S: PageSize> Clone for Page<S> {
     }
 
     fn clone_from(&mut self, source: &Self) {
-        *self = source.clone()
+        *self = *source
     }
 }
 

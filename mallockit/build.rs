@@ -29,7 +29,7 @@ fn generate_malloc_tests(tests: &HashMap<String, String>) {
     for (t, cmd) in tests {
         code += &generate_one_test(t, cmd);
     }
-    fs::write(&target_dir_file("generated_tests.rs"), code).unwrap();
+    fs::write(target_dir_file("generated_tests.rs"), code).unwrap();
 }
 
 fn main() {
@@ -38,8 +38,7 @@ fn main() {
     if let Some(v) = meta
         .workspace_metadata
         .as_object()
-        .map(|v| v.get("malloc-tests"))
-        .flatten()
+        .and_then(|v| v.get("malloc-tests"))
     {
         for (name, cmd) in v.as_object().unwrap().iter() {
             let cmd = cmd.as_str().unwrap();

@@ -101,8 +101,7 @@ impl Cell {
         debug_assert!(align.is_power_of_two());
         let log_align = align.trailing_zeros() as usize;
         debug_assert!(log_align <= 21);
-        let start_offset =
-            unsafe { (Address::from((self as *const Self).add(1)) - start) as usize };
+        let start_offset = unsafe { Address::from((self as *const Self).add(1)) - start };
         self.word.set(Self::START_OFFSET, start_offset);
         self.word.set(Self::SIZE, size);
         self.word.set(Self::LOG_ALIGN, log_align);

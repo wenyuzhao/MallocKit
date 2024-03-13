@@ -76,7 +76,7 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<NUM_
     fn pop_cell(&mut self, size_class: usize) -> Option<Unit> {
         let head = self.table[size_class];
         if head.is_none() {
-            return None;
+            None
         } else {
             let mut head_ptr = head.unwrap();
             let head = unsafe { head_ptr.as_mut() };
@@ -91,7 +91,7 @@ impl<const NUM_SIZE_CLASS: usize> InternalAbstractFreeList for PageFreeList<NUM_
             let unit = head.unit;
             self.delete_pages(unit);
             self.arena.dealloc(head);
-            return Some(unit);
+            Some(unit)
         }
     }
 
