@@ -2,6 +2,7 @@ use super::{page_resource::BlockPageResource, Allocator, Space, SpaceId};
 use crate::util::bits::{BitField, BitFieldSlot};
 use crate::util::freelist::intrusive_freelist::AddressSpaceConfig;
 use crate::util::freelist::intrusive_freelist::IntrusiveFreeList;
+use crate::util::heap::HEAP;
 use crate::util::*;
 use spin::Mutex;
 use std::{ops::Range, sync::atomic::AtomicUsize};
@@ -122,14 +123,16 @@ impl Cell {
 
 pub struct FreeListAllocator {
     space: Lazy<&'static FreeListSpace, Local>,
-    freelist: IntrusiveFreeList<AddressSpace>,
+    freelist: Lazy<IntrusiveFreeList<AddressSpace>, Local>,
 }
 
 impl FreeListAllocator {
-    pub const fn new(space: Lazy<&'static FreeListSpace, Local>, space_id: SpaceId) -> Self {
+    pub const fn new<const SPACE_ID: SpaceId>(space: Lazy<&'static FreeListSpace, Local>) -> Self {
         Self {
             space,
-            freelist: IntrusiveFreeList::new(false, space_id.address_space().start),
+            freelist: Lazy::new(|| {
+                IntrusiveFreeList::new(false, HEAP.get_space_range(SPACE_ID).start)
+            }),
         }
     }
 

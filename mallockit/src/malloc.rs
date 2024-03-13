@@ -1,5 +1,5 @@
 use super::Plan;
-use crate::space::SpaceId;
+use crate::util::heap::HEAP;
 use crate::util::Address;
 use crate::util::Lazy;
 use crate::Mutator;
@@ -34,16 +34,12 @@ impl<P: Plan> MallocAPI<P> {
         Self(plan)
     }
 
-    pub const fn new_mutator() -> P::Mutator {
-        P::Mutator::NEW
-    }
-
     pub fn mutator(&self) -> &'static mut P::Mutator {
         P::Mutator::current()
     }
 
-    pub fn zero_spaceid(a: Address) -> bool {
-        SpaceId::from(a).is_invalid()
+    pub fn is_in_mallockit_heap(a: Address) -> bool {
+        HEAP.contains(a)
     }
 
     pub const fn align_up(value: usize, align: usize) -> usize {
@@ -58,7 +54,7 @@ impl<P: Plan> MallocAPI<P> {
     pub unsafe fn malloc_size(&self, ptr: Address) -> usize {
         let ptr = Address::from(ptr);
         #[cfg(target_os = "macos")]
-        if unlikely(Self::zero_spaceid(ptr.into())) {
+        if unlikely(Self::is_in_mallockit_heap(ptr.into())) {
             return crate::util::macos_malloc_zone::external_memory_size(ptr);
         }
         P::get_layout(ptr).size()
@@ -89,7 +85,7 @@ impl<P: Plan> MallocAPI<P> {
             return;
         }
         #[cfg(target_os = "macos")]
-        if unlikely(Self::zero_spaceid(ptr.into())) {
+        if unlikely(Self::is_in_mallockit_heap(ptr.into())) {
             return;
         }
         self.mutator().dealloc(ptr.into());
@@ -112,7 +108,7 @@ impl<P: Plan> MallocAPI<P> {
         let new_size = Self::align_up(new_size, Self::MIN_ALIGNMENT);
 
         #[cfg(target_os = "macos")]
-        if unlikely(Self::zero_spaceid(ptr.into())) {
+        if unlikely(Self::is_in_mallockit_heap(ptr.into())) {
             let ptr = Address::from(ptr);
             let old_size = crate::util::macos_malloc_zone::external_memory_size(ptr);
             let new_layout =

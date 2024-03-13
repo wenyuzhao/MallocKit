@@ -23,6 +23,7 @@
 #![feature(const_for)]
 
 extern crate mallockit_proc_macro;
+pub extern crate spin;
 
 #[macro_use]
 pub mod log;

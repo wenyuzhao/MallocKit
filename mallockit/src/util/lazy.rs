@@ -31,7 +31,7 @@ impl ThreadLocality for Shared {
     }
 }
 
-pub struct Lazy<T, TL: ThreadLocality = Shared, F: FnOnce() -> T = fn() -> T> {
+pub struct Lazy<T, TL: ThreadLocality = Shared, F = fn() -> T> {
     state: AtomicU8,
     value: UnsafeCell<MaybeUninit<T>>,
     init: Cell<Option<F>>,

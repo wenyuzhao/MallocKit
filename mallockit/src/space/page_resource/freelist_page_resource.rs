@@ -1,6 +1,7 @@
 use super::super::SpaceId;
 use super::PageResource;
 use crate::util::freelist::page_freelist::PageFreeList;
+use crate::util::heap::HEAP;
 use crate::util::memory::RawMemory;
 use crate::util::*;
 use spin::mutex::Mutex;
@@ -21,12 +22,14 @@ pub struct FreelistPageResource {
     freelist: Mutex<PageFreeList<{ NUM_SIZE_CLASS }>, Yield>,
     reserved_bytes: AtomicUsize,
     meta: RwLock<Vec<AtomicU32>, Yield>,
+    base: Address,
 }
 
 impl FreelistPageResource {
     pub fn new(id: SpaceId) -> Self {
         debug_assert!(id.0 < 0b0000_1111);
-        let base = id.address_space().start;
+        let range = HEAP.get_space_range(id);
+        let base = range.start;
         let mut freelist = PageFreeList::new(base);
         freelist.release_cell(base, 1 << (NUM_SIZE_CLASS - 1));
         Self {
@@ -34,6 +37,7 @@ impl FreelistPageResource {
             freelist: Mutex::new(freelist),
             reserved_bytes: AtomicUsize::new(0),
             meta: RwLock::new(unsafe { std::mem::transmute(vec![0u32; 1 << 20]) }),
+            base,
         }
     }
 
@@ -63,7 +67,7 @@ impl FreelistPageResource {
 
     fn set_meta<S: PageSize>(&self, start: Page<S>, pages: usize) {
         debug_assert!(pages <= u32::MAX as usize);
-        let index = (start.start() - self.id.address_space().start) >> Page::<Size4K>::LOG_BYTES;
+        let index = (start.start() - self.base) >> Page::<Size4K>::LOG_BYTES;
         let meta = self.meta.upgradeable_read();
         if unlikely(index >= meta.len()) {
             let mut meta = meta.upgrade();
@@ -76,7 +80,7 @@ impl FreelistPageResource {
     }
 
     fn get_meta<S: PageSize>(&self, start: Page<S>) -> usize {
-        let index = (start.start() - self.id.address_space().start) >> Page::<Size4K>::LOG_BYTES;
+        let index = (start.start() - self.base) >> Page::<Size4K>::LOG_BYTES;
         self.meta.read()[index].load(Ordering::Relaxed) as _
     }
 }

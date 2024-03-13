@@ -1,5 +1,6 @@
 use super::super::SpaceId;
 use super::PageResource;
+use crate::util::heap::HEAP;
 use crate::util::memory::RawMemory;
 use crate::util::*;
 use atomic::Atomic;
@@ -23,11 +24,12 @@ impl BlockPageResource {
     pub fn new(id: SpaceId, log_bytes: usize) -> Self {
         debug_assert!(id.0 < 0b0000_1111);
         debug_assert!(log_bytes >= Size4K::LOG_BYTES);
+        let range = HEAP.get_space_range(id);
         Self {
             id,
             log_bytes,
-            cursor: Atomic::new(id.address_space().start),
-            highwater: id.address_space().end,
+            cursor: Atomic::new(range.start),
+            highwater: range.end,
             recycled_blocks: SegQueue::new(),
             reserved_bytes: AtomicUsize::new(0),
         }

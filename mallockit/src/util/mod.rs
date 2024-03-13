@@ -25,6 +25,7 @@ pub mod arena;
 pub mod bits;
 pub mod discrete_tlab;
 pub mod freelist;
+pub mod heap;
 mod layout_utils;
 mod lazy;
 pub mod memory;
