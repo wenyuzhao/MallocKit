@@ -32,7 +32,7 @@ pub mod worker;
 pub use ctor::ctor;
 pub use libc;
 pub use mallockit_proc_macro::*;
-pub use mutator::Mutator;
+pub use mutator::{ConstNew, Mutator};
 pub use plan::Plan;
 use space::meta::Meta;
 

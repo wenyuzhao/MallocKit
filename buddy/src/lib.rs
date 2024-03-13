@@ -1,12 +1,11 @@
-#![feature(thread_local)]
+#![feature(thread_local, const_trait_impl, effects)]
 
 extern crate mallockit;
 
 use mallockit::{
-    space::*,
-    space::{freelist_space::*, large_object_space::*},
+    space::{freelist_space::*, large_object_space::*, *},
     util::*,
-    Mutator, Plan,
+    ConstNew, Mutator, Plan,
 };
 
 const FREELIST_SPACE: SpaceId = SpaceId::DEFAULT;
@@ -44,8 +43,8 @@ struct BuddyMutator {
     los: LargeObjectAllocator<Size4K>,
 }
 
-impl BuddyMutator {
-    const fn new() -> Self {
+impl ConstNew for BuddyMutator {
+    fn new() -> Self {
         Self {
             freelist: FreeListAllocator::new::<FREELIST_SPACE>(Lazy::new(|| {
                 &Self::plan().freelist_space
@@ -57,7 +56,6 @@ impl BuddyMutator {
 
 impl Mutator for BuddyMutator {
     type Plan = Buddy;
-    const NEW: Self = Self::new();
 
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         if FreeListSpace::can_allocate(layout) {

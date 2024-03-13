@@ -5,10 +5,13 @@ use crate::plan::Plan;
 use crate::space::meta::MetaLocal;
 use crate::util::Address;
 
-pub trait Mutator: Sized + 'static + TLS {
-    type Plan: Plan<Mutator = Self>;
+#[const_trait]
+pub trait ConstNew: Sized + 'static {
+    fn new() -> Self;
+}
 
-    const NEW: Self;
+pub trait Mutator: Sized + 'static + TLS + ConstNew {
+    type Plan: Plan<Mutator = Self>;
 
     fn current() -> &'static mut Self {
         <Self as TLS>::current()
@@ -58,9 +61,11 @@ pub(crate) struct InternalTLS {
 
 impl InternalTLS {
     #[allow(unused)]
-    const NEW: Self = Self {
-        meta: MetaLocal::new(),
-    };
+    fn new() -> Self {
+        Self {
+            meta: MetaLocal::new(),
+        }
+    }
 
     #[cfg(not(target_os = "macos"))]
     pub fn current() -> &'static mut Self {
@@ -80,7 +85,7 @@ static mut INTERNAL_TLS: std::cell::UnsafeCell<InternalTLS> =
     std::cell::UnsafeCell::new(InternalTLS::NEW);
 
 pub trait TLS: Sized {
-    const NEW: Self;
+    fn new() -> Self;
 
     #[cfg(not(target_os = "macos"))]
     fn current() -> &'static mut Self;
@@ -92,7 +97,9 @@ pub trait TLS: Sized {
 }
 
 impl TLS for u8 {
-    const NEW: Self = 0;
+    fn new() -> Self {
+        0
+    }
 
     #[cfg(not(target_os = "macos"))]
     fn current() -> &'static mut Self {
@@ -198,8 +205,8 @@ mod macos_tls {
     fn init_tls<T: TLS>() -> *mut (InternalTLS, T) {
         let ptr = alloc_tls::<(InternalTLS, T)>();
         unsafe {
-            (*ptr).0 = InternalTLS::NEW;
-            (*ptr).1 = T::NEW;
+            (*ptr).0 = InternalTLS::new();
+            (*ptr).1 = T::new();
             unsafe {
                 let mut tcb: *mut *mut T;
                 asm! {
@@ -221,8 +228,8 @@ mod macos_tls {
     fn init_tls<T: TLS>() -> *mut (InternalTLS, T) {
         let ptr = alloc_tls::<(InternalTLS, T)>();
         unsafe {
-            (*ptr).0 = InternalTLS::NEW;
-            (*ptr).1 = T::NEW;
+            (*ptr).0 = InternalTLS::new();
+            (*ptr).1 = T::new();
             asm!("mov gs:{offset}, {0}", in(reg) ptr, offset = const OFFSET);
         }
         ptr
