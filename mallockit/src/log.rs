@@ -1,8 +1,6 @@
-use libc;
 use spin::Mutex;
 use std::fmt;
 use std::fmt::Write;
-use std::intrinsics::unlikely;
 
 #[doc(hidden)]
 #[cold]
@@ -76,7 +74,7 @@ impl Log {
     fn put_char(&mut self, c: u8) {
         self.buffer[self.cursor] = c;
         self.cursor += 1;
-        if unlikely(self.cursor >= self.buffer.len()) {
+        if self.cursor >= self.buffer.len() {
             self.flush();
         }
     }

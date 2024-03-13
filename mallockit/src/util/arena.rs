@@ -1,4 +1,4 @@
-use std::{intrinsics::likely, marker::PhantomData};
+use std::marker::PhantomData;
 
 use crate::util::{Page, Size4K};
 
@@ -26,7 +26,7 @@ impl<T: Sized> Arena<T> {
 
     fn pop(&mut self) -> Option<Address> {
         let cell = self.freelist;
-        if likely(!cell.is_zero()) {
+        if !cell.is_zero() {
             unsafe {
                 self.freelist = cell.load();
             };

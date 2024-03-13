@@ -7,7 +7,6 @@ use crate::util::*;
 use spin::mutex::Mutex;
 use spin::rwlock::RwLock;
 use spin::Yield;
-use std::intrinsics::unlikely;
 use std::iter::Step;
 use std::sync::atomic::AtomicU32;
 use std::{
@@ -69,7 +68,7 @@ impl FreelistPageResource {
         debug_assert!(pages <= u32::MAX as usize);
         let index = (start.start() - self.base) >> Page::<Size4K>::LOG_BYTES;
         let meta = self.meta.upgradeable_read();
-        if unlikely(index >= meta.len()) {
+        if index >= meta.len() {
             let mut meta = meta.upgrade();
             let len = usize::max(meta.len(), index).next_power_of_two();
             meta.resize_with(len << 1, Default::default);

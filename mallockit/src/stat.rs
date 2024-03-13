@@ -105,7 +105,7 @@ pub fn track_deallocation(is_large: bool) {
     })
 }
 
-pub struct Counter(&'static str, AtomicUsize);
+pub struct Counter(#[allow(unused)] &'static str, AtomicUsize);
 
 impl Counter {
     pub const fn new(name: &'static str) -> Self {

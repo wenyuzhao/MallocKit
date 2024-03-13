@@ -4,7 +4,7 @@ use crate::Plan;
 
 fn panic_handler(panic_info: &PanicInfo<'_>) {
     println!("{}", panic_info);
-    std::intrinsics::abort();
+    std::process::abort();
 }
 
 pub fn set_panic_handler() {

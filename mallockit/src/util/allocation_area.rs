@@ -1,9 +1,9 @@
 use crate::util::LayoutUtils;
 
 use super::Address;
+use std::alloc::Layout;
 use std::mem;
 use std::ops::Range;
-use std::{alloc::Layout, intrinsics::likely};
 
 #[derive(Debug)]
 pub struct AllocationArea {
@@ -38,7 +38,7 @@ impl AllocationArea {
         let top = self.top;
         let start = Self::align_allocation(top, layout.align());
         let end = start + layout.size();
-        if likely(usize::from(end) <= usize::from(self.limit)) {
+        if usize::from(end) <= usize::from(self.limit) {
             self.top = end;
             Some(start)
         } else {
@@ -56,7 +56,7 @@ impl AllocationArea {
         debug_assert_eq!(self.top, Self::align_allocation(self.top, layout.align()));
         let start = self.top;
         let end = start + layout.size();
-        if likely(usize::from(end) <= usize::from(self.limit)) {
+        if usize::from(end) <= usize::from(self.limit) {
             self.top = end;
             Some(start)
         } else {
@@ -80,7 +80,7 @@ impl AllocationArea {
         let top = self.top;
         let start = Self::align_allocation(top, new_layout.align());
         let end = start + new_layout.size();
-        if likely(end <= self.limit) {
+        if end <= self.limit {
             let data_start = start + offset;
             *Self::get_layout_slot(data_start) = (layout.size() as u32, layout.align() as u32);
             self.top = end;

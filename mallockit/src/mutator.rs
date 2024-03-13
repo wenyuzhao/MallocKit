@@ -1,5 +1,4 @@
 use std::alloc::Layout;
-use std::intrinsics::unlikely;
 use std::ptr;
 
 use crate::plan::Plan;
@@ -34,7 +33,7 @@ pub trait Mutator: Sized + 'static + TLS {
 
     fn realloc(&mut self, ptr: Address, new_size: usize) -> Option<Address> {
         let layout = Self::Plan::get_layout(ptr);
-        if unlikely(layout.size() >= new_size) {
+        if layout.size() >= new_size {
             return Some(ptr);
         }
         let new_layout = unsafe { Layout::from_size_align_unchecked(new_size, layout.align()) };
@@ -65,7 +64,7 @@ impl InternalTLS {
 
     #[cfg(not(target_os = "macos"))]
     pub fn current() -> &'static mut Self {
-        unsafe { &mut INTERNAL_TLS }
+        unsafe { &mut *INTERNAL_TLS.get() }
     }
 
     #[cfg(target_os = "macos")]
@@ -77,7 +76,8 @@ impl InternalTLS {
 
 #[cfg(not(target_os = "macos"))]
 #[thread_local]
-static mut INTERNAL_TLS: InternalTLS = InternalTLS::NEW;
+static mut INTERNAL_TLS: std::cell::UnsafeCell<InternalTLS> =
+    std::cell::UnsafeCell::new(InternalTLS::NEW);
 
 pub trait TLS: Sized {
     const NEW: Self;
@@ -128,7 +128,7 @@ mod macos_tls {
     #[allow(unused)]
     pub(super) fn get_internal_tls() -> *mut InternalTLS {
         let mut tls = _get_tls::<InternalTLS>();
-        if unlikely(tls.is_null()) {
+        if tls.is_null() {
             unsafe {
                 mallockit_initialize_macos_tls();
             }
@@ -141,7 +141,7 @@ mod macos_tls {
     #[allow(unused)]
     pub(super) fn get_tls<T: TLS>() -> *mut T {
         let mut tls = _get_tls::<(InternalTLS, T)>();
-        if unlikely(tls.is_null()) {
+        if tls.is_null() {
             tls = init_tls::<T>();
         }
         unsafe { &mut (*tls).1 }

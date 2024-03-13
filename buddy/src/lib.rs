@@ -1,18 +1,13 @@
-#![allow(incomplete_features)]
-#![feature(type_alias_impl_trait)]
 #![feature(thread_local)]
-#![feature(core_intrinsics)]
 
 extern crate mallockit;
 
-use core::alloc::Layout;
 use mallockit::{
     space::*,
     space::{freelist_space::*, large_object_space::*},
     util::*,
     Mutator, Plan,
 };
-use std::intrinsics::likely;
 
 const FREELIST_SPACE: SpaceId = SpaceId::DEFAULT;
 const LARGE_OBJECT_SPACE: SpaceId = SpaceId::LARGE_OBJECT_SPACE;
@@ -35,7 +30,7 @@ impl Plan for Buddy {
 
     fn get_layout(ptr: Address) -> Layout {
         debug_assert!(FREELIST_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
-        if likely(FREELIST_SPACE.contains(ptr)) {
+        if FREELIST_SPACE.contains(ptr) {
             FreeListSpace::get_layout(ptr)
         } else {
             Self::get().large_object_space.get_layout::<Size4K>(ptr)
@@ -65,7 +60,7 @@ impl Mutator for BuddyMutator {
     const NEW: Self = Self::new();
 
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
-        if likely(FreeListSpace::can_allocate(layout)) {
+        if FreeListSpace::can_allocate(layout) {
             mallockit::stat::track_allocation(layout, false);
             self.freelist.alloc(layout)
         } else {
@@ -76,7 +71,7 @@ impl Mutator for BuddyMutator {
 
     fn dealloc(&mut self, ptr: Address) {
         debug_assert!(FREELIST_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
-        if likely(FREELIST_SPACE.contains(ptr)) {
+        if FREELIST_SPACE.contains(ptr) {
             mallockit::stat::track_deallocation(false);
             self.freelist.dealloc(ptr)
         } else {
