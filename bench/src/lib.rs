@@ -97,6 +97,7 @@ impl Bench {
             "je" => format!("{LOCAL_DEV_DIR}/je/lib/libjemalloc.{DYLIB_EXT}"),
             "tc" => format!("{LOCAL_DEV_DIR}/tc/.libs/libtcmalloc_minimal.{DYLIB_EXT}"),
             "mi" => format!("{LOCAL_DEV_DIR}/mi/out/release/libmimalloc.{DYLIB_EXT}"),
+            "mi2" => format!("{LOCAL_DEV_DIR}/mi2/out/release/libmimalloc.{DYLIB_EXT}"),
             "sys" => "1".to_owned(),
             _ => panic!("Unknown malloc: {name}"),
         }

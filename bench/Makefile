@@ -1,7 +1,7 @@
 setup: setup-mimalloc-bench setup-bench-tools
 
 setup-mimalloc-bench:
-	cd mimalloc-bench && ./build-bench-env.sh bench je tc mi hd redis rocksdb lean
+	cd mimalloc-bench && ./build-bench-env.sh bench je tc mi mi2 hd redis rocksdb lean
 
 setup-packages:
 	cd mimalloc-bench && ./build-bench-env.sh packages
