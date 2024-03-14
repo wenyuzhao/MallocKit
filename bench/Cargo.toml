@@ -1,0 +1,23 @@
+[package]
+name = "mallockit-bench"
+description = "mimalloc-bench, rewritten in Rust with harness"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+harness = "0.0.4"
+hoard = { path = "../hoard" }
+buddy = { path = "../buddy" }
+
+[[bench]]
+name = "cfrac"
+harness = false
+
+[[bench]]
+name = "barnes"
+harness = false
+
+[package.metadata.harness.profiles.default.builds]
+sys = { env = { MALLOC = "sys" } }
+hoard = { env = { MALLOC = "hoard" } }
