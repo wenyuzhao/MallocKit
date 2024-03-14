@@ -18,6 +18,19 @@ harness = false
 name = "barnes"
 harness = false
 
+[[bench]]
+name = "espresso"
+harness = false
+
+# [[bench]]
+# name = "gs"
+# harness = false
+
+# [[bench]]
+# name = "z3"
+# harness = false
+
+
 [package.metadata.harness.profiles.default.builds]
 sys = { env = { MALLOC = "sys" } }
 hoard = { env = { MALLOC = "hoard" } }

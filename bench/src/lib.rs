@@ -70,6 +70,21 @@ impl Bench {
             "cfrac" => {
                 self.cmd.arg("17545186520507317056371138836327483792789528");
             }
+            "espresso" => {
+                self.cmd
+                    .arg("./mimalloc-bench/bench/espresso/largest.espresso");
+            }
+            "gs" => {
+                self.cmd.args([
+                    "-dBATCH",
+                    "-dNODISPLAY",
+                    "./mimalloc-bench/extern/large.pdf",
+                ]);
+            }
+            "z3" => {
+                self.cmd
+                    .args(["-smt2", "./mimalloc-bench/bench/z3/test1.smt2"]);
+            }
             _ => panic!("Unknown benchmark: {}", self.name),
         }
     }
