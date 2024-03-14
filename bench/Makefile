@@ -1,7 +1,7 @@
 setup: setup-mimalloc-bench setup-bench-tools
 
 setup-mimalloc-bench:
-	cd mimalloc-bench && ./build-bench-env.sh all no-mesh no-nomesh no-gd no-sg no-tcg
+	cd mimalloc-bench && ./build-bench-env.sh bench je tc mi hd
 
 setup-bench-tools:
 	sudo apt install python3 python3-pip linux-tools-common linux-tools-generic
