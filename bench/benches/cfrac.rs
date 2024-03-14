@@ -4,5 +4,6 @@ use harness::{bench, Bencher};
 fn bench(bencher: &Bencher) {
     let malloc = std::env::var("MALLOC").unwrap();
     println!("MALLOC: {}", malloc);
-    bencher.time(|| mallockit_bench::run("cfrac", &malloc));
+    let mut bench = Bench::new("cfrac").alloc(&malloc);
+    bencher.time(|| bench.run());
 }

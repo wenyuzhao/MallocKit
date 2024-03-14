@@ -22,25 +22,69 @@ const DYLIB_EXT: &str = if cfg!(target_os = "linux") {
     "dylib"
 };
 
-pub fn run(bench: &str, alloc: &str) {
-    let mut cmd = Command::new(format!("./mimalloc-bench/out/bench/{bench}"));
-    let mut stdin = Stdio::null();
+pub fn get_stdin(bench: &str) -> Stdio {
     match bench {
         "barnes" => {
-            let f = File::open(format!("./mimalloc-bench/bench/barnes/input")).unwrap();
-            stdin = Stdio::from(f);
+            Stdio::from(File::open(format!("./mimalloc-bench/bench/barnes/input")).unwrap())
         }
-        "cfrac" => {
-            cmd.arg("17545186520507317056371138836327483792789528");
-        }
-
-        _ => panic!("Unknown benchmark: {}", bench),
-    };
-    cmd.stdin(stdin);
-    // Enable a specific malloc implementation
-    if alloc != "sys" {
-        cmd.env(LD_PRELOAD, format!("lib{alloc}.{DYLIB_EXT}"));
+        _ => Stdio::null(),
     }
-    let output = cmd.status().unwrap();
-    assert!(output.success());
+}
+
+pub fn get_command(bench: &str) -> Stdio {
+    match bench {
+        "barnes" => {
+            Stdio::from(File::open(format!("./mimalloc-bench/bench/barnes/input")).unwrap())
+        }
+        _ => Stdio::null(),
+    }
+}
+
+pub struct Bench {
+    name: String,
+    cmd: Command,
+}
+
+impl Bench {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            cmd: Command::new(format!("./mimalloc-bench/out/bench/{name}")),
+        }
+        .init()
+    }
+
+    fn init(mut self) -> Self {
+        self.cmd.stdin(Stdio::null());
+        self.init_args_and_stdin();
+        self
+    }
+
+    fn init_args_and_stdin(&mut self) {
+        match self.name.as_str() {
+            "barnes" => {
+                self.cmd.stdin(Stdio::from(
+                    File::open("./mimalloc-bench/bench/barnes/input").unwrap(),
+                ));
+            }
+            "cfrac" => {
+                self.cmd.arg("17545186520507317056371138836327483792789528");
+            }
+            _ => panic!("Unknown benchmark: {}", self.name),
+        }
+    }
+
+    pub fn alloc(mut self, alloc: &str) -> Self {
+        if alloc != "sys" {
+            self.cmd.env(LD_PRELOAD, format!("lib{alloc}.{DYLIB_EXT}"));
+        } else {
+            self.cmd.env("SYSMALLOC", "1");
+        }
+        self
+    }
+
+    pub fn run(&mut self) {
+        let output = self.cmd.status().unwrap();
+        assert!(output.success());
+    }
 }
