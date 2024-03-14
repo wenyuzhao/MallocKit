@@ -59,5 +59,6 @@ mk_buddy = { env = { MALLOC = "buddy", IS_MALLOCKIT = "1" } }
 # other allocators
 hd = { env = { MALLOC = "hd", IS_MALLOCKIT = "0" } }
 mi = { env = { MALLOC = "mi", IS_MALLOCKIT = "0" } }
+mi2 = { env = { MALLOC = "mi2", IS_MALLOCKIT = "0" } }
 tc = { env = { MALLOC = "tc", IS_MALLOCKIT = "0" } }
 je = { env = { MALLOC = "je", IS_MALLOCKIT = "0" } }
