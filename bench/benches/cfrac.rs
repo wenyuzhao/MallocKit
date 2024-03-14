@@ -1,4 +1,5 @@
 use harness::{bench, Bencher};
+use mallockit_bench::Bench;
 
 #[bench(oneshot)]
 fn bench(bencher: &Bencher) {
