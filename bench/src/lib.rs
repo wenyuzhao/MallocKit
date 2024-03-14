@@ -75,6 +75,7 @@ impl Bench {
             "lean" => "../bin/lean".to_owned(),
             "lua" => "make".to_owned(),
             "redis" => format!("{LOCAL_DEV_DIR}/redis-6.2.7/src/redis-benchmark"),
+            "rocksdb" => format!("{LOCAL_DEV_DIR}/rocksdb-8.1.1/db_bench"),
             _ => format!("./mimalloc-bench/out/bench/{name}"),
         }
     }
@@ -119,6 +120,9 @@ impl Bench {
                     "-r", "1000000", "-n", "100000", "-q", "-P", "16", "lpush", "a", "1", "2", "3",
                     "4", "5", "lrange", "a", "1", "5",
                 ]);
+            }
+            "rocksdb" => {
+                self.cmd.args(["--benchmarks=fillrandom"]);
             }
             "z3" => {
                 self.cmd

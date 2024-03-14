@@ -47,6 +47,10 @@ harness = false
 name = "redis"
 harness = false
 
+[[bench]]
+name = "rocksdb"
+harness = false
+
 [package.metadata.harness.profiles.default.builds]
 sys = { env = { MALLOC = "sys" } }
 hoard = { env = { MALLOC = "hoard" } }
