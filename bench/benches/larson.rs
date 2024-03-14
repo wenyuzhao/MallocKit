@@ -3,8 +3,7 @@ use mallockit_bench::Bench;
 
 #[bench(oneshot)]
 fn bench(bencher: &Bencher) {
-    let malloc = std::env::var("MALLOC").unwrap();
-    let mut bench = Bench::new("larson", &malloc);
+    let mut bench = Bench::new("larson");
     bencher.time(|| bench.run());
     bench.finalize(bencher)
 }

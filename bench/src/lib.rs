@@ -37,7 +37,8 @@ pub fn get_command(bench: &str) -> Stdio {
 
 pub struct Bench {
     name: String,
-    alloc: String,
+    alloc_name: String,
+    alloc_path: String,
     cmd: Command,
     out: PathBuf,
     server: Option<Child>,
@@ -46,11 +47,18 @@ pub struct Bench {
 const LOCAL_DEV_DIR: &str = "./mimalloc-bench/extern";
 
 impl Bench {
-    pub fn new(name: &str, alloc: &str) -> Self {
-        println!("[{name}] malloc={alloc}");
+    pub fn new(name: &str) -> Self {
+        let malloc = std::env::var("MALLOC").unwrap();
+        let is_external = std::env::var("IS_MALLOCKIT").unwrap() == "0";
+        if is_external {
+            println!("[{name}] malloc: {malloc} (external)");
+        } else {
+            println!("[{name}] malloc: {malloc} (mallockit)");
+        }
         Self {
             name: name.to_string(),
-            alloc: alloc.to_string(),
+            alloc_name: malloc.clone(),
+            alloc_path: Self::get_malloc_lib_path(&malloc, is_external),
             cmd: Command::new(Self::get_binary_path(name)),
             out: harness::utils::HARNESS_BENCH_SCRATCH_DIR.join("log"),
             server: None,
@@ -64,7 +72,7 @@ impl Bench {
         self.cmd
             .stdout(Stdio::from(File::create(&self.out).unwrap()));
         if self.name != "redis" {
-            Self::use_malloc(&mut self.cmd, &self.alloc);
+            Self::use_malloc(&mut self.cmd, &self.alloc_name, &self.alloc_path);
         }
         self.prepare();
         self
@@ -77,6 +85,20 @@ impl Bench {
             "redis" => format!("{LOCAL_DEV_DIR}/redis-6.2.7/src/redis-benchmark"),
             "rocksdb" => format!("{LOCAL_DEV_DIR}/rocksdb-8.1.1/db_bench"),
             _ => format!("./mimalloc-bench/out/bench/{name}"),
+        }
+    }
+
+    fn get_malloc_lib_path(name: &str, is_external: bool) -> String {
+        if !is_external {
+            return format!("lib{name}.{DYLIB_EXT}");
+        }
+        match name {
+            "hd" => format!("{LOCAL_DEV_DIR}/hd/src/libhoard.{DYLIB_EXT}"),
+            "je" => format!("{LOCAL_DEV_DIR}/je/lib/libjemalloc.{DYLIB_EXT}"),
+            "tc" => format!("{LOCAL_DEV_DIR}/tc/.libs/libtcmalloc_minimal.{DYLIB_EXT}"),
+            "mi" => format!("{LOCAL_DEV_DIR}/mi/out/release/libmimalloc.{DYLIB_EXT}"),
+            "sys" => "1".to_owned(),
+            _ => panic!("Unknown malloc: {name}"),
         }
     }
 
@@ -153,16 +175,16 @@ impl Bench {
             "redis" => {
                 // start the background server
                 let mut cmd = Command::new(format!("{LOCAL_DEV_DIR}/redis-6.2.7/src/redis-server"));
-                Self::use_malloc(&mut cmd, &self.alloc);
+                Self::use_malloc(&mut cmd, &self.alloc_name, &self.alloc_path);
                 self.server = Some(cmd.spawn().unwrap());
             }
             _ => {}
         }
     }
 
-    fn use_malloc(cmd: &mut Command, alloc: &str) {
+    fn use_malloc(cmd: &mut Command, alloc: &str, path: &str) {
         if alloc != "sys" {
-            cmd.env(LD_PRELOAD, format!("lib{alloc}.{DYLIB_EXT}"));
+            cmd.env(LD_PRELOAD, path);
         } else {
             cmd.env("SYSMALLOC", "1");
         }
