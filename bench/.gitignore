@@ -4,3 +4,4 @@ __pycache__
 !/__init__.py
 !/__main__.py
 !requirements.txt
+dump.rdb

@@ -6,9 +6,10 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-harness = "0.0.4"
+harness = "0.0.5"
 hoard = { path = "../hoard" }
 buddy = { path = "../buddy" }
+num_cpus.workspace = true
 
 [[bench]]
 name = "cfrac"
@@ -30,6 +31,21 @@ harness = false
 # name = "z3"
 # harness = false
 
+[[bench]]
+name = "larson"
+harness = false
+
+[[bench]]
+name = "lean"
+harness = false
+
+# [[bench]]
+# name = "lua"
+# harness = false
+
+[[bench]]
+name = "redis"
+harness = false
 
 [package.metadata.harness.profiles.default.builds]
 sys = { env = { MALLOC = "sys" } }

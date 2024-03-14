@@ -4,7 +4,7 @@ use mallockit_bench::Bench;
 #[bench(oneshot)]
 fn bench(bencher: &Bencher) {
     let malloc = std::env::var("MALLOC").unwrap();
-    println!("MALLOC: {}", malloc);
-    let mut bench = Bench::new("cfrac").alloc(&malloc);
+    let mut bench = Bench::new("cfrac", &malloc);
     bencher.time(|| bench.run());
+    bench.finalize(bencher)
 }

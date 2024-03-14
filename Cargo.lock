@@ -515,9 +515,9 @@ dependencies = [
 
 [[package]]
 name = "harness"
-version = "0.0.4"
+version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba8329edf6338c09066452118541551672c6f26cfa9e396bb5276b015112f606"
+checksum = "3a660621a0b94546cfc2b991232607e10c6d3985b0bad28dec836c366b4c8d57"
 dependencies = [
  "anyhow",
  "clap",
@@ -752,6 +752,7 @@ dependencies = [
  "buddy",
  "harness",
  "hoard",
+ "num_cpus",
 ]
 
 [[package]]
