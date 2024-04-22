@@ -30,6 +30,11 @@ impl Space for HoardSpace {
     }
 
     fn get_layout(ptr: Address) -> Layout {
+        let tagged_words = (ptr.as_usize() >> 48) & 0xff;
+        let tagged_size = tagged_words << 3;
+        if tagged_size != 0 {
+            return Layout::from_size_align(tagged_size, 16).unwrap();
+        }
         let block = SuperBlock::containing(ptr);
         block.size_class.layout()
     }

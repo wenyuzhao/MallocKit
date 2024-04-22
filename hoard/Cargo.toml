@@ -13,3 +13,8 @@ crate-type = ["cdylib", "staticlib"]
 mallockit = { path = "../mallockit" }
 spin = { workspace = true }
 array-const-fn-init = { workspace = true }
+
+[features]
+default = []
+# Use tagged pointer to record object size
+pointer_tagged_size = []
