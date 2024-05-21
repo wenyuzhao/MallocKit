@@ -1,5 +1,0 @@
-pandas
-psutil
-notebook
-numpy
-matplotlib
