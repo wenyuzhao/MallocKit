@@ -1,9 +1,9 @@
 [package]
-name = "rs-alloc-example"
+name = "rust-allocator"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
 anyhow = { version = "1.0.86", features = ["backtrace"] }
-hoard = { path = "../hoard" }
+hoard = { path = "../../hoard" }
 toml = "0.8.13"

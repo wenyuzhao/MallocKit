@@ -346,7 +346,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rs-alloc-example"
+name = "rust-allocator"
 version = "0.1.0"
 dependencies = [
  "anyhow",

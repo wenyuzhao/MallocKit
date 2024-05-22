@@ -7,7 +7,7 @@ members = [
     "buddy",
     "hoard",
     "sanity",
-    "rs-alloc-example",
+    "examples/rust-allocator",
 ]
 
 [workspace.package]
