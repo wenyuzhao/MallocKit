@@ -19,18 +19,14 @@ const DYLIB_EXT: &str = if cfg!(target_os = "linux") {
 
 pub fn get_stdin(bench: &str) -> Stdio {
     match bench {
-        "barnes" => {
-            Stdio::from(File::open(format!("./mimalloc-bench/bench/barnes/input")).unwrap())
-        }
+        "barnes" => Stdio::from(File::open("./mimalloc-bench/bench/barnes/input").unwrap()),
         _ => Stdio::null(),
     }
 }
 
 pub fn get_command(bench: &str) -> Stdio {
     match bench {
-        "barnes" => {
-            Stdio::from(File::open(format!("./mimalloc-bench/bench/barnes/input")).unwrap())
-        }
+        "barnes" => Stdio::from(File::open("./mimalloc-bench/bench/barnes/input").unwrap()),
         _ => Stdio::null(),
     }
 }
