@@ -12,29 +12,22 @@
 #![feature(effects)]
 #![feature(asm_const)]
 
-extern crate mallockit_proc_macro;
+extern crate mallockit_macros;
 pub extern crate spin;
 
 #[macro_use]
-pub mod log;
-#[macro_use]
 pub mod util;
-#[doc(hidden)]
-pub mod hooks;
-pub mod malloc;
 pub mod mutator;
 pub mod plan;
 pub mod space;
 pub mod stat;
-pub mod testing;
 pub mod worker;
 
 pub use ctor::ctor;
 pub use libc;
-pub use mallockit_proc_macro::*;
+pub use mallockit_macros::*;
 pub use mutator::Mutator;
 pub use plan::Plan;
-use space::meta::Meta;
 
 #[cfg(not(target_pointer_width = "64"))]
 const ERROR: ! = "32-bit is not supported";
@@ -50,6 +43,3 @@ const ERROR: ! = r#"
     Only the following platforms are supported:
         Linux (x86_64), macOS (x86_64), Linux (aarch64).
 "#;
-
-#[global_allocator]
-static META: Meta = Meta;

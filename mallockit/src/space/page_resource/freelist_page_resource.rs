@@ -1,8 +1,9 @@
 use super::super::SpaceId;
 use super::PageResource;
-use crate::util::freelist::page_freelist::PageFreeList;
-use crate::util::heap::HEAP;
-use crate::util::memory::RawMemory;
+use crate::space::meta::Meta;
+use crate::util::mem::freelist::page_freelist::PageFreeList;
+use crate::util::mem::heap::HEAP;
+use crate::util::sys::raw_memory::RawMemory;
 use crate::util::*;
 use spin::mutex::Mutex;
 use spin::rwlock::RwLock;
@@ -20,7 +21,7 @@ pub struct FreelistPageResource {
     pub id: SpaceId,
     freelist: Mutex<PageFreeList<{ NUM_SIZE_CLASS }>, Yield>,
     reserved_bytes: AtomicUsize,
-    meta: RwLock<Vec<AtomicU32>, Yield>,
+    meta: RwLock<Vec<AtomicU32, Meta>, Yield>,
     base: Address,
 }
 
@@ -31,11 +32,13 @@ impl FreelistPageResource {
         let base = range.start;
         let mut freelist = PageFreeList::new(base);
         freelist.release_cell(base, 1 << (NUM_SIZE_CLASS - 1));
+        let mut meta = Vec::<u32, Meta>::with_capacity_in(1 << 20, Meta);
+        meta.resize(1 << 20, 0u32);
         Self {
             id,
             freelist: Mutex::new(freelist),
             reserved_bytes: AtomicUsize::new(0),
-            meta: RwLock::new(unsafe { std::mem::transmute(vec![0u32; 1 << 20]) }),
+            meta: RwLock::new(unsafe { std::mem::transmute(meta) }),
             base,
         }
     }

@@ -1,4 +1,5 @@
 use spin::Mutex;
+use std::alloc::Allocator;
 use std::fs;
 use std::{path::PathBuf, process::Command};
 
@@ -64,9 +65,9 @@ fn build_cdylib() {
     }
     *status = true;
     let args = if cfg!(debug_assertions) {
-        vec!["build"]
+        vec!["build", "--features", "malloc"]
     } else {
-        vec!["build", "--release"]
+        vec!["build", "--features", "malloc", "--release"]
     };
     let output = Command::new(env!("CARGO")).args(args).output().unwrap();
     if !output.status.success() {
@@ -74,4 +75,11 @@ fn build_cdylib() {
         std::eprintln!("{}", String::from_utf8(output.stderr).unwrap());
         panic!("Faild to build malloc library.")
     }
+}
+
+pub fn rs_test(alloc: impl Allocator) {
+    let mut v = Vec::new_in(alloc);
+    v.push(1);
+    assert_eq!(v.pop(), Some(1));
+    assert_eq!(v.pop(), None);
 }

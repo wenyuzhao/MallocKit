@@ -1,6 +1,6 @@
 use crate::util::LayoutUtils;
 
-use super::Address;
+use crate::util::Address;
 use std::alloc::Layout;
 use std::mem;
 use std::ops::Range;

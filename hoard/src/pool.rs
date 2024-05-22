@@ -1,6 +1,6 @@
 use crate::{hoard_space::HoardSpace, super_block::SuperBlock};
 use array_const_fn_init::array_const_fn_init;
-use mallockit::util::{size_class::SizeClass, Address, Lazy, Local};
+use mallockit::util::{mem::size_class::SizeClass, Address, Lazy, Local};
 use spin::{relax::Yield, MutexGuard};
 use std::sync::atomic::{AtomicUsize, Ordering};
 

@@ -1,8 +1,8 @@
 use super::{page_resource::BlockPageResource, Allocator, Space, SpaceId};
 use crate::util::bits::{BitField, BitFieldSlot};
-use crate::util::freelist::intrusive_freelist::AddressSpaceConfig;
-use crate::util::freelist::intrusive_freelist::IntrusiveFreeList;
-use crate::util::heap::HEAP;
+use crate::util::mem::freelist::intrusive_freelist::AddressSpaceConfig;
+use crate::util::mem::freelist::intrusive_freelist::IntrusiveFreeList;
+use crate::util::mem::heap::HEAP;
 use crate::util::*;
 use spin::Mutex;
 use std::{ops::Range, sync::atomic::AtomicUsize};

@@ -9,21 +9,28 @@ pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #input
 
         mod __mallockit_plan {
-            pub(super) static PLAN: mallockit::util::Lazy<super::#name> = mallockit::util::Lazy::new(|| <super::#name as mallockit::Plan>::new());
+            pub(super) static PLAN: ::mallockit::util::Lazy<super::#name> = ::mallockit::util::Lazy::new(|| <super::#name as ::mallockit::Plan>::new());
 
-            mallockit::export_malloc_api!(PLAN, super::super::#name);
+            ::mallockit::export_malloc_api!(PLAN, super::super::#name);
         }
 
-        impl mallockit::plan::Singleton for #name {
-                        fn singleton() -> &'static Self {
+        ::mallockit::export_rust_global_alloc_api!(PLAN, #name);
+
+        impl ::mallockit::plan::Singleton for #name {
+            fn singleton() -> &'static Self {
                 unsafe { &__mallockit_plan::PLAN }
             }
         }
+
+        #[cfg(any(feature = "malloc", feature = "mallockit/malloc"))]
+        #[global_allocator]
+        static __GLOBAL_ALLOCATOR: ::mallockit::space::meta::Meta = ::mallockit::space::meta::Meta;
 
         include!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../target/generated_tests.rs"
         ));
+        ::mallockit::rust_allocator_tests!(Global);
     };
     result.into()
 }

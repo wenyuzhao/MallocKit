@@ -16,28 +16,28 @@ pub fn _print(args: fmt::Arguments<'_>, new_line: bool, stderr: bool) {
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => {{
-        $crate::log::_print(format_args!($($arg)*), false, false);
+        $crate::util::sys::log::_print(format_args!($($arg)*), false, false);
     }};
 }
 
 #[macro_export]
 macro_rules! println {
     ($($arg:tt)*) => {{
-        $crate::log::_print(format_args!($($arg)*), true, false);
+        $crate::util::sys::log::_print(format_args!($($arg)*), true, false);
     }};
 }
 
 #[macro_export]
 macro_rules! eprint {
     ($($arg:tt)*) => {{
-        $crate::log::_print(format_args!($($arg)*), false, true);
+        $crate::util::sys::log::_print(format_args!($($arg)*), false, true);
     }};
 }
 
 #[macro_export]
 macro_rules! eprintln {
     ($($arg:tt)*) => {{
-        $crate::log::_print(format_args!($($arg)*), true, true);
+        $crate::util::sys::log::_print(format_args!($($arg)*), true, true);
     }};
 }
 
