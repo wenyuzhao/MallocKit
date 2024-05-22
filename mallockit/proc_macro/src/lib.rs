@@ -14,8 +14,10 @@ pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
             mallockit::export_malloc_api!(PLAN, super::super::#name);
         }
 
+        mallockit::export_rust_global_alloc_api!(PLAN, #name);
+
         impl mallockit::plan::Singleton for #name {
-                        fn singleton() -> &'static Self {
+            fn singleton() -> &'static Self {
                 unsafe { &__mallockit_plan::PLAN }
             }
         }

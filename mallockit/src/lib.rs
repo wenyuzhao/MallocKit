@@ -21,7 +21,6 @@ pub mod log;
 pub mod util;
 #[doc(hidden)]
 pub mod hooks;
-pub mod malloc;
 pub mod mutator;
 pub mod plan;
 pub mod space;

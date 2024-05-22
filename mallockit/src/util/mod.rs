@@ -28,6 +28,8 @@ pub mod freelist;
 pub mod heap;
 mod layout_utils;
 mod lazy;
+#[macro_use]
+pub mod malloc;
 pub mod memory;
 mod page;
 pub mod size_class;

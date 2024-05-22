@@ -32,11 +32,13 @@ impl FreelistPageResource {
         let base = range.start;
         let mut freelist = PageFreeList::new(base);
         freelist.release_cell(base, 1 << (NUM_SIZE_CLASS - 1));
+        let mut meta = Vec::<u32, Meta>::with_capacity_in(1 << 20, Meta);
+        meta.resize(1 << 20, 0u32);
         Self {
             id,
             freelist: Mutex::new(freelist),
             reserved_bytes: AtomicUsize::new(0),
-            meta: RwLock::new(unsafe { std::mem::transmute(vec![0u32; 1 << 20]) }),
+            meta: RwLock::new(unsafe { std::mem::transmute(meta) }),
             base,
         }
     }

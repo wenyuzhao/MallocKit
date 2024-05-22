@@ -64,9 +64,9 @@ fn build_cdylib() {
     }
     *status = true;
     let args = if cfg!(debug_assertions) {
-        vec!["build"]
+        vec!["build", "--features", "malloc"]
     } else {
-        vec!["build", "--release"]
+        vec!["build", "--features", "malloc", "--release"]
     };
     let output = Command::new(env!("CARGO")).args(args).output().unwrap();
     if !output.status.success() {
