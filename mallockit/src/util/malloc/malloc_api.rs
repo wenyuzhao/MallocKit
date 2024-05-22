@@ -59,7 +59,7 @@ impl<P: Plan> MallocAPI<P> {
     pub unsafe fn malloc_size(&self, ptr: Address) -> usize {
         #[cfg(target_os = "macos")]
         if !Self::is_in_mallockit_heap(ptr) {
-            return crate::util::macos_malloc_zone::external_memory_size(ptr);
+            return crate::util::malloc::macos_malloc_zone::external_memory_size(ptr);
         }
         P::get_layout(ptr).size()
     }
@@ -134,7 +134,7 @@ impl<P: Plan> MallocAPI<P> {
         #[cfg(target_os = "macos")]
         if !Self::is_in_mallockit_heap(ptr.into()) {
             let ptr = Address::from(ptr);
-            let old_size = crate::util::macos_malloc_zone::external_memory_size(ptr);
+            let old_size = crate::util::malloc::macos_malloc_zone::external_memory_size(ptr);
             let new_layout =
                 unsafe { Layout::from_size_align_unchecked(new_size, Self::MIN_ALIGNMENT) };
             let new_ptr = match self.mutator().alloc(new_layout) {
@@ -359,7 +359,9 @@ macro_rules! export_malloc_api {
 }
 
 #[cfg(target_os = "macos")]
-pub use crate::util::macos_malloc_zone::{MallocZone, MALLOCKIT_MALLOC_ZONE as MACOS_MALLOC_ZONE};
+pub use crate::util::malloc::macos_malloc_zone::{
+    MallocZone, MALLOCKIT_MALLOC_ZONE as MACOS_MALLOC_ZONE,
+};
 
 #[cfg(target_os = "macos")]
 #[cfg(not(feature = "macos_malloc_zone_override"))]

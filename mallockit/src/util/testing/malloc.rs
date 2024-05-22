@@ -77,7 +77,6 @@ fn build_cdylib() {
     }
 }
 
-
 pub fn rs_test(alloc: impl Allocator) {
     let mut v = Vec::new_in(alloc);
     v.push(1);

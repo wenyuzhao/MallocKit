@@ -111,7 +111,7 @@ mod macos_tls {
     use std::arch::asm;
 
     use super::*;
-    use crate::util::{allocation_area::AllocationArea, raw_memory::RawMemory, Page, Size4K};
+    use crate::util::{mem::alloc::allocation_area::AllocationArea, sys::RawMemory, Page, Size4K};
 
     const SLOT: usize = 89;
     #[cfg(target_arch = "x86_64")]
