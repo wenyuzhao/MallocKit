@@ -1,5 +1,6 @@
 use super::super::SpaceId;
 use super::PageResource;
+use crate::space::meta::Meta;
 use crate::util::freelist::page_freelist::PageFreeList;
 use crate::util::heap::HEAP;
 use crate::util::memory::RawMemory;
@@ -20,7 +21,7 @@ pub struct FreelistPageResource {
     pub id: SpaceId,
     freelist: Mutex<PageFreeList<{ NUM_SIZE_CLASS }>, Yield>,
     reserved_bytes: AtomicUsize,
-    meta: RwLock<Vec<AtomicU32>, Yield>,
+    meta: RwLock<Vec<AtomicU32, Meta>, Yield>,
     base: Address,
 }
 

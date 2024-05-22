@@ -34,7 +34,6 @@ pub use libc;
 pub use mallockit_proc_macro::*;
 pub use mutator::Mutator;
 pub use plan::Plan;
-use space::meta::Meta;
 
 #[cfg(not(target_pointer_width = "64"))]
 const ERROR: ! = "32-bit is not supported";
@@ -50,6 +49,3 @@ const ERROR: ! = r#"
     Only the following platforms are supported:
         Linux (x86_64), macOS (x86_64), Linux (aarch64).
 "#;
-
-#[global_allocator]
-static META: Meta = Meta;
