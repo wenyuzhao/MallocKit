@@ -1,6 +1,6 @@
 use crate::{
     space::page_table::PageTable,
-    util::{arena::Arena, *},
+    util::{mem::arena::Arena, *},
 };
 use std::{ops::Range, ptr::NonNull};
 

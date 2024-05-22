@@ -1,4 +1,4 @@
-use crate::util::heap::HEAP;
+use crate::util::mem::heap::HEAP;
 use crate::util::Address;
 use crate::util::Lazy;
 use crate::Mutator;

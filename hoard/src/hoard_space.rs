@@ -2,7 +2,7 @@ use super::{page_resource::BlockPageResource, Allocator, Space, SpaceId};
 use crate::{pool::Pool, super_block::SuperBlock};
 use mallockit::{
     space::meta::{Box, Meta},
-    util::{discrete_tlab::DiscreteTLAB, size_class::SizeClass, *},
+    util::{mem::discrete_tlab::DiscreteTLAB, mem::size_class::SizeClass, *},
 };
 
 /// Global heap

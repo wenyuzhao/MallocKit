@@ -1,6 +1,6 @@
 use super::super::SpaceId;
 use super::PageResource;
-use crate::util::heap::HEAP;
+use crate::util::mem::heap::HEAP;
 use crate::util::*;
 use atomic::Atomic;
 use crossbeam::queue::SegQueue;

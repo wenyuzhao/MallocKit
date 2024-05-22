@@ -1,24 +1,26 @@
-use super::Address;
+use super::address::Address;
 
 #[macro_export]
 macro_rules! impl_aligned_block {
     ($t: ty) => {
         impl $t {
             pub const LOG_BYTES: usize =
-                <Self as $crate::util::aligned_block::AlignedBlockConfig>::LOG_BYTES;
+                <Self as $crate::util::mem::aligned_block::AlignedBlockConfig>::LOG_BYTES;
             pub const BYTES: usize = 1 << Self::LOG_BYTES;
             pub const MASK: usize = Self::BYTES - 1;
             pub const HEADER_BYTES: usize = std::mem::size_of::<
-                <Self as $crate::util::aligned_block::AlignedBlockConfig>::Header,
+                <Self as $crate::util::mem::aligned_block::AlignedBlockConfig>::Header,
             >();
             pub const WORDS: usize = Self::BYTES >> 3;
 
             pub fn new(address: Address) -> Self {
-                <Self as $crate::util::aligned_block::AlignedBlockConfig>::from_address(address)
+                <Self as $crate::util::mem::aligned_block::AlignedBlockConfig>::from_address(
+                    address,
+                )
             }
 
             pub fn start(&self) -> Address {
-                <Self as $crate::util::aligned_block::AlignedBlockConfig>::into_address(*self)
+                <Self as $crate::util::mem::aligned_block::AlignedBlockConfig>::into_address(*self)
             }
 
             pub fn end(&self) -> Address {
@@ -174,7 +176,7 @@ macro_rules! impl_aligned_block {
         }
 
         impl std::ops::Deref for $t {
-            type Target = <Self as $crate::util::aligned_block::AlignedBlockConfig>::Header;
+            type Target = <Self as $crate::util::mem::aligned_block::AlignedBlockConfig>::Header;
 
             fn deref(&self) -> &Self::Target {
                 unsafe { &*self.start().as_ptr() }

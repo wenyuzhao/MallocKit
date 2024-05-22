@@ -1,6 +1,6 @@
 use std::{alloc::Layout, usize};
 
-use super::LayoutUtils;
+use super::layout_utils::LayoutUtils;
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy)]

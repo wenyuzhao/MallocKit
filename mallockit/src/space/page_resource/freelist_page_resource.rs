@@ -1,8 +1,8 @@
 use super::super::SpaceId;
 use super::PageResource;
 use crate::space::meta::Meta;
-use crate::util::freelist::page_freelist::PageFreeList;
-use crate::util::heap::HEAP;
+use crate::util::mem::freelist::page_freelist::PageFreeList;
+use crate::util::mem::heap::HEAP;
 use crate::util::sys::raw_memory::RawMemory;
 use crate::util::*;
 use spin::mutex::Mutex;

@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crate::util::{Page, Size4K};
 
-use super::{sys::raw_memory::RawMemory, Address};
+use super::{super::sys::raw_memory::RawMemory, address::Address};
 
 pub struct Arena<T: Sized> {
     freelist: Address,
