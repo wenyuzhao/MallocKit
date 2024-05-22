@@ -1,5 +1,5 @@
-use super::{Address, Page};
 use crate::util::Size4K;
+use crate::util::{Address, Page};
 
 #[derive(Debug)]
 pub struct MemoryMapError;
@@ -9,7 +9,7 @@ pub struct RawMemory {
 }
 
 impl RawMemory {
-    pub(super) fn map_heap(heap_size: usize) -> Result<Address, MemoryMapError> {
+    pub(crate) fn map_heap(heap_size: usize) -> Result<Address, MemoryMapError> {
         let mmap_start = RawMemory::map_anonymous(heap_size << 1).unwrap();
         let mmap_end = mmap_start + (heap_size << 1);
         let start = mmap_start.align_up(heap_size);

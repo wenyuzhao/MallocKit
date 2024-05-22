@@ -1,5 +1,5 @@
 [package]
-name = "mallockit_proc_macro"
+name = "mallockit-macros"
 version = { workspace = true }
 authors = ["Wenyu Zhao <wenyu.zhao@anu.edu.au>"]
 edition = { workspace = true }

@@ -17,26 +17,19 @@ macro_rules! name_list {
     };
 }
 
-mod address;
-#[macro_use]
-pub mod aligned_block;
-pub mod allocation_area;
-pub mod arena;
 pub mod bits;
-pub mod discrete_tlab;
-pub mod freelist;
-pub mod heap;
-mod layout_utils;
 mod lazy;
-pub mod memory;
-mod page;
-pub mod size_class;
+#[macro_use]
+pub mod malloc;
+#[macro_use]
+pub mod mem;
+#[macro_use]
+pub mod sys;
+pub mod testing;
 
-#[cfg(target_os = "macos")]
-pub(crate) mod macos_malloc_zone;
-
-pub use address::*;
-pub use core::alloc::Layout;
-pub use layout_utils::*;
+pub use core::alloc::{Layout, LayoutError};
 pub use lazy::*;
-pub use page::*;
+pub use mem::address::*;
+pub use mem::layout_utils::*;
+pub use mem::page::*;
+pub use mem::size_class::*;

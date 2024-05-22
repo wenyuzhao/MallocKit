@@ -1,6 +1,6 @@
 use std::ptr::addr_of;
 
-use super::Address;
+use crate::util::Address;
 
 const ZONE_NAME: &[i8] = &[
     'm' as _, 'a' as _, 'l' as _, 'l' as _, 'o' as _, 'c' as _, 'k' as _, 'i' as _, 't' as _, 0,

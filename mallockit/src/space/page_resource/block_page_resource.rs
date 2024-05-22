@@ -1,6 +1,6 @@
 use super::super::SpaceId;
 use super::PageResource;
-use crate::util::heap::HEAP;
+use crate::util::mem::heap::HEAP;
 use crate::util::*;
 use atomic::Atomic;
 use crossbeam::queue::SegQueue;
@@ -82,6 +82,9 @@ impl PageResource for BlockPageResource {
     }
 
     fn release_pages<S: PageSize>(&self, start: Page<S>) {
+        // NOTE: `SegQueue::push` space expansion indirectly calls `malloc`.
+        // It's safe for now since we don't call `release_pages` in `malloc`.
+        // Review this later when we start to work on lazy sweeping.
         self.recycled_blocks.push(start.start());
         self.reserved_bytes
             .fetch_sub(1 << self.log_bytes, Ordering::Relaxed);

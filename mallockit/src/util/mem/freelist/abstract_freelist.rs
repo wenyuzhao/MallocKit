@@ -1,6 +1,6 @@
 use crate::{
     space::meta::Meta,
-    util::{memory::RawMemory, *},
+    util::{sys::raw_memory::RawMemory, *},
 };
 use std::ops::{Deref, Range};
 

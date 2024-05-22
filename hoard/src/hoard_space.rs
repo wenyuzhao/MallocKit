@@ -1,6 +1,9 @@
 use super::{page_resource::BlockPageResource, Allocator, Space, SpaceId};
 use crate::{pool::Pool, super_block::SuperBlock};
-use mallockit::util::{discrete_tlab::DiscreteTLAB, size_class::SizeClass, *};
+use mallockit::{
+    space::meta::{Box, Meta},
+    util::{mem::alloc::discrete_tlab::DiscreteTLAB, *},
+};
 
 /// Global heap
 pub struct HoardSpace {
@@ -93,7 +96,7 @@ impl HoardAllocator {
         Self {
             space,
             tlab: DiscreteTLAB::new(),
-            local: Lazy::new(|| Box::new(Pool::new(false))),
+            local: Lazy::new(|| Box::new_in(Pool::new(false), Meta)),
         }
     }
 }

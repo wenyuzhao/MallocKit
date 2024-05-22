@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, fmt, iter::Step, marker::PhantomData, num::NonZeroUsize, ops::Range};
 
-use super::Address;
+use super::address::Address;
 
 pub trait PageSize: 'static + Sized {
     const NAME: &'static str;

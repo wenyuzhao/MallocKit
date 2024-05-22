@@ -1,5 +1,5 @@
 use super::{page_resource::FreelistPageResource, Allocator, Space, SpaceId};
-use crate::util::{allocation_area::AllocationArea, *};
+use crate::util::{mem::alloc::allocation_area::AllocationArea, *};
 
 pub struct ImmortalSpace {
     id: SpaceId,

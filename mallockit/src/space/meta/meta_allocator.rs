@@ -156,3 +156,8 @@ unsafe impl GlobalAlloc for Meta {
         MetaLocal::current().deallocate(ptr.into(), layout)
     }
 }
+
+pub type Box<T> = std::boxed::Box<T, Meta>;
+pub type Vec<T> = std::vec::Vec<T, Meta>;
+pub type BTreeMap<K, V> = std::collections::BTreeMap<K, V, Meta>;
+pub type BTreeSet<V> = std::collections::BTreeSet<V, Meta>;

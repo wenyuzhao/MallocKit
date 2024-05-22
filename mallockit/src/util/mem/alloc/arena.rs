@@ -1,8 +1,8 @@
 use std::marker::PhantomData;
 
-use crate::util::{Page, Size4K};
+use crate::util::{Address, Page, Size4K};
 
-use super::{memory::RawMemory, Address};
+use crate::util::sys::RawMemory;
 
 pub struct Arena<T: Sized> {
     freelist: Address,

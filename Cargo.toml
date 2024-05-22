@@ -2,12 +2,13 @@
 resolver = "2"
 members = [
     "mallockit",
-    "mallockit/proc_macro",
+    "mallockit/macros",
     "bump",
     "buddy",
     "hoard",
     "sanity",
     "bench",
+    "examples/rust-allocator",
 ]
 
 [workspace.package]

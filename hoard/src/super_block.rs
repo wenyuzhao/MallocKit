@@ -1,6 +1,6 @@
 use std::num::NonZeroUsize;
 
-use mallockit::util::{aligned_block::AlignedBlockConfig, size_class::SizeClass};
+use mallockit::util::mem::{aligned_block::AlignedBlockConfig, size_class::SizeClass};
 
 use crate::pool::Pool;
 
