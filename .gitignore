@@ -10,5 +10,6 @@ a.out
 
 /.venv
 
+/.vscode
 /perf.data
 /perf.data.old
