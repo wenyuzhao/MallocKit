@@ -1,4 +1,5 @@
 #![feature(thread_local)]
+#![feature(allocator_api)]
 
 extern crate mallockit;
 

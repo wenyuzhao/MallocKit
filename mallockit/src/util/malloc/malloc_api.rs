@@ -228,6 +228,7 @@ impl<P: Plan> MallocAPI<P> {
 }
 
 #[macro_export]
+#[doc(hidden)]
 macro_rules! export_malloc_api {
     ($plan: expr, $plan_ty: ty) => {
         pub mod __mallockit {
@@ -363,6 +364,7 @@ pub use crate::util::macos_malloc_zone::{MallocZone, MALLOCKIT_MALLOC_ZONE as MA
 #[cfg(target_os = "macos")]
 #[cfg(not(feature = "macos_malloc_zone_override"))]
 #[macro_export]
+#[doc(hidden)]
 macro_rules! export_malloc_api_macos {
     () => {};
 }
@@ -370,6 +372,7 @@ macro_rules! export_malloc_api_macos {
 #[cfg(target_os = "macos")]
 #[cfg(feature = "macos_malloc_zone_override")]
 #[macro_export]
+#[doc(hidden)]
 macro_rules! export_malloc_api_macos {
     () => {
         #[cfg(target_os = "macos")]
@@ -381,12 +384,39 @@ macro_rules! export_malloc_api_macos {
 }
 
 #[macro_export]
+#[doc(hidden)]
 macro_rules! export_rust_global_alloc_api {
     ($plan: expr, $plan_ty: ty) => {
         pub struct Global;
 
-        unsafe impl std::alloc::GlobalAlloc for Global {
-            unsafe fn alloc(&self, mut layout: Layout) -> *mut u8 {
+        unsafe impl ::std::alloc::Allocator for Global {
+            fn allocate(
+                &self,
+                mut layout: Layout,
+            ) -> Result<::std::ptr::NonNull<[u8]>, ::std::alloc::AllocError> {
+                if layout.align() < 16 {
+                    layout = layout.align_to(16).unwrap();
+                }
+                layout = unsafe { layout.pad_to_align_unchecked() };
+                let start = <$plan_ty as $crate::Plan>::Mutator::current()
+                    .alloc(layout)
+                    .unwrap_or($crate::util::Address::ZERO);
+                let slice = unsafe {
+                    ::std::slice::from_raw_parts_mut(start.as_mut() as *mut u8, layout.size())
+                };
+                Ok(::std::ptr::NonNull::from(slice))
+            }
+            unsafe fn deallocate(
+                &self,
+                ptr: ::std::ptr::NonNull<u8>,
+                layout: ::std::alloc::Layout,
+            ) {
+                <$plan_ty as $crate::Plan>::Mutator::current().dealloc(ptr.as_ptr().into())
+            }
+        }
+
+        unsafe impl ::std::alloc::GlobalAlloc for Global {
+            unsafe fn alloc(&self, mut layout: ::std::alloc::Layout) -> *mut u8 {
                 if layout.align() < 16 {
                     layout = layout.align_to(16).unwrap();
                 }
@@ -396,7 +426,7 @@ macro_rules! export_rust_global_alloc_api {
                     .unwrap_or($crate::util::Address::ZERO)
                     .into()
             }
-            unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
+            unsafe fn dealloc(&self, ptr: *mut u8, _layout: ::std::alloc::Layout) {
                 <$plan_ty as $crate::Plan>::Mutator::current().dealloc(ptr.into())
             }
         }
