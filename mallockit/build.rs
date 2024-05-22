@@ -17,7 +17,7 @@ fn generate_one_test(test: &str, script: &str) -> String {
         r#"
 #[test]
 fn {}() {{
-    mallockit::testing::test(env!("CARGO_CRATE_NAME"), {:?});
+    mallockit::util::testing::test(env!("CARGO_CRATE_NAME"), {:?});
 }}
 "#,
         test, script,

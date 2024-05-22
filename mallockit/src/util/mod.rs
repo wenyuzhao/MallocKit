@@ -26,13 +26,18 @@ pub mod bits;
 pub mod discrete_tlab;
 pub mod freelist;
 pub mod heap;
+#[doc(hidden)]
+pub mod hooks;
 mod layout_utils;
 mod lazy;
+#[macro_use]
+pub mod log;
 #[macro_use]
 pub mod malloc;
 pub mod memory;
 mod page;
 pub mod size_class;
+pub mod testing;
 
 #[cfg(target_os = "macos")]
 pub(crate) mod macos_malloc_zone;

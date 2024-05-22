@@ -241,8 +241,8 @@ macro_rules! export_malloc_api {
             #[cfg(any(feature = "malloc", feature = "mallockit/malloc"))]
             #[$crate::ctor]
             unsafe fn ctor() {
-                $crate::hooks::process_start(&*$plan);
-                $crate::libc::atexit($crate::hooks::process_exit);
+                $crate::util::hooks::process_start(&*$plan);
+                $crate::libc::atexit($crate::util::hooks::process_exit);
             }
 
             #[cfg(target_os = "macos")]

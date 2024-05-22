@@ -16,16 +16,11 @@ extern crate mallockit_proc_macro;
 pub extern crate spin;
 
 #[macro_use]
-pub mod log;
-#[macro_use]
 pub mod util;
-#[doc(hidden)]
-pub mod hooks;
 pub mod mutator;
 pub mod plan;
 pub mod space;
 pub mod stat;
-pub mod testing;
 pub mod worker;
 
 pub use ctor::ctor;
