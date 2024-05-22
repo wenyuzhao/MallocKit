@@ -1,4 +1,4 @@
-use super::{address::Address, size_class::SizeClass};
+use crate::util::{Address, SizeClass};
 
 pub struct DiscreteTLAB<const MAX_SIZE_CLASS: usize = { Address::LOG_BYTES }> {
     bins: [Address; MAX_SIZE_CLASS],

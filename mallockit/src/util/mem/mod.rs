@@ -1,9 +1,7 @@
 pub mod address;
 #[macro_use]
 pub mod aligned_block;
-pub mod allocation_area;
-pub mod arena;
-pub mod discrete_tlab;
+pub mod alloc;
 pub mod freelist;
 pub mod heap;
 pub mod layout_utils;
