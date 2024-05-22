@@ -22,10 +22,6 @@ pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
 
-        #[cfg(any(feature = "malloc", feature = "mallockit/malloc"))]
-        #[global_allocator]
-        static __GLOBAL_ALLOCATOR: ::mallockit::space::meta::Meta = ::mallockit::space::meta::Meta;
-
         include!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../target/generated_tests.rs"
