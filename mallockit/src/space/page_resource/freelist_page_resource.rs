@@ -3,7 +3,7 @@ use super::PageResource;
 use crate::space::meta::Meta;
 use crate::util::freelist::page_freelist::PageFreeList;
 use crate::util::heap::HEAP;
-use crate::util::memory::RawMemory;
+use crate::util::sys::raw_memory::RawMemory;
 use crate::util::*;
 use spin::mutex::Mutex;
 use spin::rwlock::RwLock;

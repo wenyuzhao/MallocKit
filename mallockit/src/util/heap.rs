@@ -4,7 +4,7 @@ use spin::Lazy;
 
 use crate::space::SpaceId;
 
-use super::{memory::RawMemory, Address};
+use super::{sys::raw_memory::RawMemory, Address};
 
 const LOG_HEAP_SIZE: usize = 45;
 const HEAP_SIZE: usize = 1 << LOG_HEAP_SIZE;

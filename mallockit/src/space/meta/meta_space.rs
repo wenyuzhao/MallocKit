@@ -1,4 +1,4 @@
-use crate::util::{memory::RawMemory, *};
+use crate::util::{sys::raw_memory::RawMemory, *};
 use std::{
     iter::Step,
     ops::Range,
