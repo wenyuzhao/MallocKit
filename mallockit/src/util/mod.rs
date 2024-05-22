@@ -27,9 +27,6 @@ pub mod mem;
 pub mod sys;
 pub mod testing;
 
-#[cfg(target_os = "macos")]
-pub(crate) mod macos_malloc_zone;
-
 pub use core::alloc::{Layout, LayoutError};
 pub use lazy::*;
 pub use mem::address::*;
