@@ -279,14 +279,14 @@ dependencies = [
  "ctor",
  "errno",
  "libc",
- "mallockit_proc_macro",
+ "mallockit-macros",
  "num_cpus",
  "shell-words",
  "spin",
 ]
 
 [[package]]
-name = "mallockit_proc_macro"
+name = "mallockit-macros"
 version = "0.1.0"
 dependencies = [
  "quote",

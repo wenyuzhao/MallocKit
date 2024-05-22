@@ -12,7 +12,7 @@
 #![feature(effects)]
 #![feature(asm_const)]
 
-extern crate mallockit_proc_macro;
+extern crate mallockit_macros;
 pub extern crate spin;
 
 #[macro_use]
@@ -25,7 +25,7 @@ pub mod worker;
 
 pub use ctor::ctor;
 pub use libc;
-pub use mallockit_proc_macro::*;
+pub use mallockit_macros::*;
 pub use mutator::Mutator;
 pub use plan::Plan;
 
