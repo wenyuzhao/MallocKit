@@ -129,19 +129,19 @@ pub(crate) fn report() {}
 
 #[cfg(feature = "stat")]
 pub(crate) fn report() {
-    println!("alignment:");
+    eprintln!("alignment:");
     for i in 0..ALIGNMENTS.len() {
-        println!(" - {} = {}", i, ALIGNMENTS[i].get());
+        eprintln!(" - {} = {}", i, ALIGNMENTS[i].get());
     }
-    println!(" - others = {}", OTHER_ALIGNMENT.get());
-    println!("");
-    println!("size:");
+    eprintln!(" - others = {}", OTHER_ALIGNMENT.get());
+    eprintln!("");
+    eprintln!("size:");
     for i in 0..SIZES.len() {
-        println!(" - {} = {}", i, SIZES[i].get());
+        eprintln!(" - {} = {}", i, SIZES[i].get());
     }
-    println!(" - others = {}", OTHER_SIZE.get());
-    println!("");
+    eprintln!(" - others = {}", OTHER_SIZE.get());
+    eprintln!("");
     while let Some(c) = COUNTERS.lock().pop() {
-        println!("{}: {}", c.0, c.get());
+        eprintln!("{}: {}", c.0, c.get());
     }
 }
