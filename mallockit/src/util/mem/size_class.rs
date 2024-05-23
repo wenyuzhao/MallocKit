@@ -4,9 +4,11 @@ use crate::util::constants::LOG_MIN_ALIGNMENT;
 
 use super::layout_utils::LayoutUtils;
 
+const LOG_MIN_ALIGNMENT_U8: u8 = LOG_MIN_ALIGNMENT as u8;
+
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy)]
-pub struct SizeClass<const LOG_COVERAGE: u8 = LOG_MIN_ALIGNMENT>(pub u8);
+pub struct SizeClass<const LOG_COVERAGE: u8 = LOG_MIN_ALIGNMENT_U8>(pub u8);
 
 impl<const LOG_COVERAGE: u8> SizeClass<LOG_COVERAGE> {
     pub const fn as_usize(self) -> usize {
