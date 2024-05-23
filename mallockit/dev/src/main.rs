@@ -48,7 +48,7 @@ fn build_crate(opts: &Options) -> anyhow::Result<()> {
     if !features.contains(&"malloc".to_owned()) && !opts.all_features {
         features.push("malloc".to_string());
     }
-    if features.len() > 0 {
+    if !features.is_empty() {
         cmd.arg("--features").arg(features.join(","));
     }
     if opts.all_features {
@@ -97,12 +97,12 @@ fn main() -> anyhow::Result<()> {
         cmd
     } else if options.gdb {
         let mut cmd = Command::new("rust-gdb");
-        cmd.args(&["-ex", &format!("set environment {ENV}={dylib}")]);
+        cmd.args(["-ex", &format!("set environment {ENV}={dylib}")]);
         cmd.arg("--args").args(&args);
         cmd
     } else {
         let mut cmd = Command::new("rust-lldb");
-        cmd.args(&["-o", &format!("env {ENV}={dylib}")]);
+        cmd.args(["-o", &format!("env {ENV}={dylib}")]);
         cmd.arg("--source-quietly");
         cmd.arg("--").args(&args);
         cmd
