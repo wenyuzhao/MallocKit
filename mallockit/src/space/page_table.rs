@@ -148,7 +148,11 @@ impl<L: PageTableLevel> PageTable<L> {
             Some(_) => unreachable!(),
             _ => {
                 let table = Box::leak(meta_box!(PageTable::<L::NextLevel> {
-                    table: unsafe { mem::transmute([0usize; 512]) },
+                    table: unsafe {
+                        mem::transmute::<[usize; 512], [PageTableEntry<L::NextLevel>; 512]>(
+                            [0usize; 512],
+                        )
+                    },
                     phantom: PhantomData,
                 }));
                 self.table[index].set_next_page_table(table);
@@ -168,7 +172,9 @@ impl PageTable<L1> {
 impl PageTable<L4> {
     pub(crate) const fn new() -> Self {
         Self {
-            table: unsafe { mem::transmute([0usize; 512]) },
+            table: unsafe {
+                mem::transmute::<[usize; 512], [PageTableEntry<L4>; 512]>([0usize; 512])
+            },
             phantom: PhantomData,
         }
     }

@@ -38,7 +38,9 @@ impl FreelistPageResource {
             id,
             freelist: Mutex::new(freelist),
             reserved_bytes: AtomicUsize::new(0),
-            meta: RwLock::new(unsafe { std::mem::transmute(meta) }),
+            meta: RwLock::new(unsafe {
+                std::mem::transmute::<Vec<u32, Meta>, Vec<AtomicU32, Meta>>(meta)
+            }),
             base,
         }
     }

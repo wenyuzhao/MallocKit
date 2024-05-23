@@ -44,6 +44,7 @@ impl MemRegion for SuperBlock {
         unsafe { self.meta_mut().pr_next = next };
     }
 
+    #[allow(clippy::misnamed_getters)]
     fn next(&self) -> Option<Self> {
         self.pr_next
     }
