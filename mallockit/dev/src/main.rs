@@ -28,6 +28,14 @@ struct Options {
     #[arg(short, long)]
     profile: Option<String>,
 
+    /// Run the program under GDB
+    #[arg(long, default_value_t = false)]
+    gdb: bool,
+
+    /// Run the program under LLDB
+    #[arg(long, default_value_t = false)]
+    lldb: bool,
+
     /// The program to run, with arguments
     #[arg(last = true, allow_hyphen_values = true)]
     command: Vec<String>,
@@ -35,28 +43,44 @@ struct Options {
 
 fn build_crate(opts: &Options) -> anyhow::Result<()> {
     let mut cmd = Command::new("cargo");
-    let mut cmd = cmd.arg("build").args(["-p", &opts.malloc]);
-    if opts.features.len() > 0 {
-        cmd = cmd.arg("--features").arg(opts.features.join(","));
+    cmd.arg("build").args(["-p", &opts.malloc]);
+    let mut features = opts.features.clone();
+    if !features.contains(&"malloc".to_owned()) && !opts.all_features {
+        features.push("malloc".to_string());
+    }
+    if features.len() > 0 {
+        cmd.arg("--features").arg(features.join(","));
     }
     if opts.all_features {
-        cmd = cmd.arg("--all-features");
+        cmd.arg("--all-features");
     }
     if opts.no_default_features {
-        cmd = cmd.arg("--no-default-features");
+        cmd.arg("--no-default-features");
     }
     if opts.release {
-        cmd = cmd.arg("--release");
+        cmd.arg("--release");
     }
     if let Some(profile) = &opts.profile {
-        cmd = cmd.arg("--profile").arg(profile);
+        cmd.arg("--profile").arg(profile);
     }
     let status = cmd.status()?;
     if !status.success() {
-        anyhow::bail!("cargo run failed: {}", status);
+        std::process::exit(status.code().unwrap_or(1));
     }
     Ok(())
 }
+
+const ENV: &str = if cfg!(target_os = "macos") {
+    "DYLD_INSERT_LIBRARIES"
+} else {
+    "LD_PRELOAD"
+};
+
+const EXT: &str = if cfg!(target_os = "macos") {
+    "dylib"
+} else {
+    "so"
+};
 
 fn main() -> anyhow::Result<()> {
     let options = Options::parse();
@@ -64,26 +88,30 @@ fn main() -> anyhow::Result<()> {
     build_crate(&options)?;
     // 2. Run the program
     let args = options.command.clone();
-    let mut cmd = Command::new(&args[0]);
-    cmd.args(&args[1..]);
     let profile = if options.release { "release" } else { "debug" };
-    let ext = if cfg!(target_os = "macos") {
-        "dylib"
+    let dylib = format!("target/{}/lib{}.{}", profile, options.malloc, EXT);
+    let mut cmd = if !options.gdb && !options.lldb {
+        let mut cmd = Command::new(&args[0]);
+        cmd.args(&args[1..]);
+        cmd.env(ENV, dylib);
+        println!("{:?}", cmd);
+        cmd
+    } else if options.gdb {
+        let mut cmd = Command::new("rust-gdb");
+        cmd.args(&["-ex", &format!("set environment {ENV}={dylib}")]);
+        cmd.arg("--args").args(&args);
+        cmd
     } else {
-        "so"
+        let mut cmd = Command::new("rust-lldb");
+        cmd.args(&["-o", &format!("env {ENV}={dylib}")]);
+        cmd.arg("--source-quietly");
+        cmd.arg("--").args(&args);
+        cmd
     };
-    let ld_preload_env = if cfg!(target_os = "macos") {
-        "DYLD_INSERT_LIBRARIES"
-    } else {
-        "LD_PRELOAD"
-    };
-    cmd.env(
-        ld_preload_env,
-        format!("target/{}/lib{}.{}", profile, options.malloc, ext),
-    );
+    cmd.env("RUST_BACKTRACE", "1");
     let status = cmd.status()?;
     if !status.success() {
-        anyhow::bail!("program failed: {}", status);
+        std::process::exit(status.code().unwrap_or(1));
     }
     Ok(())
 }
