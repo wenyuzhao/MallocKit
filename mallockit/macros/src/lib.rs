@@ -11,7 +11,7 @@ pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
         mod __mallockit_plan {
             type Plan = super::#name;
 
-            pub(super) static PLAN: ::mallockit::util::Lazy<Plan> = ::mallockit::util::Lazy::new(|| <Plan as ::mallockit::Plan>::new());
+            static PLAN: ::mallockit::util::Lazy<Plan> = ::mallockit::util::Lazy::new(|| <Plan as ::mallockit::Plan>::new());
 
             #[cfg(any(feature = "malloc", feature = "mallockit/malloc"))]
             #[::mallockit::ctor]
@@ -21,7 +21,7 @@ pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
             #[cfg(target_os = "macos")]
             #[no_mangle]
-            pub extern "C" fn mallockit_initialize_macos_tls() -> *mut u8 {
+            extern "C" fn mallockit_initialize_macos_tls() -> *mut u8 {
                 <Plan as ::mallockit::Plan>::Mutator::current() as *mut ::mallockit::Mutator as _
             }
 
@@ -60,17 +60,17 @@ pub fn mutator(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #[cfg(not(target_os = "macos"))]
         mod __mallockit_mutator {
             #[thread_local]
-            pub(super) static mut MUTATOR: ::mallockit::util::Lazy<super::#name, ::mallockit::util::Local> = ::mallockit::util::Lazy::new(|| <super::#name as ::mallockit::Mutator>::new());
-        }
+            static mut MUTATOR: ::mallockit::util::Lazy<super::#name, ::mallockit::util::Local> = ::mallockit::util::Lazy::new(|| <super::#name as ::mallockit::Mutator>::new());
 
-        impl ::mallockit::mutator::TLS for #name {
-            fn new() -> Self {
-                <Self as ::mallockit::Mutator>::new()
-            }
+            impl ::mallockit::mutator::TLS for super::#name {
+                fn new() -> Self {
+                    <Self as ::mallockit::Mutator>::new()
+                }
 
-            #[cfg(not(target_os = "macos"))]
-            fn current() -> &'static mut Self {
-                unsafe { &mut *__mallockit_mutator::MUTATOR }
+                #[cfg(not(target_os = "macos"))]
+                fn current() -> &'static mut Self {
+                    unsafe { &mut *MUTATOR }
+                }
             }
         }
     };
