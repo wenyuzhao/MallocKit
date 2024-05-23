@@ -1,5 +1,5 @@
 use super::{
-    page_resource::{Block, BlockPageResource},
+    page_resource::{BlockPageResource, MemRegion},
     Allocator, Space, SpaceId,
 };
 use crate::util::bits::{BitField, BitFieldSlot};
@@ -17,7 +17,7 @@ type ActivePageSize = Size2M;
 #[repr(C)]
 pub struct Chunk(Address);
 
-impl Block for Chunk {
+impl MemRegion for Chunk {
     const LOG_BYTES: usize = ActivePageSize::LOG_BYTES;
 
     fn start(&self) -> Address {

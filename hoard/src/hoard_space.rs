@@ -3,7 +3,7 @@ use crate::{pool::Pool, super_block::SuperBlock};
 use mallockit::{
     space::{
         meta::{Box, Meta},
-        page_resource::Block,
+        page_resource::MemRegion,
     },
     util::{mem::alloc::discrete_tlab::DiscreteTLAB, *},
 };

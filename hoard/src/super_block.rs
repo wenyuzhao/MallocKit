@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use mallockit::{space::page_resource::Block, util::mem::size_class::SizeClass};
+use mallockit::{space::page_resource::MemRegion, util::mem::size_class::SizeClass};
 
 use crate::pool::Pool;
 
@@ -25,7 +25,7 @@ pub struct BlockMeta {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SuperBlock(NonZeroUsize);
 
-impl Block for SuperBlock {
+impl MemRegion for SuperBlock {
     type Meta = BlockMeta;
 
     const LOG_BYTES: usize = 18;

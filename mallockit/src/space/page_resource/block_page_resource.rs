@@ -10,7 +10,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-pub trait Block: 'static + Sized + Clone + Copy {
+pub trait MemRegion: 'static + Sized + Clone + Copy {
     type Meta = ();
 
     const LOG_BYTES: usize;
@@ -64,7 +64,7 @@ pub trait Block: 'static + Sized + Clone + Copy {
     }
 }
 
-pub struct BlockPageResource<B: Block, const INTRUSIVE: bool = true> {
+pub struct BlockPageResource<B: MemRegion, const INTRUSIVE: bool = true> {
     pub id: SpaceId,
     cursor: Atomic<Address>,
     highwater: Address,
@@ -73,7 +73,7 @@ pub struct BlockPageResource<B: Block, const INTRUSIVE: bool = true> {
     reserved_bytes: AtomicUsize,
 }
 
-impl<B: Block, const INTRUSIVE: bool> BlockPageResource<B, INTRUSIVE> {
+impl<B: MemRegion, const INTRUSIVE: bool> BlockPageResource<B, INTRUSIVE> {
     pub fn new(id: SpaceId) -> Self {
         debug_assert!(id.0 < 0b0000_1111);
         debug_assert!(B::LOG_BYTES >= Size4K::LOG_BYTES);
@@ -163,7 +163,7 @@ impl<B: Block, const INTRUSIVE: bool> BlockPageResource<B, INTRUSIVE> {
     }
 }
 
-impl<B: Block, const INTRUSIVE: bool> PageResource for BlockPageResource<B, INTRUSIVE> {
+impl<B: MemRegion, const INTRUSIVE: bool> PageResource for BlockPageResource<B, INTRUSIVE> {
     fn reserved_bytes(&self) -> usize {
         self.reserved_bytes.load(Ordering::Relaxed)
     }
