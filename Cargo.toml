@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "mallockit",
     "mallockit/macros",
+    "mallockit/dev",
     "bump",
     "buddy",
     "hoard",
