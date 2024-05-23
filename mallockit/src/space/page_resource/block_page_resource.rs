@@ -1,9 +1,10 @@
 use super::super::SpaceId;
 use super::PageResource;
+use crate::space::meta::{Meta, Vec};
 use crate::util::mem::heap::HEAP;
 use crate::util::*;
 use atomic::Atomic;
-use crossbeam::queue::SegQueue;
+use spin::Mutex;
 use std::iter::Step;
 use std::{
     ops::Range,
@@ -69,7 +70,7 @@ pub struct BlockPageResource<B: MemRegion, const INTRUSIVE: bool = true> {
     cursor: Atomic<Address>,
     highwater: Address,
     recycled_blocks_intrusive: Atomic<Option<B>>,
-    recycled_blocks_non_intrusive: SegQueue<Address>,
+    recycled_blocks_non_intrusive: Mutex<Vec<Address>>,
     reserved_bytes: AtomicUsize,
 }
 
@@ -83,7 +84,7 @@ impl<B: MemRegion, const INTRUSIVE: bool> BlockPageResource<B, INTRUSIVE> {
             cursor: Atomic::new(range.start),
             highwater: range.end,
             recycled_blocks_intrusive: Atomic::new(None),
-            recycled_blocks_non_intrusive: SegQueue::new(),
+            recycled_blocks_non_intrusive: Mutex::new(Vec::new_in(Meta)),
             reserved_bytes: AtomicUsize::new(0),
         }
     }
@@ -128,7 +129,7 @@ impl<B: MemRegion, const INTRUSIVE: bool> BlockPageResource<B, INTRUSIVE> {
                     break;
                 }
             }
-        } else if let Some(addr) = self.recycled_blocks_non_intrusive.pop() {
+        } else if let Some(addr) = self.recycled_blocks_non_intrusive.lock().pop() {
             let block = B::from_address(addr);
             self.reserved_bytes.fetch_add(B::BYTES, Ordering::Relaxed);
             return Some(block);
@@ -156,7 +157,9 @@ impl<B: MemRegion, const INTRUSIVE: bool> BlockPageResource<B, INTRUSIVE> {
                 }
             }
         } else {
-            self.recycled_blocks_non_intrusive.push(block.start());
+            self.recycled_blocks_non_intrusive
+                .lock()
+                .push(block.start());
         }
         self.reserved_bytes
             .fetch_sub(1 << B::LOG_BYTES, Ordering::Relaxed);

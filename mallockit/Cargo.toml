@@ -12,7 +12,6 @@ errno = { workspace = true }
 spin = { workspace = true }
 ctor = { workspace = true }
 num_cpus = { workspace = true }
-crossbeam = { workspace = true }
 atomic = { workspace = true }
 shell-words = { workspace = true }
 mallockit-macros = { path = "./macros" }
