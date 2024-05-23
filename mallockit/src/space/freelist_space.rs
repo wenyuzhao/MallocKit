@@ -148,17 +148,15 @@ impl Cell {
 }
 
 pub struct FreeListAllocator {
-    space: Lazy<&'static FreeListSpace, Local>,
-    freelist: Lazy<IntrusiveFreeList<AddressSpace>, Local>,
+    space: &'static FreeListSpace,
+    freelist: IntrusiveFreeList<AddressSpace>,
 }
 
 impl FreeListAllocator {
-    pub const fn new<const SPACE_ID: SpaceId>(space: Lazy<&'static FreeListSpace, Local>) -> Self {
+    pub fn new<const SPACE_ID: SpaceId>(space: &'static FreeListSpace) -> Self {
         Self {
             space,
-            freelist: Lazy::new(|| {
-                IntrusiveFreeList::new(false, HEAP.get_space_range(SPACE_ID).start)
-            }),
+            freelist: IntrusiveFreeList::new(false, HEAP.get_space_range(SPACE_ID).start),
         }
     }
 

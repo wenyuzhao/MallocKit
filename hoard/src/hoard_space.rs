@@ -82,20 +82,20 @@ impl HoardSpace {
 }
 /// Thread-local heap
 pub struct HoardAllocator {
-    space: Lazy<&'static HoardSpace, Local>,
+    space: &'static HoardSpace,
     tlab: DiscreteTLAB<{ SizeClass::<4>::from_bytes(Self::LARGEST_SMALL_OBJECT).as_usize() + 1 }>,
-    local: Lazy<Box<Pool>, Local>,
+    local: Box<Pool>,
 }
 
 impl HoardAllocator {
     const LOCAL_HEAP_THRESHOLD: usize = 16 * 1024 * 1024;
     const LARGEST_SMALL_OBJECT: usize = 1024;
 
-    pub const fn new(space: Lazy<&'static HoardSpace, Local>, _space_id: SpaceId) -> Self {
+    pub fn new(space: &'static HoardSpace, _space_id: SpaceId) -> Self {
         Self {
             space,
             tlab: DiscreteTLAB::new(),
-            local: Lazy::new(|| Box::new_in(Pool::new(false), Meta)),
+            local: Box::new_in(Pool::new(false), Meta),
         }
     }
 }
@@ -108,7 +108,7 @@ impl Allocator for HoardAllocator {
                 return Some(cell);
             }
         }
-        self.local.alloc_cell(size_class, &self.space)
+        self.local.alloc_cell(size_class, self.space)
     }
 
     fn dealloc(&mut self, cell: Address) {
@@ -119,7 +119,7 @@ impl Allocator for HoardAllocator {
         {
             self.tlab.push(block.size_class, cell);
         } else {
-            self.local.free_cell(cell, &self.space);
+            self.local.free_cell(cell, self.space);
         }
     }
 }

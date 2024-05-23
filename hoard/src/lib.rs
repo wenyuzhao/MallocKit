@@ -55,8 +55,8 @@ impl Mutator for HoardMutator {
 
     fn new() -> Self {
         Self {
-            hoard: HoardAllocator::new(Lazy::new(|| &Self::plan().hoard_space), HOARD_SPACE),
-            los: LargeObjectAllocator::new(Lazy::new(|| &Self::plan().large_object_space)),
+            hoard: HoardAllocator::new(&Self::plan().hoard_space, HOARD_SPACE),
+            los: LargeObjectAllocator::new(&Self::plan().large_object_space),
         }
     }
 

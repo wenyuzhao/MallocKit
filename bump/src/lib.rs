@@ -41,7 +41,7 @@ impl Mutator for BumpMutator {
 
     fn new() -> Self {
         Self {
-            bump: BumpAllocator::new(Lazy::new(|| &Self::plan().immortal)),
+            bump: BumpAllocator::new(&Self::plan().immortal),
         }
     }
 
