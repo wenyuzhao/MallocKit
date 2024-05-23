@@ -131,6 +131,7 @@ impl MetaLocal {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Meta;
 
 unsafe impl Allocator for Meta {

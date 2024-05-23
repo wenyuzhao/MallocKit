@@ -6,26 +6,29 @@ use std::{
     },
 };
 
-use crossbeam::queue::SegQueue;
+use spin::Mutex;
 
-use crate::util::Lazy;
+use crate::{
+    space::meta::{Meta, Vec},
+    util::Lazy,
+};
 
-static COUNTERS: SegQueue<Arc<Counter>> = SegQueue::new();
+static COUNTERS: Mutex<Vec<Arc<Counter, Meta>>> = Mutex::new(Vec::new_in(Meta));
 
-pub type CounterRef = Lazy<Arc<Counter>>;
+pub type CounterRef = Lazy<Arc<Counter, Meta>>;
 
-pub const fn define_counter<const NAME: &'static str>() -> Lazy<Arc<Counter>> {
+pub const fn define_counter<const NAME: &'static str>() -> Lazy<Arc<Counter, Meta>> {
     Lazy::new(|| {
-        let c = Arc::new(Counter::new(NAME));
-        COUNTERS.push(c.clone());
+        let c = Arc::new_in(Counter::new(NAME), Meta);
+        COUNTERS.lock().push(c.clone());
         c
     })
 }
 
-static TOTAL_ALLOCATIONS: Lazy<Arc<Counter>> = define_counter::<"total-allocations">();
-static LARGE_ALLOCATIONS: Lazy<Arc<Counter>> = define_counter::<"large-allocations">();
-static TOTAL_DEALLOCATIONS: Lazy<Arc<Counter>> = define_counter::<"total-deallocations">();
-static LARGE_DEALLOCATIONS: Lazy<Arc<Counter>> = define_counter::<"large-deallocations">();
+static TOTAL_ALLOCATIONS: Lazy<Arc<Counter, Meta>> = define_counter::<"total-allocations">();
+static LARGE_ALLOCATIONS: Lazy<Arc<Counter, Meta>> = define_counter::<"large-allocations">();
+static TOTAL_DEALLOCATIONS: Lazy<Arc<Counter, Meta>> = define_counter::<"total-deallocations">();
+static LARGE_DEALLOCATIONS: Lazy<Arc<Counter, Meta>> = define_counter::<"large-deallocations">();
 
 static ALIGNMENTS: [Counter; 11] = [
     Counter::new(""), // 1
@@ -138,7 +141,7 @@ pub(crate) fn report() {
     }
     println!(" - others = {}", OTHER_SIZE.get());
     println!("");
-    while let Some(c) = COUNTERS.pop() {
+    while let Some(c) = COUNTERS.lock().pop() {
         println!("{}: {}", c.0, c.get());
     }
 }
