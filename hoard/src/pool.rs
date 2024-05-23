@@ -1,6 +1,9 @@
 use crate::{hoard_space::HoardSpace, super_block::SuperBlock};
 use array_const_fn_init::array_const_fn_init;
-use mallockit::util::{mem::size_class::SizeClass, Address, Lazy, Local};
+use mallockit::{
+    space::page_resource::Block,
+    util::{mem::size_class::SizeClass, Address, Lazy, Local},
+};
 use spin::{relax::Yield, MutexGuard};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -36,7 +39,7 @@ impl BlockList {
     fn group(block: SuperBlock, alloc: bool) -> usize {
         let u = block.used_bytes()
             + if alloc { block.size_class.bytes() } else { 0 }
-            + (Address::ZERO + SuperBlock::HEADER_BYTES)
+            + (Address::ZERO + SuperBlock::META_BYTES)
                 .align_up(block.size_class.bytes())
                 .as_usize();
         (u << 2) >> SuperBlock::LOG_BYTES

@@ -1,3 +1,4 @@
+use crate::util::constants::MIN_ALIGNMENT;
 use crate::util::mem::heap::HEAP;
 use crate::util::Address;
 use crate::util::Lazy;
@@ -18,16 +19,7 @@ impl<P: Plan> GetMutatorType for MallocAPI<P> {
 
 #[allow(unused)]
 impl<P: Plan> MallocAPI<P> {
-    #[cfg(not(any(
-        target_os = "macos",
-        all(target_os = "windows", target_pointer_width = "64")
-    )))]
-    pub const MIN_ALIGNMENT: usize = 16; // should be 8?
-    #[cfg(any(
-        target_os = "macos",
-        all(target_os = "windows", target_pointer_width = "64")
-    ))]
-    pub const MIN_ALIGNMENT: usize = 16;
+    pub const MIN_ALIGNMENT: usize = MIN_ALIGNMENT;
     pub const PAGE_SIZE: usize = 4096;
 
     pub const fn new(plan: &'static Lazy<P>) -> Self {
@@ -396,8 +388,10 @@ macro_rules! export_rust_global_alloc_api {
                 &self,
                 mut layout: Layout,
             ) -> Result<::std::ptr::NonNull<[u8]>, ::std::alloc::AllocError> {
-                if layout.align() < 16 {
-                    layout = layout.align_to(16).unwrap();
+                if layout.align() < $crate::util::constants::MIN_ALIGNMENT {
+                    layout = layout
+                        .align_to($crate::util::constants::MIN_ALIGNMENT)
+                        .unwrap();
                 }
                 layout = unsafe { layout.pad_to_align_unchecked() };
                 let start = <$plan_ty as $crate::Plan>::Mutator::current()

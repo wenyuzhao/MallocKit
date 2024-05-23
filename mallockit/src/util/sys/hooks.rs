@@ -3,7 +3,7 @@ use std::panic::PanicInfo;
 use crate::Plan;
 
 fn panic_handler(panic_info: &PanicInfo<'_>) {
-    println!("{}", panic_info);
+    crate::println!("{}", panic_info);
     std::process::abort();
 }
 

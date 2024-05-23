@@ -18,6 +18,7 @@ macro_rules! name_list {
 }
 
 pub mod bits;
+pub mod constants;
 mod lazy;
 #[macro_use]
 pub mod malloc;
