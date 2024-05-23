@@ -33,22 +33,30 @@ pub trait Mutator: Sized + 'static + TLS {
 
     fn dealloc(&mut self, ptr: Address);
 
-    fn realloc(&mut self, ptr: Address, new_size: usize) -> Option<Address> {
+    fn realloc(&mut self, ptr: Address, new_layout: Layout) -> Option<Address> {
         let layout = Self::Plan::get_layout(ptr);
-        if layout.size() >= new_size {
+        if layout.size() >= new_layout.size() && layout.align() >= new_layout.align() {
             return Some(ptr);
         }
-        let new_layout = unsafe { Layout::from_size_align_unchecked(new_size, layout.align()) };
         let new_ptr = self.alloc(new_layout);
         if let Some(new_ptr) = new_ptr {
             unsafe {
                 ptr::copy_nonoverlapping(
                     ptr.as_ptr::<u8>(),
                     new_ptr.as_mut_ptr::<u8>(),
-                    usize::min(layout.size(), new_size),
+                    usize::min(layout.size(), new_layout.size()),
                 );
             }
             self.dealloc(ptr);
+        }
+        new_ptr
+    }
+
+    fn realloc_zeroed(&mut self, ptr: Address, new_layout: Layout) -> Option<Address> {
+        let size = new_layout.size();
+        let new_ptr = self.realloc(ptr, new_layout);
+        if let Some(new_ptr) = new_ptr {
+            unsafe { ptr::write_bytes(new_ptr.as_mut_ptr::<u8>(), 0, size) };
         }
         new_ptr
     }
