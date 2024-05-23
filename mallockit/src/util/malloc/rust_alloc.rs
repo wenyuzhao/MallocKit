@@ -20,7 +20,7 @@ macro_rules! export_rust_global_alloc_api {
             fn allocate(
                 &self,
                 mut layout: ::std::alloc::Layout,
-            ) -> Result<::std::ptr::NonNull<[u8]>, ::std::alloc::AllocError> {
+            ) -> ::std::result::Result<::std::ptr::NonNull<[u8]>, ::std::alloc::AllocError> {
                 layout = Self::__fix_layout(layout);
                 let start = <$plan_ty as $crate::Plan>::Mutator::current()
                     .alloc(layout)
@@ -28,13 +28,13 @@ macro_rules! export_rust_global_alloc_api {
                 let slice = unsafe {
                     ::std::slice::from_raw_parts_mut(start.as_mut() as *mut u8, layout.size())
                 };
-                Ok(::std::ptr::NonNull::from(slice))
+                ::std::result::Result::Ok(::std::ptr::NonNull::from(slice))
             }
 
             fn allocate_zeroed(
                 &self,
                 mut layout: ::std::alloc::Layout,
-            ) -> Result<::std::ptr::NonNull<[u8]>, ::std::alloc::AllocError> {
+            ) -> ::std::result::Result<::std::ptr::NonNull<[u8]>, ::std::alloc::AllocError> {
                 layout = Self::__fix_layout(layout);
                 let start = <$plan_ty as $crate::Plan>::Mutator::current()
                     .alloc_zeroed(layout)
@@ -42,7 +42,7 @@ macro_rules! export_rust_global_alloc_api {
                 let slice = unsafe {
                     ::std::slice::from_raw_parts_mut(start.as_mut() as *mut u8, layout.size())
                 };
-                Ok(::std::ptr::NonNull::from(slice))
+                ::std::result::Result::Ok(::std::ptr::NonNull::from(slice))
             }
 
             unsafe fn deallocate(
@@ -58,7 +58,7 @@ macro_rules! export_rust_global_alloc_api {
                 ptr: ::std::ptr::NonNull<u8>,
                 old_layout: ::std::alloc::Layout,
                 mut new_layout: ::std::alloc::Layout,
-            ) -> Result<::std::ptr::NonNull<[u8]>, ::std::alloc::AllocError> {
+            ) -> ::std::result::Result<::std::ptr::NonNull<[u8]>, ::std::alloc::AllocError> {
                 debug_assert!(
                     new_layout.size() >= old_layout.size(),
                     "`new_layout.size()` must be greater than or equal to `old_layout.size()`"
@@ -71,7 +71,7 @@ macro_rules! export_rust_global_alloc_api {
                 let slice = unsafe {
                     ::std::slice::from_raw_parts_mut(start.as_mut() as *mut u8, new_layout.size())
                 };
-                Ok(::std::ptr::NonNull::from(slice))
+                ::std::result::Result::Ok(::std::ptr::NonNull::from(slice))
             }
 
             unsafe fn grow_zeroed(
@@ -79,7 +79,7 @@ macro_rules! export_rust_global_alloc_api {
                 ptr: ::std::ptr::NonNull<u8>,
                 old_layout: ::std::alloc::Layout,
                 mut new_layout: ::std::alloc::Layout,
-            ) -> Result<::std::ptr::NonNull<[u8]>, ::std::alloc::AllocError> {
+            ) -> ::std::result::Result<::std::ptr::NonNull<[u8]>, ::std::alloc::AllocError> {
                 debug_assert!(
                     new_layout.size() >= old_layout.size(),
                     "`new_layout.size()` must be greater than or equal to `old_layout.size()`"
@@ -92,7 +92,7 @@ macro_rules! export_rust_global_alloc_api {
                 let slice = unsafe {
                     ::std::slice::from_raw_parts_mut(start.as_mut() as *mut u8, new_layout.size())
                 };
-                Ok(::std::ptr::NonNull::from(slice))
+                ::std::result::Result::Ok(::std::ptr::NonNull::from(slice))
             }
 
             unsafe fn shrink(
@@ -100,7 +100,7 @@ macro_rules! export_rust_global_alloc_api {
                 ptr: ::std::ptr::NonNull<u8>,
                 old_layout: ::std::alloc::Layout,
                 mut new_layout: ::std::alloc::Layout,
-            ) -> Result<::std::ptr::NonNull<[u8]>, ::std::alloc::AllocError> {
+            ) -> ::std::result::Result<::std::ptr::NonNull<[u8]>, ::std::alloc::AllocError> {
                 debug_assert!(
                     new_layout.size() <= old_layout.size(),
                     "`new_layout.size()` must be smaller than or equal to `old_layout.size()`"
@@ -113,7 +113,7 @@ macro_rules! export_rust_global_alloc_api {
                 let slice = unsafe {
                     ::std::slice::from_raw_parts_mut(start.as_mut() as *mut u8, new_layout.size())
                 };
-                Ok(::std::ptr::NonNull::from(slice))
+                ::std::result::Result::Ok(::std::ptr::NonNull::from(slice))
             }
         }
 
