@@ -59,7 +59,6 @@ impl HoardSpace {
             debug_assert!(!block.is_full());
             register(block);
             debug_assert!(block.is_owned_by(local));
-            mallockit::println!("Allocating block1: {:?}", block);
             return Some(block);
         }
         // Acquire new memory
