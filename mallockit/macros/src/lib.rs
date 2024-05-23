@@ -22,7 +22,8 @@ pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #[cfg(target_os = "macos")]
             #[no_mangle]
             extern "C" fn mallockit_initialize_macos_tls() -> *mut u8 {
-                <Plan as ::mallockit::Plan>::Mutator::current() as *mut ::mallockit::Mutator as _
+                use ::mallockit::mutator::TLS;
+                <Plan as ::mallockit::Plan>::Mutator::current() as *mut <Plan as ::mallockit::Plan>::Mutator as _
             }
 
             impl ::mallockit::plan::Singleton for super::#name {
@@ -57,22 +58,19 @@ pub fn mutator(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #[repr(align(256))]
         #input
 
-        #[cfg(not(target_os = "macos"))]
-        mod __mallockit_mutator {
-            #[thread_local]
-            static mut MUTATOR: ::mallockit::util::Lazy<super::#name, ::mallockit::util::Local> = ::mallockit::util::Lazy::new(|| <super::#name as ::mallockit::Mutator>::new());
+        impl ::mallockit::mutator::TLS for #name {
+            fn new() -> Self {
+                <Self as ::mallockit::Mutator>::new()
+            }
 
-            impl ::mallockit::mutator::TLS for super::#name {
-                fn new() -> Self {
-                    <Self as ::mallockit::Mutator>::new()
-                }
-
-                #[cfg(not(target_os = "macos"))]
-                fn current() -> &'static mut Self {
-                    unsafe { &mut *MUTATOR }
-                }
+            #[cfg(not(target_os = "macos"))]
+            fn current() -> &'static mut Self {
+                #[thread_local]
+                static mut MUTATOR: ::mallockit::util::Lazy<#name, ::mallockit::util::Local> = ::mallockit::util::Lazy::new(|| <#name as ::mallockit::Mutator>::new());
+                unsafe { &mut * MUTATOR }
             }
         }
+
     };
     result.into()
 }
