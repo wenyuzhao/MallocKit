@@ -94,7 +94,6 @@ fn main() -> anyhow::Result<()> {
         let mut cmd = Command::new(&args[0]);
         cmd.args(&args[1..]);
         cmd.env(ENV, dylib);
-        println!("{:?}", cmd);
         cmd
     } else if options.gdb {
         let mut cmd = Command::new("rust-gdb");
