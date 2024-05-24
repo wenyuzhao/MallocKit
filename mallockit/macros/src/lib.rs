@@ -9,28 +9,43 @@ pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #input
 
         mod __mallockit_plan {
-            pub(super) static PLAN: ::mallockit::util::Lazy<super::#name> = ::mallockit::util::Lazy::new(|| <super::#name as ::mallockit::Plan>::new());
+            type Plan = super::#name;
+
+            static PLAN: ::mallockit::util::Lazy<Plan> = ::mallockit::util::Lazy::new(|| <Plan as ::mallockit::Plan>::new());
+
+            #[cfg(any(feature = "malloc", feature = "mallockit/malloc"))]
+            #[::mallockit::ctor]
+            unsafe fn ctor() {
+                ::mallockit::util::sys::hooks::process_start(&*PLAN);
+            }
+
+            #[cfg(target_os = "macos")]
+            #[no_mangle]
+            extern "C" fn mallockit_initialize_macos_tls() -> *mut u8 {
+                use ::mallockit::mutator::TLS;
+                <Plan as ::mallockit::Plan>::Mutator::current() as *mut <Plan as ::mallockit::Plan>::Mutator as _
+            }
+
+            impl ::mallockit::plan::Singleton for super::#name {
+                fn singleton() -> &'static Self {
+                    unsafe { &PLAN }
+                }
+            }
 
             ::mallockit::export_malloc_api!(PLAN, super::super::#name);
+            ::mallockit::export_rust_global_alloc_api!(super::super::#name);
         }
 
-        ::mallockit::export_rust_global_alloc_api!(PLAN, #name);
+        pub use __mallockit_plan::__mallockit_rust_api::Global;
 
-        impl ::mallockit::plan::Singleton for #name {
-            fn singleton() -> &'static Self {
-                unsafe { &__mallockit_plan::PLAN }
-            }
+        #[cfg(test)]
+        mod tests {
+            include!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../target/generated_tests.rs"
+            ));
+            ::mallockit::rust_allocator_tests!(crate::Global);
         }
-
-        #[cfg(any(feature = "malloc", feature = "mallockit/malloc"))]
-        #[global_allocator]
-        static __GLOBAL_ALLOCATOR: ::mallockit::space::meta::Meta = ::mallockit::space::meta::Meta;
-
-        include!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../target/generated_tests.rs"
-        ));
-        ::mallockit::rust_allocator_tests!(Global);
     };
     result.into()
 }
@@ -43,22 +58,19 @@ pub fn mutator(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #[repr(align(256))]
         #input
 
-        #[cfg(not(target_os = "macos"))]
-        mod __mallockit_mutator {
-            #[thread_local]
-            pub(super) static mut MUTATOR: mallockit::util::Lazy<super::#name, mallockit::util::Local> = mallockit::util::Lazy::new(|| <super::#name as mallockit::Mutator>::new());
-        }
-
-        impl mallockit::mutator::TLS for #name {
+        impl ::mallockit::mutator::TLS for #name {
             fn new() -> Self {
-                <Self as mallockit::Mutator>::new()
+                <Self as ::mallockit::Mutator>::new()
             }
 
             #[cfg(not(target_os = "macos"))]
             fn current() -> &'static mut Self {
-                unsafe { &mut *__mallockit_mutator::MUTATOR }
+                #[thread_local]
+                static mut MUTATOR: ::mallockit::util::Lazy<#name, ::mallockit::util::Local> = ::mallockit::util::Lazy::new(|| <#name as ::mallockit::Mutator>::new());
+                unsafe { &mut * MUTATOR }
             }
         }
+
     };
     result.into()
 }

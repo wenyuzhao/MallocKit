@@ -3,7 +3,7 @@ use std::panic::PanicInfo;
 use crate::Plan;
 
 fn panic_handler(panic_info: &PanicInfo<'_>) {
-    println!("{}", panic_info);
+    crate::println!("{}", panic_info);
     std::process::abort();
 }
 
@@ -13,11 +13,14 @@ pub fn set_panic_handler() {
 
 pub extern "C" fn process_start(plan: &'static impl Plan) {
     set_panic_handler();
+    unsafe {
+        libc::atexit(process_exit);
+    }
     #[cfg(target_os = "macos")]
     crate::util::malloc::macos_malloc_zone::init();
     plan.init();
 }
 
-pub extern "C" fn process_exit() {
+extern "C" fn process_exit() {
     crate::stat::report();
 }

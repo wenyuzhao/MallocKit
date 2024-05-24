@@ -1,3 +1,4 @@
+use crate::util::constants::MIN_ALIGNMENT;
 use crate::util::mem::heap::HEAP;
 use crate::util::Address;
 use crate::util::Lazy;
@@ -18,16 +19,7 @@ impl<P: Plan> GetMutatorType for MallocAPI<P> {
 
 #[allow(unused)]
 impl<P: Plan> MallocAPI<P> {
-    #[cfg(not(any(
-        target_os = "macos",
-        all(target_os = "windows", target_pointer_width = "64")
-    )))]
-    pub const MIN_ALIGNMENT: usize = 16; // should be 8?
-    #[cfg(any(
-        target_os = "macos",
-        all(target_os = "windows", target_pointer_width = "64")
-    ))]
-    pub const MIN_ALIGNMENT: usize = 16;
+    pub const MIN_ALIGNMENT: usize = MIN_ALIGNMENT;
     pub const PAGE_SIZE: usize = 4096;
 
     pub const fn new(plan: &'static Lazy<P>) -> Self {
@@ -154,7 +146,8 @@ impl<P: Plan> MallocAPI<P> {
             return new_ptr.into();
         }
 
-        match self.mutator().realloc(ptr.into(), new_size) {
+        let layout = Layout::from_size_align_unchecked(new_size, Self::MIN_ALIGNMENT);
+        match self.mutator().realloc(ptr.into(), layout) {
             Some(ptr) => ptr.into(),
             None => {
                 if free_if_fail {
@@ -231,128 +224,109 @@ impl<P: Plan> MallocAPI<P> {
 #[doc(hidden)]
 macro_rules! export_malloc_api {
     ($plan: expr, $plan_ty: ty) => {
-        pub mod __mallockit {
+        #[cfg(any(feature = "malloc", feature = "mallockit/malloc"))]
+        pub mod __mallockit_malloc_api {
             use super::*;
             use $crate::Plan;
-            type ConcretePlan = $plan_ty;
-            type Malloc = $crate::util::malloc::MallocAPI<ConcretePlan>;
-            static MALLOC_IMPL: Malloc =
-                $crate::util::malloc::MallocAPI::<ConcretePlan>::new(&$plan);
+            type Malloc = $crate::util::malloc::MallocAPI<$plan_ty>;
+            static MALLOC_IMPL: Malloc = $crate::util::malloc::MallocAPI::<$plan_ty>::new(&$plan);
 
-            #[cfg(any(feature = "malloc", feature = "mallockit/malloc"))]
-            #[$crate::ctor]
-            unsafe fn ctor() {
-                $crate::util::sys::hooks::process_start(&*$plan);
-                $crate::libc::atexit($crate::util::sys::hooks::process_exit);
+            #[$crate::interpose]
+            pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
+                MALLOC_IMPL.alloc_or_enomem(size, Malloc::MIN_ALIGNMENT)
             }
 
             #[cfg(target_os = "macos")]
-            #[no_mangle]
-            pub extern "C" fn mallockit_initialize_macos_tls() -> *mut u8 {
-                MALLOC_IMPL.mutator() as *mut _ as _
+            #[$crate::interpose]
+            pub unsafe extern "C" fn malloc_size(ptr: *mut u8) -> usize {
+                MALLOC_IMPL.malloc_size(ptr.into())
             }
 
-            #[cfg(any(feature = "malloc", feature = "mallockit/malloc"))]
-            pub mod __malloc_api {
-                use super::{Malloc, MALLOC_IMPL};
+            // #[cfg(target_os = "macos")]
+            // #[$crate::interpose]
+            // pub unsafe fn malloc_good_size(ptr: *mut u8) -> usize {
+            //     MALLOC_IMPL.malloc_size(ptr.into())
+            // }
 
-                #[$crate::interpose]
-                pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
-                    MALLOC_IMPL.alloc_or_enomem(size, Malloc::MIN_ALIGNMENT)
-                }
+            #[cfg(target_os = "linux")]
+            #[$crate::interpose]
+            pub unsafe extern "C" fn malloc_usable_size(ptr: *mut u8) -> usize {
+                MALLOC_IMPL.malloc_size(ptr.into())
+            }
 
-                #[cfg(target_os = "macos")]
-                #[$crate::interpose]
-                pub unsafe extern "C" fn malloc_size(ptr: *mut u8) -> usize {
-                    MALLOC_IMPL.malloc_size(ptr.into())
-                }
+            #[$crate::interpose]
+            pub unsafe extern "C" fn free(ptr: *mut u8) {
+                MALLOC_IMPL.free(ptr)
+            }
 
-                // #[cfg(target_os = "macos")]
-                // #[$crate::interpose]
-                // pub unsafe fn malloc_good_size(ptr: *mut u8) -> usize {
-                //     MALLOC_IMPL.malloc_size(ptr.into())
-                // }
+            #[cfg(target_os = "linux")]
+            #[$crate::interpose]
+            pub unsafe extern "C" fn cfree(ptr: *mut u8) {
+                MALLOC_IMPL.free(ptr)
+            }
 
-                #[cfg(target_os = "linux")]
-                #[$crate::interpose]
-                pub unsafe extern "C" fn malloc_usable_size(ptr: *mut u8) -> usize {
-                    MALLOC_IMPL.malloc_size(ptr.into())
-                }
+            #[$crate::interpose]
+            pub unsafe extern "C" fn calloc(count: usize, size: usize) -> *mut u8 {
+                let size = count * size;
+                let ptr = MALLOC_IMPL.alloc_or_enomem(size, Malloc::MIN_ALIGNMENT);
+                std::ptr::write_bytes(ptr, 0, size);
+                ptr
+            }
 
-                #[$crate::interpose]
-                pub unsafe extern "C" fn free(ptr: *mut u8) {
-                    MALLOC_IMPL.free(ptr)
-                }
+            #[cfg(any(target_os = "linux", target_os = "macos"))]
+            #[$crate::interpose]
+            pub unsafe extern "C" fn valloc(size: usize) -> *mut u8 {
+                MALLOC_IMPL.alloc_or_enomem(size, Malloc::PAGE_SIZE)
+            }
 
-                #[cfg(target_os = "linux")]
-                #[$crate::interpose]
-                pub unsafe extern "C" fn cfree(ptr: *mut u8) {
-                    MALLOC_IMPL.free(ptr)
-                }
+            #[cfg(target_os = "linux")]
+            #[$crate::interpose]
+            pub unsafe extern "C" fn pvalloc(size: usize) -> *mut u8 {
+                MALLOC_IMPL.alloc_or_enomem(size, Malloc::PAGE_SIZE)
+            }
 
-                #[$crate::interpose]
-                pub unsafe extern "C" fn calloc(count: usize, size: usize) -> *mut u8 {
-                    let size = count * size;
-                    let ptr = MALLOC_IMPL.alloc_or_enomem(size, Malloc::MIN_ALIGNMENT);
-                    std::ptr::write_bytes(ptr, 0, size);
-                    ptr
-                }
+            #[$crate::interpose]
+            pub unsafe extern "C" fn realloc(ptr: *mut u8, size: usize) -> *mut u8 {
+                MALLOC_IMPL.reallocate_or_enomem(
+                    ptr,
+                    size,
+                    cfg!(any(target_os = "linux", target_os = "windows")),
+                    false,
+                )
+            }
 
-                #[cfg(any(target_os = "linux", target_os = "macos"))]
-                #[$crate::interpose]
-                pub unsafe extern "C" fn valloc(size: usize) -> *mut u8 {
-                    MALLOC_IMPL.alloc_or_enomem(size, Malloc::PAGE_SIZE)
-                }
+            #[cfg(target_os = "macos")]
+            #[$crate::interpose]
+            pub unsafe extern "C" fn reallocf(ptr: *mut u8, size: usize) -> *mut u8 {
+                MALLOC_IMPL.reallocate_or_enomem(ptr, size, false, true)
+            }
 
-                #[cfg(target_os = "linux")]
-                #[$crate::interpose]
-                pub unsafe extern "C" fn pvalloc(size: usize) -> *mut u8 {
-                    MALLOC_IMPL.alloc_or_enomem(size, Malloc::PAGE_SIZE)
-                }
+            #[cfg(any(target_os = "linux", target_os = "macos"))]
+            #[$crate::interpose]
+            pub unsafe extern "C" fn posix_memalign(
+                ptr: *mut *mut u8,
+                alignment: usize,
+                size: usize,
+            ) -> i32 {
+                MALLOC_IMPL.posix_memalign(ptr, alignment, size)
+            }
 
-                #[$crate::interpose]
-                pub unsafe extern "C" fn realloc(ptr: *mut u8, size: usize) -> *mut u8 {
-                    MALLOC_IMPL.reallocate_or_enomem(
-                        ptr,
-                        size,
-                        cfg!(any(target_os = "linux", target_os = "windows")),
-                        false,
-                    )
-                }
+            #[cfg(target_os = "linux")]
+            #[$crate::interpose]
+            pub unsafe extern "C" fn memalign(alignment: usize, size: usize) -> *mut u8 {
+                MALLOC_IMPL.memalign(alignment, size)
+            }
 
-                #[cfg(target_os = "macos")]
-                #[$crate::interpose]
-                pub unsafe extern "C" fn reallocf(ptr: *mut u8, size: usize) -> *mut u8 {
-                    MALLOC_IMPL.reallocate_or_enomem(ptr, size, false, true)
-                }
+            #[cfg(target_os = "linux")]
+            #[$crate::interpose]
+            pub unsafe extern "C" fn aligned_alloc(alignment: usize, size: usize) -> *mut u8 {
+                MALLOC_IMPL.aligned_alloc(size, alignment, true, false)
+            }
 
-                #[cfg(any(target_os = "linux", target_os = "macos"))]
-                #[$crate::interpose]
-                pub unsafe extern "C" fn posix_memalign(
-                    ptr: *mut *mut u8,
-                    alignment: usize,
-                    size: usize,
-                ) -> i32 {
-                    MALLOC_IMPL.posix_memalign(ptr, alignment, size)
-                }
-
-                #[cfg(target_os = "linux")]
-                #[$crate::interpose]
-                pub unsafe extern "C" fn memalign(alignment: usize, size: usize) -> *mut u8 {
-                    MALLOC_IMPL.memalign(alignment, size)
-                }
-
-                #[cfg(target_os = "linux")]
-                #[$crate::interpose]
-                pub unsafe extern "C" fn aligned_alloc(alignment: usize, size: usize) -> *mut u8 {
-                    MALLOC_IMPL.aligned_alloc(size, alignment, true, false)
-                }
-
-                #[cfg(target_os = "windows")]
-                #[$crate::interpose]
-                pub unsafe extern "C" fn _aligned_malloc(size: usize, alignment: usize) -> *mut u8 {
-                    MALLOC_IMPL.aligned_alloc(size, alignment, false, true)
-                }
+            #[cfg(target_os = "windows")]
+            #[$crate::interpose]
+            pub unsafe extern "C" fn _aligned_malloc(size: usize, alignment: usize) -> *mut u8 {
+                MALLOC_IMPL.aligned_alloc(size, alignment, false, true)
             }
         }
     };
@@ -381,56 +355,6 @@ macro_rules! export_malloc_api_macos {
         #[$crate::interpose]
         pub unsafe extern "C" fn malloc_default_zone() -> *mut $crate::malloc::MallocZone {
             &mut $crate::malloc::MACOS_MALLOC_ZONE
-        }
-    };
-}
-
-#[macro_export]
-#[doc(hidden)]
-macro_rules! export_rust_global_alloc_api {
-    ($plan: expr, $plan_ty: ty) => {
-        pub struct Global;
-
-        unsafe impl ::std::alloc::Allocator for Global {
-            fn allocate(
-                &self,
-                mut layout: Layout,
-            ) -> Result<::std::ptr::NonNull<[u8]>, ::std::alloc::AllocError> {
-                if layout.align() < 16 {
-                    layout = layout.align_to(16).unwrap();
-                }
-                layout = unsafe { layout.pad_to_align_unchecked() };
-                let start = <$plan_ty as $crate::Plan>::Mutator::current()
-                    .alloc(layout)
-                    .unwrap_or($crate::util::Address::ZERO);
-                let slice = unsafe {
-                    ::std::slice::from_raw_parts_mut(start.as_mut() as *mut u8, layout.size())
-                };
-                Ok(::std::ptr::NonNull::from(slice))
-            }
-            unsafe fn deallocate(
-                &self,
-                ptr: ::std::ptr::NonNull<u8>,
-                layout: ::std::alloc::Layout,
-            ) {
-                <$plan_ty as $crate::Plan>::Mutator::current().dealloc(ptr.as_ptr().into())
-            }
-        }
-
-        unsafe impl ::std::alloc::GlobalAlloc for Global {
-            unsafe fn alloc(&self, mut layout: ::std::alloc::Layout) -> *mut u8 {
-                if layout.align() < 16 {
-                    layout = layout.align_to(16).unwrap();
-                }
-                layout = layout.pad_to_align_unchecked();
-                <$plan_ty as $crate::Plan>::Mutator::current()
-                    .alloc(layout)
-                    .unwrap_or($crate::util::Address::ZERO)
-                    .into()
-            }
-            unsafe fn dealloc(&self, ptr: *mut u8, _layout: ::std::alloc::Layout) {
-                <$plan_ty as $crate::Plan>::Mutator::current().dealloc(ptr.into())
-            }
         }
     };
 }

@@ -1,25 +1,28 @@
 use super::{page_resource::BlockPageResource, Allocator, Space, SpaceId};
 use crate::{pool::Pool, super_block::SuperBlock};
 use mallockit::{
-    space::meta::{Box, Meta},
+    space::{
+        meta::{Box, Meta},
+        page_resource::MemRegion,
+    },
     util::{mem::alloc::discrete_tlab::DiscreteTLAB, *},
 };
 
 /// Global heap
 pub struct HoardSpace {
     id: SpaceId,
-    pr: BlockPageResource,
+    pr: BlockPageResource<SuperBlock>,
     pub(crate) pool: Pool,
 }
 
 impl Space for HoardSpace {
     const MAX_ALLOCATION_SIZE: usize = SuperBlock::BYTES / 4;
-    type PR = BlockPageResource;
+    type PR = BlockPageResource<SuperBlock>;
 
     fn new(id: SpaceId) -> Self {
         Self {
             id,
-            pr: BlockPageResource::new(id, SuperBlock::LOG_BYTES),
+            pr: BlockPageResource::new(id),
             pool: Pool::new(true),
         }
     }
@@ -59,11 +62,7 @@ impl HoardSpace {
             return Some(block);
         }
         // Acquire new memory
-        let addr = self
-            .acquire::<Size4K>(1 << (SuperBlock::LOG_BYTES - Size4K::LOG_BYTES))?
-            .start
-            .start();
-        let block = SuperBlock::new(addr);
+        let block = self.pr.acquire_block()?;
         block.init(local.static_ref(), size_class);
         debug_assert!(!block.is_full());
         debug_assert!(block.is_empty());
@@ -78,25 +77,25 @@ impl HoardSpace {
     }
 
     pub fn release_block(&self, block: SuperBlock) {
-        self.release::<Size4K>(Page::new(block.start()));
+        self.pr.release_block(block)
     }
 }
 /// Thread-local heap
 pub struct HoardAllocator {
-    space: Lazy<&'static HoardSpace, Local>,
+    space: &'static HoardSpace,
     tlab: DiscreteTLAB<{ SizeClass::<4>::from_bytes(Self::LARGEST_SMALL_OBJECT).as_usize() + 1 }>,
-    local: Lazy<Box<Pool>, Local>,
+    local: Box<Pool>,
 }
 
 impl HoardAllocator {
     const LOCAL_HEAP_THRESHOLD: usize = 16 * 1024 * 1024;
     const LARGEST_SMALL_OBJECT: usize = 1024;
 
-    pub const fn new(space: Lazy<&'static HoardSpace, Local>, _space_id: SpaceId) -> Self {
+    pub fn new(space: &'static HoardSpace, _space_id: SpaceId) -> Self {
         Self {
             space,
             tlab: DiscreteTLAB::new(),
-            local: Lazy::new(|| Box::new_in(Pool::new(false), Meta)),
+            local: Box::new_in(Pool::new(false), Meta),
         }
     }
 }
@@ -109,7 +108,7 @@ impl Allocator for HoardAllocator {
                 return Some(cell);
             }
         }
-        self.local.alloc_cell(size_class, &self.space)
+        self.local.alloc_cell(size_class, self.space)
     }
 
     fn dealloc(&mut self, cell: Address) {
@@ -120,7 +119,7 @@ impl Allocator for HoardAllocator {
         {
             self.tlab.push(block.size_class, cell);
         } else {
-            self.local.free_cell(cell, &self.space);
+            self.local.free_cell(cell, self.space);
         }
     }
 }

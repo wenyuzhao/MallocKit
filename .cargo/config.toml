@@ -1,2 +1,6 @@
 [build]
 rustflags = ["-Z", "tls_model=initial-exec"]
+
+[alias]
+# Helper command to run a program with a malloc implementation
+x = "run -p mallockit-dev-tools --quiet --"

@@ -1,6 +1,9 @@
-use std::num::NonZeroUsize;
+use std::{
+    num::NonZeroUsize,
+    ops::{Deref, DerefMut},
+};
 
-use mallockit::util::mem::{aligned_block::AlignedBlockConfig, size_class::SizeClass};
+use mallockit::{space::page_resource::MemRegion, util::mem::size_class::SizeClass};
 
 use crate::pool::Pool;
 
@@ -16,35 +19,58 @@ pub struct BlockMeta {
     pub group: u8,
     head_cell: Address,
     pub owner: &'static Pool,
+    pr_next: Option<SuperBlock>,
 }
 
-#[mallockit::aligned_block]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SuperBlock(NonZeroUsize);
 
-impl AlignedBlockConfig for SuperBlock {
-    type Header = BlockMeta;
+impl MemRegion for SuperBlock {
+    type Meta = BlockMeta;
+
     const LOG_BYTES: usize = 18;
 
-    fn from_address(address: Address) -> Self {
-        debug_assert!(!address.is_zero());
-        debug_assert!(Self::is_aligned(address));
-        Self(unsafe { NonZeroUsize::new_unchecked(usize::from(address)) })
+    fn start(&self) -> Address {
+        Address::from(self.0.get())
     }
 
-    fn into_address(self) -> Address {
-        Address::from(self.0.get())
+    fn from_address(addr: Address) -> Self {
+        debug_assert!(!addr.is_zero());
+        debug_assert!(Self::is_aligned(addr));
+        Self(unsafe { NonZeroUsize::new_unchecked(usize::from(addr)) })
+    }
+
+    fn set_next(&self, next: Option<Self>) {
+        unsafe { self.meta_mut().pr_next = next };
+    }
+
+    #[allow(clippy::misnamed_getters)]
+    fn next(&self) -> Option<Self> {
+        self.pr_next
+    }
+}
+
+impl Deref for SuperBlock {
+    type Target = BlockMeta;
+
+    fn deref(&self) -> &Self::Target {
+        self.meta()
+    }
+}
+
+impl DerefMut for SuperBlock {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { self.meta_mut() }
     }
 }
 
 impl SuperBlock {
     pub fn init(mut self, _local: &'static Pool, size_class: SizeClass) {
-        debug_assert_eq!(SuperBlock::HEADER_BYTES, Address::BYTES * 6);
+        debug_assert_eq!(Self::META_BYTES, Address::BYTES * 8);
         self.size_class = size_class;
         let size = size_class.bytes();
         self.head_cell = Address::ZERO;
-        self.bump_cursor = (Address::ZERO + Self::HEADER_BYTES)
-            .align_up(size)
-            .as_usize() as u32;
+        self.bump_cursor = (Address::ZERO + Self::META_BYTES).align_up(size).as_usize() as u32;
         self.used_bytes = 0;
     }
 

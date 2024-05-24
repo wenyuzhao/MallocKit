@@ -1,6 +1,9 @@
 use crate::{hoard_space::HoardSpace, super_block::SuperBlock};
 use array_const_fn_init::array_const_fn_init;
-use mallockit::util::{mem::size_class::SizeClass, Address, Lazy, Local};
+use mallockit::{
+    space::page_resource::MemRegion,
+    util::{mem::size_class::SizeClass, Address},
+};
 use spin::{relax::Yield, MutexGuard};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -36,7 +39,7 @@ impl BlockList {
     fn group(block: SuperBlock, alloc: bool) -> usize {
         let u = block.used_bytes()
             + if alloc { block.size_class.bytes() } else { 0 }
-            + (Address::ZERO + SuperBlock::HEADER_BYTES)
+            + (Address::ZERO + SuperBlock::META_BYTES)
                 .align_up(block.size_class.bytes())
                 .as_usize();
         (u << 2) >> SuperBlock::LOG_BYTES
@@ -252,7 +255,7 @@ impl Pool {
         &self,
         size_class: SizeClass,
         blocks: &mut BlockList,
-        space: &Lazy<&'static HoardSpace, Local>,
+        space: &'static HoardSpace,
     ) -> SuperBlock {
         // Get a block from global pool
         let block = space
@@ -273,7 +276,7 @@ impl Pool {
     pub fn alloc_cell(
         &mut self,
         size_class: SizeClass,
-        space: &Lazy<&'static HoardSpace, Local>,
+        space: &'static HoardSpace,
     ) -> Option<Address> {
         debug_assert!(!self.global);
         let mut blocks = unsafe { self.blocks.get_unchecked(size_class.as_usize()).lock() };
@@ -289,7 +292,7 @@ impl Pool {
     }
 
     #[cold]
-    pub fn free_cell(&self, cell: Address, space: &Lazy<&'static HoardSpace, Local>) {
+    pub fn free_cell(&self, cell: Address, space: &'static HoardSpace) {
         let block = SuperBlock::containing(cell);
         let mut owner = block.owner;
         let mut blocks = owner.lock_blocks(block.size_class);
@@ -305,7 +308,7 @@ impl Pool {
     fn free_cell_slow_impl(
         &self,
         cell: Address,
-        space: &Lazy<&'static HoardSpace, Local>,
+        space: &'static HoardSpace,
         blocks: &mut BlockList,
     ) {
         let block = SuperBlock::containing(cell);
@@ -328,7 +331,7 @@ impl Pool {
     fn flush_block_slow(
         &self,
         size_class: SizeClass,
-        space: &Lazy<&'static HoardSpace, Local>,
+        space: &'static HoardSpace,
         blocks: &mut BlockList,
     ) {
         // Transit a mostly-empty block to the global pool

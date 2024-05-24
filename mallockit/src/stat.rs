@@ -6,26 +6,29 @@ use std::{
     },
 };
 
-use crossbeam::queue::SegQueue;
+use spin::Mutex;
 
-use crate::util::Lazy;
+use crate::{
+    space::meta::{Meta, Vec},
+    util::Lazy,
+};
 
-static COUNTERS: SegQueue<Arc<Counter>> = SegQueue::new();
+static COUNTERS: Mutex<Vec<Arc<Counter, Meta>>> = Mutex::new(Vec::new_in(Meta));
 
-pub type CounterRef = Lazy<Arc<Counter>>;
+pub type CounterRef = Lazy<Arc<Counter, Meta>>;
 
-pub const fn define_counter<const NAME: &'static str>() -> Lazy<Arc<Counter>> {
+pub const fn define_counter<const NAME: &'static str>() -> Lazy<Arc<Counter, Meta>> {
     Lazy::new(|| {
-        let c = Arc::new(Counter::new(NAME));
-        COUNTERS.push(c.clone());
+        let c = Arc::new_in(Counter::new(NAME), Meta);
+        COUNTERS.lock().push(c.clone());
         c
     })
 }
 
-static TOTAL_ALLOCATIONS: Lazy<Arc<Counter>> = define_counter::<"total-allocations">();
-static LARGE_ALLOCATIONS: Lazy<Arc<Counter>> = define_counter::<"large-allocations">();
-static TOTAL_DEALLOCATIONS: Lazy<Arc<Counter>> = define_counter::<"total-deallocations">();
-static LARGE_DEALLOCATIONS: Lazy<Arc<Counter>> = define_counter::<"large-deallocations">();
+static TOTAL_ALLOCATIONS: Lazy<Arc<Counter, Meta>> = define_counter::<"total-allocations">();
+static LARGE_ALLOCATIONS: Lazy<Arc<Counter, Meta>> = define_counter::<"large-allocations">();
+static TOTAL_DEALLOCATIONS: Lazy<Arc<Counter, Meta>> = define_counter::<"total-deallocations">();
+static LARGE_DEALLOCATIONS: Lazy<Arc<Counter, Meta>> = define_counter::<"large-deallocations">();
 
 static ALIGNMENTS: [Counter; 11] = [
     Counter::new(""), // 1
@@ -126,19 +129,19 @@ pub(crate) fn report() {}
 
 #[cfg(feature = "stat")]
 pub(crate) fn report() {
-    println!("alignment:");
+    eprintln!("alignment:");
     for i in 0..ALIGNMENTS.len() {
-        println!(" - {} = {}", i, ALIGNMENTS[i].get());
+        eprintln!(" - {} = {}", i, ALIGNMENTS[i].get());
     }
-    println!(" - others = {}", OTHER_ALIGNMENT.get());
-    println!("");
-    println!("size:");
+    eprintln!(" - others = {}", OTHER_ALIGNMENT.get());
+    eprintln!("");
+    eprintln!("size:");
     for i in 0..SIZES.len() {
-        println!(" - {} = {}", i, SIZES[i].get());
+        eprintln!(" - {} = {}", i, SIZES[i].get());
     }
-    println!(" - others = {}", OTHER_SIZE.get());
-    println!("");
-    while let Some(c) = COUNTERS.pop() {
-        println!("{}: {}", c.0, c.get());
+    eprintln!(" - others = {}", OTHER_SIZE.get());
+    eprintln!("");
+    while let Some(c) = COUNTERS.lock().pop() {
+        eprintln!("{}: {}", c.0, c.get());
     }
 }

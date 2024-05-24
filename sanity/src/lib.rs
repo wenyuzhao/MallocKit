@@ -41,7 +41,7 @@ impl Mutator for SanityMutator {
 
     fn new() -> Self {
         Self {
-            los: LargeObjectAllocator::new(Lazy::new(|| &Self::plan().large_object_space)),
+            los: LargeObjectAllocator::new(&Self::plan().large_object_space),
         }
     }
 

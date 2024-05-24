@@ -49,10 +49,8 @@ impl Mutator for BuddyMutator {
 
     fn new() -> Self {
         Self {
-            freelist: FreeListAllocator::new::<FREELIST_SPACE>(Lazy::new(|| {
-                &Self::plan().freelist_space
-            })),
-            los: LargeObjectAllocator::new(Lazy::new(|| &Self::plan().large_object_space)),
+            freelist: FreeListAllocator::new::<FREELIST_SPACE>(&Self::plan().freelist_space),
+            los: LargeObjectAllocator::new(&Self::plan().large_object_space),
         }
     }
 

@@ -30,13 +30,13 @@ impl Space for ImmortalSpace {
 }
 
 pub struct BumpAllocator {
-    space: Lazy<&'static ImmortalSpace, Local>,
+    space: &'static ImmortalSpace,
     allocation_area: AllocationArea,
     retry: bool,
 }
 
 impl BumpAllocator {
-    pub const fn new(space: Lazy<&'static ImmortalSpace, Local>) -> Self {
+    pub const fn new(space: &'static ImmortalSpace) -> Self {
         Self {
             space,
             allocation_area: AllocationArea::EMPTY,

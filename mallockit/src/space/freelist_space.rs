@@ -1,4 +1,7 @@
-use super::{page_resource::BlockPageResource, Allocator, Space, SpaceId};
+use super::{
+    page_resource::{BlockPageResource, MemRegion},
+    Allocator, Space, SpaceId,
+};
 use crate::util::bits::{BitField, BitFieldSlot};
 use crate::util::mem::freelist::intrusive_freelist::AddressSpaceConfig;
 use crate::util::mem::freelist::intrusive_freelist::IntrusiveFreeList;
@@ -10,6 +13,30 @@ use std::{ops::Range, sync::atomic::AtomicUsize};
 // type ActivePageSize = Size4K;
 type ActivePageSize = Size2M;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(C)]
+pub struct Chunk(Address);
+
+impl MemRegion for Chunk {
+    const LOG_BYTES: usize = ActivePageSize::LOG_BYTES;
+
+    fn start(&self) -> Address {
+        self.0
+    }
+
+    fn from_address(addr: Address) -> Self {
+        Self(addr)
+    }
+
+    fn set_next(&self, _next: Option<Self>) {
+        unreachable!()
+    }
+
+    fn next(&self) -> Option<Self> {
+        unreachable!()
+    }
+}
+
 pub struct AddressSpace;
 
 impl AddressSpaceConfig for AddressSpace {
@@ -20,18 +47,18 @@ impl AddressSpaceConfig for AddressSpace {
 
 pub struct FreeListSpace {
     id: SpaceId,
-    pr: BlockPageResource,
+    pr: BlockPageResource<Chunk, false>,
     pages: Mutex<Option<Page<ActivePageSize>>>,
 }
 
 impl Space for FreeListSpace {
     const MAX_ALLOCATION_SIZE: usize = Size4K::BYTES;
-    type PR = BlockPageResource;
+    type PR = BlockPageResource<Chunk, false>;
 
     fn new(id: SpaceId) -> Self {
         Self {
             id,
-            pr: BlockPageResource::new(id, ActivePageSize::LOG_BYTES),
+            pr: BlockPageResource::new(id),
             pages: Mutex::new(None),
         }
     }
@@ -121,27 +148,25 @@ impl Cell {
 }
 
 pub struct FreeListAllocator {
-    space: Lazy<&'static FreeListSpace, Local>,
-    freelist: Lazy<IntrusiveFreeList<AddressSpace>, Local>,
+    space: &'static FreeListSpace,
+    freelist: IntrusiveFreeList<AddressSpace>,
 }
 
 impl FreeListAllocator {
-    pub const fn new<const SPACE_ID: SpaceId>(space: Lazy<&'static FreeListSpace, Local>) -> Self {
+    pub fn new<const SPACE_ID: SpaceId>(space: &'static FreeListSpace) -> Self {
         Self {
             space,
-            freelist: Lazy::new(|| {
-                IntrusiveFreeList::new(false, HEAP.get_space_range(SPACE_ID).start)
-            }),
+            freelist: IntrusiveFreeList::new(false, HEAP.get_space_range(SPACE_ID).start),
         }
     }
 
     #[cold]
     fn alloc_cell_slow(&mut self, bytes: usize) -> Option<Range<Address>> {
-        let page = match self.space.get_coalesced_page() {
-            Some(page) => page,
-            _ => self.space.acquire::<ActivePageSize>(1)?.start,
+        let range = match self.space.get_coalesced_page() {
+            Some(page) => page.range(),
+            _ => self.space.pr.acquire_block()?.data(),
         };
-        self.freelist.add_units(page.start(), ActivePageSize::BYTES);
+        self.freelist.add_units(range.start, ActivePageSize::BYTES);
         self.alloc_cell(bytes)
     }
 

@@ -4,7 +4,7 @@ use super::{
     page_resource::{FreelistPageResource, PageResource},
     Allocator, Space, SpaceId,
 };
-use crate::util::{Address, Lazy, Local, Page, PageSize, Size4K};
+use crate::util::{Address, Page, PageSize, Size4K};
 
 pub struct LargeObjectSpace {
     id: SpaceId,
@@ -62,7 +62,7 @@ pub struct LargeObjectAllocator<
 > where
     [(); bins::<S>(MAX_CACHEABLE_SIZE)]: Sized,
 {
-    space: Lazy<&'static LargeObjectSpace, Local>,
+    space: &'static LargeObjectSpace,
     bins: [Address; bins::<S>(MAX_CACHEABLE_SIZE)],
     max_live: usize,
     live: usize,
@@ -77,7 +77,7 @@ where
 {
     const CACHE_ENABLED: bool = bins::<S>(MAX_CACHEABLE_SIZE) > 0;
 
-    pub const fn new(los: Lazy<&'static LargeObjectSpace, Local>) -> Self {
+    pub fn new(los: &'static LargeObjectSpace) -> Self {
         Self {
             space: los,
             bins: [Address::ZERO; bins::<S>(MAX_CACHEABLE_SIZE)],
@@ -89,7 +89,7 @@ where
     }
 
     fn space(&self) -> &'static LargeObjectSpace {
-        *self.space
+        self.space
     }
 
     fn alloc_slow(&mut self, layout: Layout) -> Option<Address> {
