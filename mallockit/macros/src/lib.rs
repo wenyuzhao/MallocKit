@@ -1,10 +1,42 @@
+use std::collections::HashMap;
+
 use proc_macro::TokenStream;
 use quote::quote;
+
+fn construct_tests_from_config() -> Vec<proc_macro2::TokenStream> {
+    let meta = cargo_metadata::MetadataCommand::new().exec().unwrap();
+    let mut tests = HashMap::new();
+    let ws_meta = meta.workspace_metadata.as_object();
+    if let Some(v) = ws_meta.and_then(|v| v.get("malloc-tests")) {
+        for (name, cmd) in v.as_object().unwrap() {
+            let cmd = cmd.as_str().unwrap();
+            tests.insert(name.to_owned(), cmd.to_owned());
+        }
+    }
+    tests
+        .iter()
+        .map(|(k, v)| {
+            let s = format!(
+                r#"
+                    #[test]
+                    fn {}() {{
+                        ::mallockit::util::testing::malloc::test(env!("CARGO_CRATE_NAME"), {:?});
+                    }}
+                "#,
+                k, v,
+            );
+            s.parse().unwrap()
+        })
+        .collect()
+}
 
 #[proc_macro_attribute]
 pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::DeriveInput);
     let name = &input.ident;
+
+    let tests = construct_tests_from_config();
+
     let result = quote! {
         #input
 
@@ -40,10 +72,7 @@ pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
         #[cfg(test)]
         mod tests {
-            include!(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../target/generated_tests.rs"
-            ));
+            #(#tests)*
             ::mallockit::rust_allocator_tests!(crate::Global);
         }
     };
