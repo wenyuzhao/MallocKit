@@ -1,0 +1,8 @@
+services:
+  mimalloc-bench:
+    build: .
+    container_name: mimalloc-bench
+    volumes:
+      - ./mimalloc-bench:/root/mimalloc-bench
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
