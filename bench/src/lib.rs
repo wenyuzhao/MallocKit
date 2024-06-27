@@ -51,15 +51,29 @@ impl Bench {
         } else {
             println!("[{name}] malloc: {malloc} (mallockit)");
         }
+        Self::build_mallockit();
+        let malloc_path = Self::get_malloc_lib_path(&malloc, is_external);
+        if malloc != "sys" && !PathBuf::from(&malloc_path).exists() {
+            panic!("Malloc dylib does not exist: {malloc_path}");
+        }
         Self {
             name: name.to_string(),
             alloc_name: malloc.clone(),
-            alloc_path: Self::get_malloc_lib_path(&malloc, is_external),
+            alloc_path: malloc_path,
             cmd: Command::new(Self::get_binary_path(name)),
             out: harness::utils::HARNESS_BENCH_SCRATCH_DIR.join("log"),
             server: None,
         }
         .init()
+    }
+
+    fn build_mallockit() {
+        let status = Command::new("cargo")
+            .args(["build", "--release", "-q", "--features", "malloc"])
+            .current_dir("..")
+            .status()
+            .unwrap();
+        assert!(status.success(), "Failed to build MallocKit");
     }
 
     fn init(mut self) -> Self {
@@ -86,7 +100,15 @@ impl Bench {
 
     fn get_malloc_lib_path(name: &str, is_external: bool) -> String {
         if !is_external {
-            return format!("lib{name}.{DYLIB_EXT}");
+            let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("target")
+                .join("release");
+            return path
+                .join(format!("lib{name}.{DYLIB_EXT}"))
+                .to_str()
+                .unwrap()
+                .to_owned();
         }
         match name {
             "hd" => format!("{LOCAL_DEV_DIR}/hd/src/libhoard.{DYLIB_EXT}"),

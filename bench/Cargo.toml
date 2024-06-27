@@ -7,8 +7,6 @@ publish = false
 
 [dependencies]
 harness = "0.0.5"
-hoard = { path = "../hoard" }
-buddy = { path = "../buddy" }
 num_cpus.workspace = true
 
 [[bench]]
@@ -55,7 +53,7 @@ harness = false
 sys = { env = { MALLOC = "sys", IS_MALLOCKIT = "0" } }
 # mallockit allocators
 mk_hoard = { env = { MALLOC = "hoard", IS_MALLOCKIT = "1" } }
-mk_buddy = { env = { MALLOC = "buddy", IS_MALLOCKIT = "1" } }
+# mk_buddy = { env = { MALLOC = "buddy", IS_MALLOCKIT = "1" } }
 # other allocators
 hd = { env = { MALLOC = "hd", IS_MALLOCKIT = "0" } }
 mi = { env = { MALLOC = "mi", IS_MALLOCKIT = "0" } }

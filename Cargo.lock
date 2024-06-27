@@ -699,9 +699,7 @@ dependencies = [
 name = "mallockit-bench"
 version = "0.1.0"
 dependencies = [
- "buddy",
  "harness",
- "hoard",
  "num_cpus",
 ]
 
