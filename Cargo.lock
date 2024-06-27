@@ -460,9 +460,9 @@ dependencies = [
 
 [[package]]
 name = "harness"
-version = "0.0.5"
+version = "0.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a660621a0b94546cfc2b991232607e10c6d3985b0bad28dec836c366b4c8d57"
+checksum = "d855b92a4629a8003b2dc0bd07e7725981ebf51f96e287328e69f11d3481e9e7"
 dependencies = [
  "anyhow",
  "clap",
@@ -476,9 +476,9 @@ dependencies = [
 
 [[package]]
 name = "harness-macros"
-version = "0.0.1"
+version = "0.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b5043564cf57c918fcd9f461622bb22d45557a857c63850ebd97d89451cb6e9"
+checksum = "0c2f1491aeb46b1d331d5387c7377963067a0138ae42f784e802b39140bc6796"
 dependencies = [
  "darling",
  "quote",

@@ -6,7 +6,7 @@ edition.workspace = true
 publish = false
 
 [dependencies]
-harness = "0.0.5"
+harness = "0.0.7"
 num_cpus.workspace = true
 once_cell = "1.19.0"
 
@@ -61,3 +61,6 @@ mi = { env = { MALLOC = "mi", IS_MALLOCKIT = "0" } }
 mi2 = { env = { MALLOC = "mi2", IS_MALLOCKIT = "0" } }
 tc = { env = { MALLOC = "tc", IS_MALLOCKIT = "0" } }
 je = { env = { MALLOC = "je", IS_MALLOCKIT = "0" } }
+
+[package.metadata.harness.profiles.default.probes]
+harness-probe-perf = { events = "PERF_COUNT_HW_CACHE_LL:ACCESS,PERF_COUNT_HW_CACHE_LL:MISS,PERF_COUNT_HW_INSTRUCTIONS,PERF_COUNT_HW_CACHE_L1D:MISS,PERF_COUNT_HW_CACHE_DTLB:MISS", inherit = true }
