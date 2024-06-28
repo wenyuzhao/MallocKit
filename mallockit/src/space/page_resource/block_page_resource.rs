@@ -1,10 +1,8 @@
 use super::super::SpaceId;
 use super::PageResource;
-use crate::space::meta::{Meta, Vec};
 use crate::util::mem::heap::HEAP;
 use crate::util::*;
 use atomic::Atomic;
-use spin::Mutex;
 use std::iter::Step;
 use std::{
     ops::Range,
@@ -23,8 +21,6 @@ pub trait MemRegion: 'static + Sized + Clone + Copy {
 
     fn start(&self) -> Address;
     fn from_address(addr: Address) -> Self;
-    fn set_next(&self, next: Option<Self>);
-    fn next(&self) -> Option<Self>;
 
     fn data_start(&self) -> Address {
         self.start() + Self::META_BYTES
@@ -67,16 +63,15 @@ pub trait MemRegion: 'static + Sized + Clone + Copy {
     }
 }
 
-pub struct BlockPageResource<B: MemRegion, const INTRUSIVE: bool = true> {
+pub struct BlockPageResource<B: MemRegion> {
     pub id: SpaceId,
     cursor: Atomic<Address>,
     highwater: Address,
-    recycled_blocks_intrusive: Atomic<Option<B>>,
-    recycled_blocks_non_intrusive: Mutex<Vec<Address>>,
+    head: Atomic<Option<B>>,
     reserved_bytes: AtomicUsize,
 }
 
-impl<B: MemRegion, const INTRUSIVE: bool> BlockPageResource<B, INTRUSIVE> {
+impl<B: MemRegion> BlockPageResource<B> {
     pub fn new(id: SpaceId) -> Self {
         debug_assert!(id.0 < 0b0000_1111);
         debug_assert!(B::LOG_BYTES >= Size4K::LOG_BYTES);
@@ -85,8 +80,7 @@ impl<B: MemRegion, const INTRUSIVE: bool> BlockPageResource<B, INTRUSIVE> {
             id,
             cursor: Atomic::new(range.start),
             highwater: range.end,
-            recycled_blocks_intrusive: Atomic::new(None),
-            recycled_blocks_non_intrusive: Mutex::new(Vec::new_in(Meta)),
+            head: Atomic::new(None),
             reserved_bytes: AtomicUsize::new(0),
         }
     }
@@ -114,61 +108,71 @@ impl<B: MemRegion, const INTRUSIVE: bool> BlockPageResource<B, INTRUSIVE> {
         }
     }
 
+    const fn set_next(b: B, next: Option<B>) {
+        let a = b.start();
+        let next = match next {
+            Some(b) => b.start(),
+            None => Address::ZERO,
+        };
+        unsafe { a.store(next) }
+    }
+
+    const fn get_next(b: B) -> Option<B> {
+        let a = b.start();
+        let next: Address = unsafe { a.load() };
+        if next.is_zero() {
+            None
+        } else {
+            Some(B::from_address(next))
+        }
+    }
+
     pub fn acquire_block(&self) -> Option<B> {
-        if INTRUSIVE {
-            loop {
-                let head = self.recycled_blocks_intrusive.load(Ordering::Relaxed);
-                if let Some(block) = head {
-                    if self
-                        .recycled_blocks_intrusive
-                        .compare_exchange(head, block.next(), Ordering::Relaxed, Ordering::Relaxed)
-                        .is_ok()
-                    {
-                        self.reserved_bytes.fetch_add(B::BYTES, Ordering::Relaxed);
-                        return Some(block);
-                    }
-                } else {
-                    break;
+        loop {
+            let head = self.head.load(Ordering::Relaxed);
+            if let Some(block) = head {
+                if self
+                    .head
+                    .compare_exchange(
+                        head,
+                        Self::get_next(block),
+                        Ordering::Relaxed,
+                        Ordering::Relaxed,
+                    )
+                    .is_ok()
+                {
+                    self.reserved_bytes.fetch_add(B::BYTES, Ordering::Relaxed);
+                    return Some(block);
                 }
+            } else {
+                break;
             }
-        } else if let Some(addr) = self.recycled_blocks_non_intrusive.lock().pop() {
-            let block = B::from_address(addr);
-            self.reserved_bytes.fetch_add(B::BYTES, Ordering::Relaxed);
-            return Some(block);
         }
         let range = self.acquire_block_slow::<Size4K>(B::BYTES >> Size4K::LOG_BYTES)?;
         let block = B::from_address(range.start.start());
-        if INTRUSIVE {
-            block.set_next(None);
-        }
+        Self::set_next(block, None);
         self.reserved_bytes.fetch_add(B::BYTES, Ordering::Relaxed);
         Some(block)
     }
 
     pub fn release_block(&self, block: B) {
-        if INTRUSIVE {
-            loop {
-                let head = self.recycled_blocks_intrusive.load(Ordering::Relaxed);
-                block.set_next(head);
-                if self
-                    .recycled_blocks_intrusive
-                    .compare_exchange(head, Some(block), Ordering::Relaxed, Ordering::Relaxed)
-                    .is_ok()
-                {
-                    break;
-                }
+        loop {
+            let head = self.head.load(Ordering::Relaxed);
+            Self::set_next(block, head);
+            if self
+                .head
+                .compare_exchange(head, Some(block), Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+            {
+                break;
             }
-        } else {
-            self.recycled_blocks_non_intrusive
-                .lock()
-                .push(block.start());
         }
         self.reserved_bytes
             .fetch_sub(1 << B::LOG_BYTES, Ordering::Relaxed);
     }
 }
 
-impl<B: MemRegion, const INTRUSIVE: bool> PageResource for BlockPageResource<B, INTRUSIVE> {
+impl<B: MemRegion> PageResource for BlockPageResource<B> {
     fn reserved_bytes(&self) -> usize {
         self.reserved_bytes.load(Ordering::Relaxed)
     }

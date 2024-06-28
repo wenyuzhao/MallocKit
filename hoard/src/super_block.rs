@@ -19,7 +19,6 @@ pub struct BlockMeta {
     pub group: u8,
     head_cell: Address,
     pub owner: &'static Pool,
-    pr_next: Option<SuperBlock>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -38,15 +37,6 @@ impl MemRegion for SuperBlock {
         debug_assert!(!addr.is_zero());
         debug_assert!(Self::is_aligned(addr));
         Self(unsafe { NonZeroUsize::new_unchecked(usize::from(addr)) })
-    }
-
-    fn set_next(&self, next: Option<Self>) {
-        unsafe { self.meta_mut().pr_next = next };
-    }
-
-    #[allow(clippy::misnamed_getters)]
-    fn next(&self) -> Option<Self> {
-        self.pr_next
     }
 }
 

@@ -27,14 +27,6 @@ impl MemRegion for Chunk {
     fn from_address(addr: Address) -> Self {
         Self(addr)
     }
-
-    fn set_next(&self, _next: Option<Self>) {
-        unreachable!()
-    }
-
-    fn next(&self) -> Option<Self> {
-        unreachable!()
-    }
 }
 
 pub struct AddressSpace;
@@ -47,13 +39,13 @@ impl AddressSpaceConfig for AddressSpace {
 
 pub struct FreeListSpace {
     id: SpaceId,
-    pr: BlockPageResource<Chunk, false>,
+    pr: BlockPageResource<Chunk>,
     pages: Mutex<Option<Page<ActivePageSize>>>,
 }
 
 impl Space for FreeListSpace {
     const MAX_ALLOCATION_SIZE: usize = Size4K::BYTES;
-    type PR = BlockPageResource<Chunk, false>;
+    type PR = BlockPageResource<Chunk>;
 
     fn new(id: SpaceId) -> Self {
         Self {
