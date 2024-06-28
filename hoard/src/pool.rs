@@ -1,5 +1,4 @@
 use crate::{hoard_space::HoardSpace, super_block::SuperBlock};
-use array_const_fn_init::array_const_fn_init;
 use mallockit::{
     space::page_resource::MemRegion,
     util::{mem::size_class::SizeClass, Address},
@@ -8,37 +7,26 @@ use spin::{relax::Yield, MutexGuard};
 
 type Mutex<T> = spin::mutex::Mutex<T, Yield>;
 
-pub struct BlockList {
-    cache: Option<SuperBlock>,
-    groups: [Option<SuperBlock>; Self::GROUPS], // fullnesss groups: <25%, <50%, <75%, <100%, FULL
-    used_bytes: usize,
-    total_bytes: usize,
+struct EmptyClass {
+    // 0 => emoty blocks
+    // classes+1 => full blocks
+    groups: [Option<SuperBlock>; Self::GROUPS],
 }
 
-impl BlockList {
+impl EmptyClass {
     const EMPTINESS_CLASSES: usize = 8;
     const GROUPS: usize = Self::EMPTINESS_CLASSES + 2;
 
     const fn new() -> Self {
         Self {
-            cache: None,
             groups: [None; Self::GROUPS],
-            used_bytes: 0,
-            total_bytes: 0,
         }
     }
 
-    const fn should_flush(&self, log_obj_size: usize) -> bool {
-        let u = self.used_bytes;
-        let a = self.total_bytes;
-        (Self::EMPTINESS_CLASSES * u) < ((Self::EMPTINESS_CLASSES - 1) * a)
-            && u + ((2 * SuperBlock::BYTES) >> log_obj_size) < a
-    }
-
-    const fn group(block: SuperBlock, alloc: bool) -> usize {
+    const fn group(block: SuperBlock) -> usize {
         let t =
             SuperBlock::DATA_BYTES >> block.size_class.log_bytes() << block.size_class.log_bytes();
-        let u = block.used_bytes() + if alloc { block.size_class.bytes() } else { 0 };
+        let u = block.used_bytes();
         if u == 0 {
             return 0;
         } else {
@@ -46,20 +34,31 @@ impl BlockList {
         }
     }
 
-    fn push(&mut self, mut block: SuperBlock, mut alloc: bool, update_stats: bool) {
-        if alloc {
-            if self.cache.is_some() {
-                let cache = self.cache.unwrap();
-                self.cache = Some(block);
-                block.group = u8::MAX;
-                block = cache;
-                alloc = false;
-            } else {
-                self.cache = Some(block);
-                return;
-            }
+    #[cold]
+    fn transfer(&mut self, mut block: SuperBlock, oldg: usize, newg: usize) {
+        if Some(block) == self.groups[newg] || newg == oldg {
+            return;
         }
-        let group = Self::group(block, alloc);
+        if self.groups[oldg] == Some(block) {
+            self.groups[oldg] = block.next;
+        }
+        if let Some(mut prev) = block.prev {
+            prev.next = block.next;
+        }
+        if let Some(mut next) = block.next {
+            next.prev = block.prev;
+        }
+        block.group = newg as _;
+        block.next = self.groups[newg];
+        block.prev = None;
+        if let Some(mut head) = self.groups[newg] {
+            head.prev = Some(block)
+        }
+        self.groups[newg] = Some(block);
+    }
+
+    fn put(&mut self, mut block: SuperBlock) {
+        let group = Self::group(block);
         block.group = group as _;
         block.next = self.groups[group];
         block.prev = None;
@@ -68,37 +67,9 @@ impl BlockList {
         }
         self.groups[group] = Some(block);
         debug_assert_ne!(block.prev, Some(block));
-        if update_stats {
-            self.inc_used_bytes(block.used_bytes());
-            self.inc_total_bytes(SuperBlock::DATA_BYTES);
-        }
     }
 
-    #[cold]
-    fn find_slow(&mut self) -> Option<SuperBlock> {
-        for i in 0..Self::EMPTINESS_CLASSES + 1 {
-            if let Some(block) = self.groups[i] {
-                debug_assert!(!block.is_full());
-                return Some(block);
-            }
-        }
-        None
-    }
-
-    fn find(&mut self) -> Option<SuperBlock> {
-        if let Some(block) = self.cache {
-            if !block.is_full() {
-                return Some(block);
-            }
-        }
-        self.find_slow()
-    }
-
-    fn remove(&mut self, block: SuperBlock, update_stats: bool) {
-        if self.cache == Some(block) {
-            self.cache = None;
-            return;
-        }
+    fn remove(&mut self, block: SuperBlock) {
         if self.groups[block.group as usize] == Some(block) {
             self.groups[block.group as usize] = block.next;
         }
@@ -108,51 +79,9 @@ impl BlockList {
         if let Some(mut next) = block.next {
             next.prev = block.prev;
         }
-        if update_stats {
-            self.dec_used_bytes(block.used_bytes());
-            self.dec_total_bytes(SuperBlock::DATA_BYTES);
-        }
     }
 
-    #[cold]
-    fn move_to_front_slow(&mut self, mut block: SuperBlock, alloc: bool) {
-        if Some(block) == self.cache {
-            return;
-        }
-        let group = Self::group(block, alloc);
-        let block_group = block.group as usize;
-        if Some(block) == self.groups[group] || group == block_group {
-            return;
-        }
-        if self.groups[block_group] == Some(block) {
-            self.groups[block_group] = block.next;
-        }
-        if let Some(mut prev) = block.prev {
-            prev.next = block.next;
-        }
-        if let Some(mut next) = block.next {
-            next.prev = block.prev;
-        }
-        block.group = group as _;
-        block.next = self.groups[group];
-        block.prev = None;
-        if let Some(mut head) = self.groups[group] {
-            head.prev = Some(block)
-        }
-        self.groups[group] = Some(block);
-    }
-
-    fn move_to_front(&mut self, block: SuperBlock, alloc: bool) {
-        if Some(block) == self.cache {
-            return;
-        }
-        self.move_to_front_slow(block, alloc)
-    }
-
-    fn pop_mostly_empty_block(&mut self) -> Option<SuperBlock> {
-        if let Some(cache) = self.cache.take() {
-            return Some(cache);
-        }
+    fn pop_most_empty_block(&mut self) -> Option<SuperBlock> {
         for i in 0..Self::EMPTINESS_CLASSES + 1 {
             while let Some(block) = self.groups[i] {
                 // remove
@@ -160,17 +89,72 @@ impl BlockList {
                 if let Some(mut next) = block.next {
                     next.prev = None;
                 }
-                let bg = Self::group(block, false);
+                let bg = Self::group(block);
                 if bg > i {
-                    self.push(block, false, false)
+                    self.put(block)
                 } else {
-                    self.dec_used_bytes(block.used_bytes());
-                    self.dec_total_bytes(SuperBlock::DATA_BYTES);
                     return Some(block);
                 }
             }
         }
         None
+    }
+
+    #[cold]
+    fn free_cell(&mut self, a: Address, mut b: SuperBlock) {
+        let oldg = Self::group(b);
+        b.free_cell(a);
+        let newg = Self::group(b);
+        if oldg != newg {
+            self.transfer(b, oldg, newg)
+        }
+    }
+}
+
+pub struct BlockList {
+    cache: Option<SuperBlock>,
+    groups: EmptyClass,
+    used_bytes: usize,
+    total_bytes: usize,
+}
+
+impl BlockList {
+    const fn new() -> Self {
+        Self {
+            cache: None,
+            groups: EmptyClass::new(),
+            used_bytes: 0,
+            total_bytes: 0,
+        }
+    }
+
+    const fn should_flush(&self, log_obj_size: usize) -> bool {
+        let u = self.used_bytes;
+        let a = self.total_bytes;
+        (EmptyClass::EMPTINESS_CLASSES * u) < ((EmptyClass::EMPTINESS_CLASSES - 1) * a)
+            && u + ((2 * SuperBlock::BYTES) >> log_obj_size) < a
+    }
+
+    fn remove(&mut self, block: SuperBlock) {
+        self.dec_used_bytes(block.used_bytes());
+        self.dec_total_bytes(SuperBlock::DATA_BYTES);
+        if self.cache == Some(block) {
+            self.cache = None;
+            return;
+        }
+        self.groups.remove(block);
+    }
+
+    fn pop_most_empty_block(&mut self) -> Option<SuperBlock> {
+        if let Some(cache) = self.cache.take() {
+            self.dec_total_bytes(SuperBlock::DATA_BYTES);
+            self.dec_used_bytes(cache.used_bytes());
+            return Some(cache);
+        }
+        let b = self.groups.pop_most_empty_block()?;
+        self.dec_total_bytes(SuperBlock::DATA_BYTES);
+        self.dec_used_bytes(b.used_bytes());
+        Some(b)
     }
 
     const fn inc_used_bytes(&mut self, used_bytes: usize) {
@@ -188,6 +172,56 @@ impl BlockList {
     const fn dec_total_bytes(&mut self, total_bytes: usize) {
         self.total_bytes -= total_bytes;
     }
+
+    fn put(&mut self, b: SuperBlock) {
+        if Some(b) == self.cache {
+            return;
+        }
+        if let Some(c) = self.cache {
+            self.groups.put(c);
+        }
+        self.cache = Some(b);
+        self.inc_total_bytes(SuperBlock::DATA_BYTES);
+        self.inc_used_bytes(b.used_bytes());
+    }
+
+    #[cold]
+    fn alloc_cell_slow(&mut self, size_class: SizeClass) -> Option<Address> {
+        loop {
+            if self.cache.is_none() {
+                self.cache = Some(self.groups.pop_most_empty_block()?);
+            }
+            let mut b = self.cache.unwrap();
+            if let Some(a) = b.alloc_cell() {
+                self.inc_used_bytes(size_class.bytes());
+                return Some(a);
+            } else {
+                self.cache = None;
+                self.groups.put(b);
+            }
+        }
+    }
+
+    #[inline]
+    fn alloc_cell(&mut self, size_class: SizeClass) -> Option<Address> {
+        if let Some(mut b) = self.cache {
+            if let Some(a) = b.alloc_cell() {
+                self.inc_used_bytes(size_class.bytes());
+                return Some(a);
+            }
+        }
+        self.alloc_cell_slow(size_class)
+    }
+
+    #[inline]
+    fn free_cell(&mut self, a: Address, mut b: SuperBlock, size_class: SizeClass) {
+        if Some(b) == self.cache {
+            b.free_cell(a)
+        } else {
+            self.groups.free_cell(a, b);
+        }
+        self.dec_used_bytes(size_class.bytes());
+    }
 }
 
 pub struct Pool {
@@ -199,12 +233,9 @@ impl Pool {
     const MAX_BINS: usize = 32;
 
     pub const fn new(global: bool) -> Self {
-        const fn create_block_list(_: usize) -> Mutex<BlockList> {
-            Mutex::new(BlockList::new())
-        }
         Self {
             global,
-            blocks: array_const_fn_init![create_block_list; 32],
+            blocks: [const { Mutex::new(BlockList::new()) }; 32],
         }
     }
 
@@ -212,42 +243,27 @@ impl Pool {
         unsafe { &*(self as *const Self) }
     }
 
-    pub fn push(&self, size_class: SizeClass, mut block: SuperBlock) {
+    pub fn put(&self, size_class: SizeClass, mut block: SuperBlock) {
         debug_assert!(!block.is_full());
         let mut blocks = self.lock_blocks(size_class);
         block.owner = self.static_ref();
-        blocks.push(block, false, true);
+        blocks.put(block);
     }
 
-    pub fn pop(&self, size_class: SizeClass) -> Option<(SuperBlock, MutexGuard<BlockList>)> {
+    pub fn pop_most_empty_block(
+        &self,
+        size_class: SizeClass,
+    ) -> Option<(SuperBlock, MutexGuard<BlockList>)> {
         debug_assert!(self.global);
         let mut blocks = self.lock_blocks(size_class);
-        if let Some(block) = blocks.pop_mostly_empty_block() {
+        if let Some(block) = blocks.pop_most_empty_block() {
             debug_assert!(block.is_owned_by(self));
             return Some((block, blocks));
         }
         None
     }
 
-    #[cold]
-    pub fn acquire_block_slow(
-        &self,
-        size_class: SizeClass,
-        blocks: &mut BlockList,
-        space: &'static HoardSpace,
-    ) -> SuperBlock {
-        // Get a block from global pool
-        let block = space
-            .acquire_block(size_class, self, |mut block| {
-                block.owner = self.static_ref();
-                blocks.push(block, true, true);
-            })
-            .unwrap();
-        debug_assert!(!block.is_full());
-        block
-    }
-
-    pub fn lock_blocks(&self, size_class: SizeClass) -> MutexGuard<BlockList> {
+    fn lock_blocks(&self, size_class: SizeClass) -> MutexGuard<BlockList> {
         unsafe { self.blocks.get_unchecked(size_class.as_usize()).lock() }
     }
 
@@ -259,15 +275,17 @@ impl Pool {
     ) -> Option<Address> {
         debug_assert!(!self.global);
         let mut blocks = self.lock_blocks(size_class);
-        let block = if let Some(block) = blocks.find() {
-            blocks.move_to_front(block, true);
-            block
-        } else {
-            self.acquire_block_slow(size_class, &mut blocks, space)
-        };
-        let cell = unsafe { block.alloc_cell().unwrap_unchecked() };
-        blocks.inc_used_bytes(size_class.bytes());
-        Some(cell)
+        if let Some(a) = blocks.alloc_cell(size_class) {
+            return Some(a);
+        }
+        // slow-path
+        loop {
+            if let Some(a) = blocks.alloc_cell(size_class) {
+                return Some(a);
+            }
+            let block = space.acquire_block(size_class, self)?;
+            blocks.put(block);
+        }
     }
 
     #[cold]
@@ -291,15 +309,11 @@ impl Pool {
         blocks: &mut BlockList,
         block: SuperBlock,
     ) {
-        block.free_cell(cell);
-        blocks.dec_used_bytes(block.size_class.bytes());
+        blocks.free_cell(cell, block, block.size_class);
         if block.is_empty() {
-            blocks.remove(block, true);
+            blocks.remove(block);
             space.release_block(block);
-        } else {
-            blocks.move_to_front(block, false);
         }
-        debug_assert!(block.is_owned_by(self));
         // Flush?
         if !self.global && blocks.should_flush(block.size_class.log_bytes()) {
             self.flush_block_slow(block.size_class, space, blocks);
@@ -315,7 +329,7 @@ impl Pool {
     ) {
         // Transit a mostly-empty block to the global pool
         debug_assert!(!self.global);
-        if let Some(mostly_empty_block) = blocks.pop_mostly_empty_block() {
+        if let Some(mostly_empty_block) = blocks.pop_most_empty_block() {
             debug_assert!(!mostly_empty_block.is_full());
             debug_assert!(mostly_empty_block.is_owned_by(self));
             space.flush_block(size_class, mostly_empty_block);

@@ -86,7 +86,7 @@ impl SuperBlock {
         self.bump_cursor >= Self::BYTES as u32 && self.head_cell.is_zero()
     }
 
-    pub fn alloc_cell(mut self) -> Option<Address> {
+    pub fn alloc_cell(&mut self) -> Option<Address> {
         let cell = if self.bump_cursor < Self::BYTES as u32 {
             let cell = self.start() + (self.bump_cursor as usize);
             self.bump_cursor += self.size_class.bytes() as u32;
@@ -102,7 +102,7 @@ impl SuperBlock {
         Some(cell)
     }
 
-    pub const fn free_cell(mut self, cell: Address) {
+    pub const fn free_cell(&mut self, cell: Address) {
         unsafe {
             cell.store(self.head_cell);
         }

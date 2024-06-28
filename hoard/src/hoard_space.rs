@@ -48,32 +48,27 @@ impl HoardSpace {
         size <= Self::MAX_ALLOCATION_SIZE
     }
 
-    pub fn acquire_block(
-        &self,
-        size_class: SizeClass,
-        local: &Pool,
-        mut register: impl FnMut(SuperBlock),
-    ) -> Option<SuperBlock> {
+    pub fn acquire_block(&self, size_class: SizeClass, local: &Pool) -> Option<SuperBlock> {
         // Try allocate from the global pool
-        if let Some((block, _guard)) = self.pool.pop(size_class) {
+        if let Some((mut block, _guard)) = self.pool.pop_most_empty_block(size_class) {
             debug_assert!(!block.is_full());
-            register(block);
+            block.owner = local.static_ref();
             debug_assert!(block.is_owned_by(local));
             return Some(block);
         }
         // Acquire new memory
-        let block = self.pr.acquire_block()?;
+        let mut block = self.pr.acquire_block()?;
         block.init(local.static_ref(), size_class);
         debug_assert!(!block.is_full());
         debug_assert!(block.is_empty());
-        register(block);
+        block.owner = local.static_ref();
         debug_assert!(block.is_owned_by(local));
         Some(block)
     }
 
     pub fn flush_block(&self, size_class: SizeClass, block: SuperBlock) {
         debug_assert!(!block.is_full());
-        self.pool.push(size_class, block);
+        self.pool.put(size_class, block);
     }
 
     pub fn release_block(&self, block: SuperBlock) {
