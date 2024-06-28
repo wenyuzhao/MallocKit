@@ -63,4 +63,4 @@ tc = { env = { MALLOC = "tc", IS_MALLOCKIT = "0" } }
 je = { env = { MALLOC = "je", IS_MALLOCKIT = "0" } }
 
 [package.metadata.harness.profiles.default.probes]
-harness-probe-perf = { events = "PERF_COUNT_HW_CACHE_LL:ACCESS,PERF_COUNT_HW_CACHE_LL:MISS,PERF_COUNT_HW_INSTRUCTIONS,PERF_COUNT_HW_CACHE_L1D:MISS,PERF_COUNT_HW_CACHE_DTLB:MISS", inherit = true }
+harness-probe-perf = { events = "PERF_COUNT_HW_CACHE_LL:READ:ACCESS,PERF_COUNT_HW_CACHE_LL:READ:MISS,PERF_COUNT_HW_INSTRUCTIONS,PERF_COUNT_HW_CACHE_L1I:MISS,PERF_COUNT_HW_CACHE_ITLB:MISS", inherit = true }
