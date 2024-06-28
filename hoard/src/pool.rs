@@ -16,7 +16,8 @@ pub struct BlockList {
 }
 
 impl BlockList {
-    const GROUPS: usize = 4 + 1;
+    const EMPTINESS_CLASSES: usize = 8;
+    const GROUPS: usize = Self::EMPTINESS_CLASSES + 2;
 
     const fn new() -> Self {
         Self {
@@ -27,29 +28,36 @@ impl BlockList {
         }
     }
 
-    fn should_flush(&self, log_obj_size: usize) -> bool {
-        const EMPTINESS_CLASSES: usize = 8;
+    const fn should_flush(&self, log_obj_size: usize) -> bool {
         let u = self.used_bytes;
         let a = self.total_bytes;
-        u + ((2 * SuperBlock::BYTES) >> log_obj_size) < a
-            && (EMPTINESS_CLASSES * u) < ((EMPTINESS_CLASSES - 1) * a)
+        (Self::EMPTINESS_CLASSES * u) < ((Self::EMPTINESS_CLASSES - 1) * a)
+            && u + ((2 * SuperBlock::BYTES) >> log_obj_size) < a
     }
 
-    fn group(block: SuperBlock, alloc: bool) -> usize {
-        let u = block.used_bytes()
-            + if alloc { block.size_class.bytes() } else { 0 }
-            + (Address::ZERO + SuperBlock::META_BYTES)
-                .align_up(block.size_class.bytes())
-                .as_usize();
-        (u << 2) >> SuperBlock::LOG_BYTES
+    const fn group(block: SuperBlock, alloc: bool) -> usize {
+        let t =
+            SuperBlock::DATA_BYTES >> block.size_class.log_bytes() << block.size_class.log_bytes();
+        let u = block.used_bytes() + if alloc { block.size_class.bytes() } else { 0 };
+        if u == 0 {
+            return 0;
+        } else {
+            return 1 + (Self::EMPTINESS_CLASSES * u / t);
+        }
     }
 
-    fn push(&mut self, mut block: SuperBlock, alloc: bool, update_stats: bool) {
-        if alloc && self.cache.is_some() {
-            let cache = self.cache.unwrap();
-            self.cache = Some(block);
-            block.group = u8::MAX;
-            block = cache;
+    fn push(&mut self, mut block: SuperBlock, mut alloc: bool, update_stats: bool) {
+        if alloc {
+            if self.cache.is_some() {
+                let cache = self.cache.unwrap();
+                self.cache = Some(block);
+                block.group = u8::MAX;
+                block = cache;
+                alloc = false;
+            } else {
+                self.cache = Some(block);
+                return;
+            }
         }
         let group = Self::group(block, alloc);
         block.group = group as _;
@@ -62,22 +70,15 @@ impl BlockList {
         debug_assert_ne!(block.prev, Some(block));
         if update_stats {
             self.inc_used_bytes(block.used_bytes());
-            self.inc_total_bytes(SuperBlock::BYTES);
+            self.inc_total_bytes(SuperBlock::DATA_BYTES);
         }
     }
 
     #[cold]
     fn find_slow(&mut self) -> Option<SuperBlock> {
-        if let Some(block) = self.cache {
-            self.cache = None;
-            self.push(block, false, false)
-        }
-        for i in (0..Self::GROUPS - 1).rev() {
-            if let Some(mut block) = self.groups[i] {
+        for i in 0..Self::EMPTINESS_CLASSES + 1 {
+            if let Some(block) = self.groups[i] {
                 debug_assert!(!block.is_full());
-                self.remove(block, false);
-                self.cache = Some(block);
-                block.group = u8::MAX;
                 return Some(block);
             }
         }
@@ -91,24 +92,6 @@ impl BlockList {
             }
         }
         self.find_slow()
-    }
-
-    fn pop(&mut self) -> Option<SuperBlock> {
-        if let Some(block) = self.cache.take() {
-            return Some(block);
-        }
-        for i in (0..Self::GROUPS - 1).rev() {
-            if let Some(block) = self.groups[i] {
-                self.groups[i] = block.next;
-                if let Some(mut next) = block.next {
-                    next.prev = None;
-                }
-                self.dec_used_bytes(block.used_bytes());
-                self.dec_total_bytes(SuperBlock::BYTES);
-                return Some(block);
-            }
-        }
-        None
     }
 
     fn remove(&mut self, block: SuperBlock, update_stats: bool) {
@@ -127,7 +110,7 @@ impl BlockList {
         }
         if update_stats {
             self.dec_used_bytes(block.used_bytes());
-            self.dec_total_bytes(SuperBlock::BYTES);
+            self.dec_total_bytes(SuperBlock::DATA_BYTES);
         }
     }
 
@@ -167,15 +150,24 @@ impl BlockList {
     }
 
     fn pop_mostly_empty_block(&mut self) -> Option<SuperBlock> {
-        for i in 0..Self::GROUPS / 2 {
-            if let Some(block) = self.groups[i] {
+        if let Some(cache) = self.cache.take() {
+            return Some(cache);
+        }
+        for i in 0..Self::EMPTINESS_CLASSES + 1 {
+            while let Some(block) = self.groups[i] {
+                // remove
                 self.groups[i] = block.next;
                 if let Some(mut next) = block.next {
                     next.prev = None;
                 }
-                self.dec_used_bytes(block.used_bytes());
-                self.dec_total_bytes(SuperBlock::BYTES);
-                return Some(block);
+                let bg = Self::group(block, false);
+                if bg > i {
+                    self.push(block, false, false)
+                } else {
+                    self.dec_used_bytes(block.used_bytes());
+                    self.dec_total_bytes(SuperBlock::DATA_BYTES);
+                    return Some(block);
+                }
             }
         }
         None
@@ -230,7 +222,7 @@ impl Pool {
     pub fn pop(&self, size_class: SizeClass) -> Option<(SuperBlock, MutexGuard<BlockList>)> {
         debug_assert!(self.global);
         let mut blocks = self.lock_blocks(size_class);
-        if let Some(block) = blocks.pop() {
+        if let Some(block) = blocks.pop_mostly_empty_block() {
             debug_assert!(block.is_owned_by(self));
             return Some((block, blocks));
         }
