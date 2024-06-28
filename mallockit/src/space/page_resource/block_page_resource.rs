@@ -19,6 +19,8 @@ pub trait MemRegion: 'static + Sized + Clone + Copy {
 
     const META_BYTES: usize = std::mem::size_of::<Self::Meta>().next_power_of_two();
 
+    const DATA_BYTES: usize = Self::BYTES - Self::META_BYTES;
+
     fn start(&self) -> Address;
     fn from_address(addr: Address) -> Self;
     fn set_next(&self, next: Option<Self>);

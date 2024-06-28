@@ -13,7 +13,7 @@ impl<const MAX_SIZE_CLASS: usize> DiscreteTLAB<MAX_SIZE_CLASS> {
         }
     }
 
-    pub fn free_bytes(&self) -> usize {
+    pub const fn free_bytes(&self) -> usize {
         self.bytes
     }
 

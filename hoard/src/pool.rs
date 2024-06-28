@@ -5,15 +5,14 @@ use mallockit::{
     util::{mem::size_class::SizeClass, Address},
 };
 use spin::{relax::Yield, MutexGuard};
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 type Mutex<T> = spin::mutex::Mutex<T, Yield>;
 
 pub struct BlockList {
     cache: Option<SuperBlock>,
     groups: [Option<SuperBlock>; Self::GROUPS], // fullnesss groups: <25%, <50%, <75%, <100%, FULL
-    used_bytes: AtomicUsize,
-    total_bytes: AtomicUsize,
+    used_bytes: usize,
+    total_bytes: usize,
 }
 
 impl BlockList {
@@ -23,15 +22,15 @@ impl BlockList {
         Self {
             cache: None,
             groups: [None; Self::GROUPS],
-            used_bytes: AtomicUsize::new(0),
-            total_bytes: AtomicUsize::new(0),
+            used_bytes: 0,
+            total_bytes: 0,
         }
     }
 
     fn should_flush(&self, log_obj_size: usize) -> bool {
         const EMPTINESS_CLASSES: usize = 8;
-        let u = self.used_bytes.load(Ordering::Relaxed);
-        let a = self.total_bytes.load(Ordering::Relaxed);
+        let u = self.used_bytes;
+        let a = self.total_bytes;
         u + ((2 * SuperBlock::BYTES) >> log_obj_size) < a
             && (EMPTINESS_CLASSES * u) < ((EMPTINESS_CLASSES - 1) * a)
     }
@@ -182,32 +181,20 @@ impl BlockList {
         None
     }
 
-    fn inc_used_bytes(&self, used_bytes: usize) {
-        self.used_bytes.store(
-            self.used_bytes.load(Ordering::Relaxed) + used_bytes,
-            Ordering::Relaxed,
-        )
+    const fn inc_used_bytes(&mut self, used_bytes: usize) {
+        self.used_bytes += used_bytes;
     }
 
-    fn dec_used_bytes(&self, used_bytes: usize) {
-        self.used_bytes.store(
-            self.used_bytes.load(Ordering::Relaxed) - used_bytes,
-            Ordering::Relaxed,
-        )
+    const fn dec_used_bytes(&mut self, used_bytes: usize) {
+        self.used_bytes -= used_bytes;
     }
 
-    fn inc_total_bytes(&self, total_bytes: usize) {
-        self.total_bytes.store(
-            self.total_bytes.load(Ordering::Relaxed) + total_bytes,
-            Ordering::Relaxed,
-        )
+    const fn inc_total_bytes(&mut self, total_bytes: usize) {
+        self.total_bytes += total_bytes;
     }
 
-    fn dec_total_bytes(&self, total_bytes: usize) {
-        self.total_bytes.store(
-            self.total_bytes.load(Ordering::Relaxed) - total_bytes,
-            Ordering::Relaxed,
-        )
+    const fn dec_total_bytes(&mut self, total_bytes: usize) {
+        self.total_bytes -= total_bytes;
     }
 }
 
@@ -269,7 +256,7 @@ impl Pool {
     }
 
     pub fn lock_blocks(&self, size_class: SizeClass) -> MutexGuard<BlockList> {
-        self.blocks[size_class.as_usize()].lock()
+        unsafe { self.blocks.get_unchecked(size_class.as_usize()).lock() }
     }
 
     #[cold]
@@ -279,7 +266,7 @@ impl Pool {
         space: &'static HoardSpace,
     ) -> Option<Address> {
         debug_assert!(!self.global);
-        let mut blocks = unsafe { self.blocks.get_unchecked(size_class.as_usize()).lock() };
+        let mut blocks = self.lock_blocks(size_class);
         let block = if let Some(block) = blocks.find() {
             blocks.move_to_front(block, true);
             block
@@ -302,7 +289,7 @@ impl Pool {
             owner = block.owner;
             blocks = owner.lock_blocks(block.size_class);
         }
-        owner.free_cell_slow_impl(cell, space, &mut blocks)
+        owner.free_cell_slow_impl(cell, space, &mut blocks, block)
     }
 
     fn free_cell_slow_impl(
@@ -310,8 +297,8 @@ impl Pool {
         cell: Address,
         space: &'static HoardSpace,
         blocks: &mut BlockList,
+        block: SuperBlock,
     ) {
-        let block = SuperBlock::containing(cell);
         block.free_cell(cell);
         blocks.dec_used_bytes(block.size_class.bytes());
         if block.is_empty() {
