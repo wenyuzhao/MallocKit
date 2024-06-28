@@ -12,7 +12,6 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 [dependencies]
 mallockit = { path = "../mallockit" }
 spin = { workspace = true }
-array-const-fn-init = { workspace = true }
 
 [features]
 default = []

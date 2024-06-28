@@ -34,7 +34,6 @@ num_cpus = "1.13.1"
 atomic = "0.5.1"
 quote = "1.0.20"
 syn = "1.0.98"
-array-const-fn-init = "0.1.1"
 shell-words = "1.1.0"
 cargo_metadata = "0.18.1"
 

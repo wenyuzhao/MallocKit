@@ -226,6 +226,7 @@ impl BlockList {
 
 pub struct Pool {
     pub global: bool,
+    // This is a major difference to the original hoard: we lock bins instead of the entire local heap.
     blocks: [Mutex<BlockList>; Self::MAX_BINS],
 }
 
