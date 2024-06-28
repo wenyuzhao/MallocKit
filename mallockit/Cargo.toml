@@ -20,7 +20,7 @@ mallockit-macros = { path = "./macros" }
 cargo_metadata = { workspace = true }
 
 [features]
-default = ["transparent_huge_page"]
+default = []
 transparent_huge_page = []
 slow_assert = []
 stat = []
