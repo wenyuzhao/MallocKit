@@ -28,9 +28,9 @@ impl EmptyClass {
             SuperBlock::DATA_BYTES >> block.size_class.log_bytes() << block.size_class.log_bytes();
         let u = block.used_bytes();
         if u == 0 {
-            return 0;
+            0
         } else {
-            return 1 + (Self::EMPTINESS_CLASSES * u / t);
+            1 + (Self::EMPTINESS_CLASSES * u / t)
         }
     }
 
