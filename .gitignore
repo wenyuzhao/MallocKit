@@ -13,3 +13,5 @@ a.out
 /.vscode
 /perf.data
 /perf.data.old
+/bench/perf.data
+/bench/perf.data.old

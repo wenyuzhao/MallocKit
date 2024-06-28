@@ -233,6 +233,7 @@ impl Bench {
             }
             _ => {}
         }
+        println!("> {:?}", self.cmd);
     }
 
     fn use_malloc(cmd: &mut Command, alloc: &str, path: &str) {
