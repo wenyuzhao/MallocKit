@@ -72,7 +72,10 @@ pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
         #[cfg(test)]
         mod tests {
-            #(#tests)*
+            #[cfg(feature = "malloc")]
+            mod malloc {
+                #(#tests)*
+            }
             ::mallockit::rust_allocator_tests!(crate::Global);
         }
     };

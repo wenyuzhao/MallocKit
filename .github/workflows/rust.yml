@@ -24,4 +24,4 @@ jobs:
       - name: Test (Debug)
         run: cargo test
       - name: Test (Release)
-        run: cargo test --release
+        run: cargo test --release --features malloc
