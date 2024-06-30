@@ -51,6 +51,7 @@ impl Plan for Hoard {
 struct HoardMutator {
     hoard: HoardAllocator,
     los: LargeObjectAllocator<Size4K, { 1 << 31 }, { 16 << 20 }>,
+    _padding: [usize; 8],
 }
 
 impl Mutator for HoardMutator {
@@ -60,9 +61,11 @@ impl Mutator for HoardMutator {
         Self {
             hoard: HoardAllocator::new(&Self::plan().hoard_space, HOARD_SPACE),
             los: LargeObjectAllocator::new(&Self::plan().large_object_space),
+            _padding: [0; 8],
         }
     }
 
+    #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         if HoardSpace::can_allocate(layout) {
             mallockit::stat::track_allocation(layout, false);
@@ -73,6 +76,7 @@ impl Mutator for HoardMutator {
         }
     }
 
+    #[inline(always)]
     fn dealloc(&mut self, ptr: Address) {
         debug_assert!(HOARD_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
         if HOARD_SPACE.contains(ptr) {

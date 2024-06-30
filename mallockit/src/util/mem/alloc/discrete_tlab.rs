@@ -1,6 +1,7 @@
 use crate::util::{Address, SizeClass};
 
 pub struct DiscreteTLAB<const MAX_SIZE_CLASS: usize = { Address::LOG_BYTES }> {
+    _padding: [usize; 16],
     bins: [Address; MAX_SIZE_CLASS],
     bytes: usize,
 }
@@ -8,6 +9,7 @@ pub struct DiscreteTLAB<const MAX_SIZE_CLASS: usize = { Address::LOG_BYTES }> {
 impl<const MAX_SIZE_CLASS: usize> DiscreteTLAB<MAX_SIZE_CLASS> {
     pub const fn new() -> Self {
         Self {
+            _padding: [0; 16],
             bins: [Address::ZERO; MAX_SIZE_CLASS],
             bytes: 0,
         }

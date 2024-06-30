@@ -22,23 +22,28 @@ impl<P: Plan> MallocAPI<P> {
     pub const MIN_ALIGNMENT: usize = MIN_ALIGNMENT;
     pub const PAGE_SIZE: usize = 4096;
 
+    #[inline(always)]
     pub const fn new(plan: &'static Lazy<P>) -> Self {
         Self(PhantomData)
     }
 
+    #[inline(always)]
     pub fn mutator(&self) -> &'static mut P::Mutator {
         P::Mutator::current()
     }
 
+    #[inline(always)]
     pub fn is_in_mallockit_heap(a: Address) -> bool {
         HEAP.contains(a)
     }
 
+    #[inline(always)]
     pub const fn align_up(value: usize, align: usize) -> usize {
         let mask = align - 1;
         (value + mask) & !mask
     }
 
+    #[cold]
     pub fn set_error(e: i32) {
         errno::set_errno(errno::Errno(e));
     }
@@ -61,6 +66,7 @@ impl<P: Plan> MallocAPI<P> {
     /// # Safety
     ///
     /// The caller must ensure that `size` and `align` are valid
+    #[inline(always)]
     pub unsafe fn alloc(&self, mut size: usize, align: usize) -> Result<Option<*mut u8>, i32> {
         size = std::cmp::max(size, Self::MIN_ALIGNMENT);
         let size = Self::align_up(size, align);
@@ -76,6 +82,7 @@ impl<P: Plan> MallocAPI<P> {
     /// # Safety
     ///
     /// The caller must ensure that `size` and `align` are valid
+    #[inline(always)]
     pub unsafe fn alloc_or_enomem(&self, size: usize, align: usize) -> *mut u8 {
         match self.alloc(size, align) {
             Ok(ptr) => ptr.unwrap_or(0 as _),
@@ -91,6 +98,7 @@ impl<P: Plan> MallocAPI<P> {
     /// # Safety
     ///
     /// The caller must ensure that `ptr` is a valid heap pointer
+    #[inline(always)]
     pub unsafe fn free(&self, ptr: *mut u8) {
         if ptr.is_null() {
             return;
@@ -107,6 +115,7 @@ impl<P: Plan> MallocAPI<P> {
     /// # Safety
     ///
     /// The caller must ensure that `ptr` is a valid heap pointer and `new_size` is valid
+    #[inline(always)]
     pub unsafe fn reallocate_or_enomem(
         &self,
         ptr: *mut u8,
@@ -164,6 +173,7 @@ impl<P: Plan> MallocAPI<P> {
     /// # Safety
     ///
     /// The caller must ensure that `alignment` and `size` are valid
+    #[inline(always)]
     pub unsafe fn posix_memalign(
         &self,
         result: *mut *mut u8,
@@ -188,6 +198,7 @@ impl<P: Plan> MallocAPI<P> {
     /// # Safety
     ///
     /// The caller must ensure that `alignment` and `size` are valid
+    #[inline(always)]
     pub unsafe fn memalign(&self, alignment: usize, size: usize) -> *mut u8 {
         let mut result = ptr::null_mut();
         let errno = self.posix_memalign(&mut result, alignment, size);
@@ -202,6 +213,7 @@ impl<P: Plan> MallocAPI<P> {
     /// # Safety
     ///
     /// The caller must ensure that `alignment` and `size` are valid
+    #[inline(always)]
     pub unsafe fn aligned_alloc(
         &self,
         size: usize,

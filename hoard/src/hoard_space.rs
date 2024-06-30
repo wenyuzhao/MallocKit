@@ -77,9 +77,9 @@ impl HoardSpace {
 }
 /// Thread-local heap
 pub struct HoardAllocator {
-    space: &'static HoardSpace,
     tlab: DiscreteTLAB<{ SizeClass::<4>::from_bytes(Self::LARGEST_SMALL_OBJECT).as_usize() + 1 }>,
     local: Box<Pool>,
+    space: &'static HoardSpace,
 }
 
 impl HoardAllocator {
@@ -88,14 +88,15 @@ impl HoardAllocator {
 
     pub fn new(space: &'static HoardSpace, _space_id: SpaceId) -> Self {
         Self {
-            space,
             tlab: DiscreteTLAB::new(),
             local: Box::new_in(Pool::new(false), Meta),
+            space,
         }
     }
 }
 
 impl Allocator for HoardAllocator {
+    #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let size_class = SizeClass::from_layout(layout);
         if layout.size() <= Self::LARGEST_SMALL_OBJECT {
@@ -106,6 +107,7 @@ impl Allocator for HoardAllocator {
         self.local.alloc_cell(size_class, self.space)
     }
 
+    #[inline(always)]
     fn dealloc(&mut self, cell: Address) {
         let block = SuperBlock::containing(cell);
         let size = block.size_class.bytes();

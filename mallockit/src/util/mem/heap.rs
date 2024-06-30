@@ -23,15 +23,15 @@ impl Heap {
         Self { start, end }
     }
 
-    pub fn contains(&self, ptr: Address) -> bool {
+    pub const fn contains(&self, ptr: Address) -> bool {
         self.start <= ptr && ptr < self.end
     }
 
-    pub fn start(&self) -> Address {
+    pub const fn start(&self) -> Address {
         self.start
     }
 
-    pub fn end(&self) -> Address {
+    pub const fn end(&self) -> Address {
         self.end
     }
 

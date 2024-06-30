@@ -268,7 +268,6 @@ impl Pool {
         unsafe { self.blocks.get_unchecked(size_class.as_usize()).lock() }
     }
 
-    #[cold]
     pub fn alloc_cell(
         &mut self,
         size_class: SizeClass,
@@ -289,7 +288,6 @@ impl Pool {
         }
     }
 
-    #[cold]
     pub fn free_cell(&self, cell: Address, space: &'static HoardSpace) {
         let block = SuperBlock::containing(cell);
         let mut owner = block.owner;
