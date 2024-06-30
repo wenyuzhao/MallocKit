@@ -241,3 +241,22 @@ mod macos_tls {
         ptr
     }
 }
+
+static mut TLS_KEY: libc::pthread_key_t = u32::MAX;
+
+#[thread_local]
+static X: usize = 0;
+
+extern "C" fn dtor(_ptr: *mut libc::c_void) {}
+
+pub fn init_pthread_specific() {
+    unsafe {
+        libc::pthread_setspecific(TLS_KEY, &X as *const usize as _);
+    }
+}
+
+pub(crate) fn init_pthread_key() {
+    unsafe {
+        libc::pthread_key_create(addr_of_mut!(TLS_KEY), Some(dtor));
+    }
+}

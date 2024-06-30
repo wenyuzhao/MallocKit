@@ -13,6 +13,7 @@ pub fn set_panic_handler() {
 
 pub extern "C" fn process_start(plan: &'static impl Plan) {
     set_panic_handler();
+    crate::mutator::init_pthread_key();
     unsafe {
         libc::atexit(process_exit);
     }

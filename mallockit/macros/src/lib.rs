@@ -98,7 +98,10 @@ pub fn mutator(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #[cfg(not(target_os = "macos"))]
             fn current() -> &'static mut Self {
                 #[thread_local]
-                static mut MUTATOR: ::mallockit::util::Lazy<#name, ::mallockit::util::Local> = ::mallockit::util::Lazy::new(|| <#name as ::mallockit::Mutator>::new());
+                static mut MUTATOR: ::mallockit::util::Lazy<#name, ::mallockit::util::Local> = ::mallockit::util::Lazy::new(|| {
+                    ::mallockit::mutator::init_pthread_specific();
+                    <#name as ::mallockit::Mutator>::new()
+                });
                 unsafe { &mut * MUTATOR }
             }
         }
