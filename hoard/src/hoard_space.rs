@@ -113,6 +113,7 @@ impl Allocator for HoardAllocator {
         let size = block.size_class.bytes();
         if size <= Self::LARGEST_SMALL_OBJECT
             && size + self.tlab.free_bytes() <= Self::LOCAL_HEAP_THRESHOLD
+            && block.is_owned_by(&self.local)
         {
             self.tlab.push(block.size_class, cell);
         } else {

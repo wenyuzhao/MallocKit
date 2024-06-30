@@ -1,5 +1,6 @@
 [build]
 rustflags = ["-Z", "tls_model=initial-exec"]
+# rustflags = ["-Z", "tls_model=initial-exec", "-C", "force-frame-pointers=yes"]
 
 [alias]
 # Helper command to run a program with a malloc implementation
