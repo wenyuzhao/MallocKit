@@ -37,6 +37,9 @@ pub struct Lazy<T, TL: ThreadLocality = Shared, F = fn() -> T> {
 }
 
 impl<T, F: FnOnce() -> T> Lazy<T, Local, F> {
+    /// # Safety
+    ///
+    /// This can only be called by pthread destructors, to clear the thread-local storage.
     pub unsafe fn reset(&mut self, new: F) {
         // Drop old value
         if self.state.load(Ordering::SeqCst) == INITIALIZED {
