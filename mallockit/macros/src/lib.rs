@@ -48,6 +48,7 @@ pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
             #[cfg(any(feature = "malloc", feature = "mallockit/malloc"))]
             #[::mallockit::ctor]
             unsafe fn ctor() {
+                <<Plan as ::mallockit::Plan>::Mutator as ::mallockit::mutator::TLS>::current();
                 ::mallockit::util::sys::hooks::process_start(&*PLAN);
             }
 
@@ -92,19 +93,29 @@ pub fn mutator(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
 
         mod __mallockit_mutator {
+            #[cfg(not(target_os = "macos"))]
             fn init() -> super::#name {
                 ::mallockit::mutator::init_pthread_specific();
                 <super::#name as ::mallockit::Mutator>::new()
             }
 
+            #[cfg(not(target_os = "macos"))]
             #[thread_local]
             pub(super) static mut MUTATOR: ::mallockit::util::Lazy<super::#name, ::mallockit::util::Local> = ::mallockit::util::Lazy::new(init);
 
             #[no_mangle]
+            #[cfg(not(target_os = "macos"))]
             extern "C" fn mallockit_pthread_destructor() {
                 unsafe {
                     MUTATOR.reset(init);
                 }
+            }
+
+            #[no_mangle]
+            #[cfg(target_os = "macos")]
+            extern "C" fn mallockit_pthread_destructor() {
+                use crate::mallockit::mutator::TLS;
+                <super::#name as ::mallockit::mutator::TLS>::current().reset();
             }
         }
 

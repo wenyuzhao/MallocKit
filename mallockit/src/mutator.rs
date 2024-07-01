@@ -100,6 +100,10 @@ pub trait TLS: Sized {
     fn current() -> &'static mut Self {
         unsafe { &mut *macos_tls::get_tls::<Self>() }
     }
+
+    fn reset(&mut self) {
+        *self = Self::new();
+    }
 }
 
 impl TLS for u8 {
@@ -211,8 +215,7 @@ mod macos_tls {
     fn init_tls<T: TLS>() -> *mut (InternalTLS, T) {
         let ptr = alloc_tls::<(InternalTLS, T)>();
         unsafe {
-            (*ptr).0 = InternalTLS::new();
-            (*ptr).1 = T::new();
+            std::ptr::write(&mut (*ptr).0, InternalTLS::new());
             unsafe {
                 let mut tcb: *mut *mut T;
                 asm! {
@@ -224,6 +227,8 @@ mod macos_tls {
                 }
                 tcb.add(SLOT).write(ptr as *mut T)
             }
+            std::ptr::write(&mut (*ptr).1, T::new());
+            crate::mutator::init_pthread_specific();
         }
         ptr
     }
@@ -234,9 +239,10 @@ mod macos_tls {
     fn init_tls<T: TLS>() -> *mut (InternalTLS, T) {
         let ptr = alloc_tls::<(InternalTLS, T)>();
         unsafe {
-            (*ptr).0 = InternalTLS::new();
-            (*ptr).1 = T::new();
+            std::ptr::write(&mut (*ptr).0, InternalTLS::new());
             asm!("mov gs:{offset}, {0}", in(reg) ptr, offset = const OFFSET);
+            std::ptr::write(&mut (*ptr).1, T::new());
+            crate::mutator::init_pthread_specific();
         }
         ptr
     }
