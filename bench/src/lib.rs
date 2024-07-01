@@ -6,6 +6,7 @@ use std::{
 
 use harness::Bencher;
 use once_cell::sync::Lazy;
+use regex::Regex;
 
 const LD_PRELOAD: &str = if cfg!(target_os = "linux") {
     "LD_PRELOAD"
@@ -55,13 +56,17 @@ static LOCAL_DEV_DIR: Lazy<String> = Lazy::new(|| {
 impl Bench {
     pub fn new(name: &str) -> Self {
         let malloc = std::env::var("MALLOC").unwrap();
-        let is_external = std::env::var("IS_MALLOCKIT").unwrap() == "0";
+        let is_mallockit_env = std::env::var("IS_MALLOCKIT").map(|x| x.to_lowercase());
+        let is_external =
+            is_mallockit_env != Ok("1".to_owned()) && is_mallockit_env != Ok("true".to_owned());
         let kind = match (malloc.as_str(), is_external) {
             ("sys", _) => "system",
             (_, true) => "external",
             _ => "mallockit",
         };
-        Self::build_mallockit();
+        if !is_external {
+            Self::build_mallockit();
+        }
         let malloc_path = Self::get_malloc_lib_path(&malloc, is_external);
         if malloc != "sys" && !PathBuf::from(&malloc_path).exists() {
             panic!("Malloc dylib does not exist: {malloc_path}");
@@ -100,17 +105,6 @@ impl Bench {
         self
     }
 
-    fn get_binary_path(name: &str) -> String {
-        let local_dev_dir = LOCAL_DEV_DIR.as_str();
-        match name {
-            "lean" => "../bin/lean".to_owned(),
-            "lua" => "make".to_owned(),
-            "redis" => format!("{local_dev_dir}/redis-6.2.7/src/redis-benchmark"),
-            "rocksdb" => format!("{local_dev_dir}/rocksdb-8.1.1/db_bench"),
-            _ => format!("./mimalloc-bench/out/bench/{name}"),
-        }
-    }
-
     fn get_malloc_lib_path(name: &str, is_external: bool) -> String {
         if !is_external {
             let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -137,9 +131,23 @@ impl Bench {
         }
     }
 
+    fn get_binary_path(name: &str) -> String {
+        let local_dev_dir = LOCAL_DEV_DIR.as_str();
+        match name {
+            "lean" => "../bin/lean".to_owned(),
+            "lua" => "make".to_owned(),
+            "redis" => format!("{local_dev_dir}/redis-6.2.7/src/redis-benchmark"),
+            "rocksdb" => format!("{local_dev_dir}/rocksdb-8.1.1/db_bench"),
+            "gs" => "gs".to_owned(),
+            "rbstress" => "ruby".to_owned(),
+            _ => format!("./mimalloc-bench/out/bench/{name}"),
+        }
+    }
+
     fn init_args_and_stdin(&mut self) {
         let local_dev_dir = LOCAL_DEV_DIR.as_str();
         let procs = num_cpus::get().to_string();
+        let procsx2 = (num_cpus::get() * 2).to_string();
         match self.name.as_str() {
             "barnes" => {
                 self.cmd.stdin(Stdio::from(
@@ -185,6 +193,44 @@ impl Bench {
             "z3" => {
                 self.cmd
                     .args(["-smt2", "./mimalloc-bench/bench/z3/test1.smt2"]);
+            }
+            "alloc-test" => {
+                let procs = usize::min(num_cpus::get(), 16).to_string();
+                self.cmd.args([&procs]);
+            }
+            "sh6bench" => {
+                self.cmd.args([&procsx2]);
+            }
+            "sh8bench" => {
+                self.cmd.args([&procsx2]);
+            }
+            "xmalloc-test" => {
+                self.cmd.args(["-w", &procs, "-t", "5", "-s", "64"]);
+            }
+            "cache-thrash" => {
+                self.cmd.args([&procs, "1000", "1", "2000000", &procs]);
+            }
+            "cache-scratch" => {
+                self.cmd.args([&procs, "1000", "1", "2000000", &procs]);
+            }
+            "malloc-large" => {}
+            "rbstress" => {
+                self.cmd
+                    .args(["./mimalloc-bench/bench/rbstress/stress_mem.rb", &procs]);
+            }
+            "mstress" => {
+                self.cmd.args([&procs, "50", "25"]);
+            }
+            "mleak" => {
+                self.cmd.args([&procs, "100"]);
+            }
+            "rptest" => {
+                self.cmd
+                    .args([&procs, "0", "1", "2", "500", "1000", "100", "8", "16000"]);
+            }
+            "glibc-simple" => {}
+            "glibc-thread" => {
+                self.cmd.args([&procs]);
             }
             _ => panic!("Unknown benchmark: {}", self.name),
         }
@@ -278,30 +324,41 @@ impl Bench {
     pub fn finalize(&mut self, bencher: &Bencher) {
         let log = std::fs::read_to_string(&self.out).unwrap();
         println!("{}", log);
-        if self.name == "larson" {
-            let time = log
-                .lines()
-                .find(|line| line.contains("operations per second, relative time:"))
-                .unwrap()
-                .split_whitespace()
-                .last()
-                .unwrap()
-                .trim()
-                .trim_end_matches("s.")
-                .parse::<f32>()
-                .unwrap();
-            bencher.add_stat("time", time * 1000.0);
-        }
-        if self.name == "redis" {
-            let s = log
-                .lines()
-                .find(|line| line.contains("requests per second"))
-                .unwrap();
-            let s = s.split_once(" requests per second").unwrap().0;
-            let s = s.split_whitespace().last().unwrap().trim();
-            let ops = s.parse::<f32>().unwrap();
-            let time = 2000000f32 / ops;
-            bencher.add_stat("time", time * 1000.0);
+        match self.name.as_str() {
+            x if x.starts_with("larson") => {
+                let re = Regex::new(r"relative time: (?<rtime>[0-9\.]+)s").unwrap();
+                let caps = re.captures(&log).unwrap();
+                let rtime = caps["rtime"].parse::<f32>().unwrap();
+                bencher.add_stat("time", rtime * 1000.0);
+            }
+            x if x.starts_with("redis") => {
+                let re = Regex::new(r"(?<ops>[0-9\.]+) requests per second,").unwrap();
+                let caps = re.captures(&log).unwrap();
+                let ops = caps["ops"].parse::<f32>().unwrap();
+                let time = 2000000f32 / ops;
+                bencher.add_stat("time", time * 1000.0);
+            }
+            x if x.starts_with("rptest") => {
+                let re = Regex::new(r"(?<ops>[0-9]+) memory ops/CPU second").unwrap();
+                let caps = re.captures(&log).unwrap();
+                let ops = caps["ops"].parse::<f32>().unwrap();
+                let time = 2000000f32 / ops;
+                bencher.add_stat("time", time * 1000.0);
+            }
+            x if x.starts_with("xmalloc") => {
+                let re = Regex::new(r"rtime: (?<rtime>[0-9\.]+),").unwrap();
+                let caps = re.captures(&log).unwrap();
+                let rtime = caps["rtime"].parse::<f32>().unwrap();
+                bencher.add_stat("time", rtime * 1000.0);
+            }
+            x if x.starts_with("glibc-thread") => {
+                let re = Regex::new(r"(?<ops>[0-9]+) iterations").unwrap();
+                let caps = re.captures(&log).unwrap();
+                let ops = caps["ops"].parse::<f32>().unwrap();
+                let time = 1000000000f32 / ops;
+                bencher.add_stat("time", time * 1000.0);
+            }
+            _ => {}
         }
     }
 }
