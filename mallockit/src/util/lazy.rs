@@ -36,6 +36,20 @@ pub struct Lazy<T, TL: ThreadLocality = Shared, F = fn() -> T> {
     phantom: PhantomData<TL>,
 }
 
+impl<T, F: FnOnce() -> T> Lazy<T, Local, F> {
+    pub unsafe fn reset(&mut self, new: F) {
+        // Drop old value
+        if self.state.load(Ordering::SeqCst) == INITIALIZED {
+            let value = unsafe { (*self.value.get()).as_mut_ptr() };
+            unsafe { value.drop_in_place() };
+        }
+        // Reset value and states
+        self.state.store(UNINITIALIZED, Ordering::SeqCst);
+        self.init.set(Some(new));
+        self.value = UnsafeCell::new(MaybeUninit::uninit());
+    }
+}
+
 impl<T, TL: ThreadLocality, F: FnOnce() -> T> Lazy<T, TL, F> {
     pub const fn new(f: F) -> Self {
         Self {

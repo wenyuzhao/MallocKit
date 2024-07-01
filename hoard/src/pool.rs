@@ -2,6 +2,7 @@ use crate::{hoard_space::HoardSpace, super_block::SuperBlock};
 use mallockit::{
     space::page_resource::MemRegion,
     util::{mem::size_class::SizeClass, Address},
+    Plan,
 };
 use spin::{relax::Yield, MutexGuard};
 
@@ -79,6 +80,17 @@ impl EmptyClass {
         if let Some(mut next) = block.next {
             next.prev = block.prev;
         }
+    }
+
+    fn pop(&mut self, group: usize) -> Option<SuperBlock> {
+        if let Some(block) = self.groups[group] {
+            self.groups[group] = block.next;
+            if let Some(mut next) = block.next {
+                next.prev = None;
+            }
+            return Some(block);
+        }
+        None
     }
 
     fn pop_most_empty_block(&mut self) -> Option<SuperBlock> {
@@ -228,6 +240,24 @@ pub struct Pool {
     pub global: bool,
     // This is a major difference to the original hoard: we lock bins instead of the entire local heap.
     blocks: [Mutex<BlockList>; Self::MAX_BINS],
+}
+
+impl Drop for Pool {
+    fn drop(&mut self) {
+        let space = &crate::Hoard::get().hoard_space;
+        for (i, block) in self.blocks.iter().enumerate() {
+            let sz: SizeClass = SizeClass(i as _);
+            let mut block = block.lock();
+            if let Some(b) = block.cache.take() {
+                space.flush_block(sz, b);
+            }
+            for i in 0..EmptyClass::GROUPS {
+                while let Some(b) = block.groups.pop(i) {
+                    space.flush_block(sz, b);
+                }
+            }
+        }
+    }
 }
 
 impl Pool {

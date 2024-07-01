@@ -247,7 +247,15 @@ static mut TLS_KEY: libc::pthread_key_t = u32::MAX;
 #[thread_local]
 static X: usize = 0;
 
-extern "C" fn dtor(_ptr: *mut libc::c_void) {}
+extern "C" {
+    fn mallockit_pthread_destructor();
+}
+
+extern "C" fn dtor(_ptr: *mut libc::c_void) {
+    unsafe {
+        mallockit_pthread_destructor();
+    }
+}
 
 pub fn init_pthread_specific() {
     unsafe {

@@ -95,6 +95,13 @@ impl HoardAllocator {
     }
 }
 
+impl Drop for HoardAllocator {
+    fn drop(&mut self) {
+        self.tlab
+            .clear(|cell| self.local.free_cell(cell, self.space));
+    }
+}
+
 impl Allocator for HoardAllocator {
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {

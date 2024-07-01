@@ -34,4 +34,17 @@ impl<const MAX_SIZE_CLASS: usize> DiscreteTLAB<MAX_SIZE_CLASS> {
         self.bytes -= size_class.bytes();
         Some(cell)
     }
+
+    pub fn clear(&mut self, mut f: impl FnMut(Address)) {
+        for bin in self.bins.iter_mut() {
+            let mut cell = *bin;
+            while !cell.is_zero() {
+                let next = unsafe { cell.load() };
+                f(cell);
+                cell = next;
+            }
+            *bin = Address::ZERO;
+        }
+        self.bytes = 0;
+    }
 }

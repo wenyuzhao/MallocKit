@@ -90,6 +90,24 @@ pub fn mutator(_attr: TokenStream, item: TokenStream) -> TokenStream {
         #[repr(align(256))]
         #input
 
+
+        mod __mallockit_mutator {
+            fn init() -> super::#name {
+                ::mallockit::mutator::init_pthread_specific();
+                <super::#name as ::mallockit::Mutator>::new()
+            }
+
+            #[thread_local]
+            pub(super) static mut MUTATOR: ::mallockit::util::Lazy<super::#name, ::mallockit::util::Local> = ::mallockit::util::Lazy::new(init);
+
+            #[no_mangle]
+            extern "C" fn mallockit_pthread_destructor() {
+                unsafe {
+                    MUTATOR.reset(init);
+                }
+            }
+        }
+
         impl ::mallockit::mutator::TLS for #name {
             fn new() -> Self {
                 <Self as ::mallockit::Mutator>::new()
@@ -97,12 +115,7 @@ pub fn mutator(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
             #[cfg(not(target_os = "macos"))]
             fn current() -> &'static mut Self {
-                #[thread_local]
-                static mut MUTATOR: ::mallockit::util::Lazy<#name, ::mallockit::util::Local> = ::mallockit::util::Lazy::new(|| {
-                    ::mallockit::mutator::init_pthread_specific();
-                    <#name as ::mallockit::Mutator>::new()
-                });
-                unsafe { &mut * MUTATOR }
+                unsafe { &mut *__mallockit_mutator::MUTATOR }
             }
         }
 
