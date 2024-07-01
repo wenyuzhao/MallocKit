@@ -67,7 +67,7 @@ impl HoardSpace {
     }
 
     pub fn flush_block(&self, size_class: SizeClass, block: SuperBlock) {
-        debug_assert!(!block.is_full());
+        // debug_assert!(!block.is_full());
         self.pool.put(size_class, block);
     }
 

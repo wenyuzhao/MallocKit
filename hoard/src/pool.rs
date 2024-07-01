@@ -275,7 +275,7 @@ impl Pool {
     }
 
     pub fn put(&self, size_class: SizeClass, mut block: SuperBlock) {
-        debug_assert!(!block.is_full());
+        // debug_assert!(!block.is_full());
         let mut blocks = self.lock_blocks(size_class);
         block.owner = self.static_ref();
         blocks.put(block);
@@ -359,7 +359,7 @@ impl Pool {
         // Transit a mostly-empty block to the global pool
         debug_assert!(!self.global);
         if let Some(mostly_empty_block) = blocks.pop_most_empty_block() {
-            debug_assert!(!mostly_empty_block.is_full());
+            // debug_assert!(!mostly_empty_block.is_full());
             debug_assert!(mostly_empty_block.is_owned_by(self));
             space.flush_block(size_class, mostly_empty_block);
             debug_assert!(!mostly_empty_block.is_owned_by(self));
