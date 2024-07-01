@@ -4,9 +4,9 @@ use std::mem::MaybeUninit;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::*;
 
-const UNINITIALIZED: u8 = 0;
+const UNINITIALIZED: u8 = 2;
 const INITIALIZING: u8 = 1;
-const INITIALIZED: u8 = 2;
+const INITIALIZED: u8 = 0;
 
 pub trait ThreadLocality: Sized {
     const THREAD_LOCAL: bool;

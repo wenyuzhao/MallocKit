@@ -1,7 +1,6 @@
 use self::page_resource::PageResource;
 use crate::util::*;
 use std::ops::Range;
-use std::ptr;
 pub mod freelist_space;
 pub mod immortal_space;
 pub mod large_object_space;
@@ -72,14 +71,7 @@ pub trait Space: Sized + 'static {
 pub trait Allocator {
     fn alloc(&mut self, layout: Layout) -> Option<Address>;
 
-    fn alloc_zeroed(&mut self, layout: Layout) -> Option<Address> {
-        let size = layout.size();
-        let ptr = self.alloc(layout);
-        if let Some(ptr) = ptr {
-            unsafe { ptr::write_bytes(ptr.as_mut_ptr::<u8>(), 0, size) };
-        }
-        ptr
-    }
-
     fn dealloc(&mut self, ptr: Address);
+
+    // TODO: realloc
 }
