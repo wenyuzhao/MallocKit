@@ -168,3 +168,15 @@ where
         }
     }
 }
+
+impl<S: PageSize, const MAX_CACHEABLE_SIZE: usize, const THRESHOLD_SLOP: usize> Drop
+    for LargeObjectAllocator<S, MAX_CACHEABLE_SIZE, THRESHOLD_SLOP>
+where
+    [(); bins::<S>(MAX_CACHEABLE_SIZE)]: Sized,
+{
+    fn drop(&mut self) {
+        if Self::CACHE_ENABLED {
+            self.clear_bins();
+        }
+    }
+}
