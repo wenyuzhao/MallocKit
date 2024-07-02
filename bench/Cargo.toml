@@ -43,13 +43,17 @@ harness = false
 # name = "lua"
 # harness = false
 
-[[bench]]
-name = "rocksdb"
-harness = false
+# [[bench]]
+# name = "rocksdb"
+# harness = false
 
 # [[bench]]
 # name = "z3"
 # harness = false
+
+[[bench]]
+name = "alloc_test1"
+harness = false
 
 [[bench]]
 name = "alloc_test"
@@ -59,37 +63,37 @@ harness = false
 name = "cache_scratch"
 harness = false
 
-[[bench]]
-name = "cache_thrash"
-harness = false
+# [[bench]]
+# name = "cache_thrash"
+# harness = false
 
-[[bench]]
-name = "glibc_simple"
-harness = false
+# [[bench]]
+# name = "glibc_simple"
+# harness = false
 
-[[bench]]
-name = "glibc_thread"
-harness = false
+# [[bench]]
+# name = "glibc_thread"
+# harness = false
 
-[[bench]]
-name = "malloc_large"
-harness = false
+# [[bench]]
+# name = "malloc_large"
+# harness = false
 
-[[bench]]
-name = "mleak"
-harness = false
+# [[bench]]
+# name = "mleak"
+# harness = false
 
-[[bench]]
-name = "rptest"
-harness = false
+# [[bench]]
+# name = "rptest"
+# harness = false
 
-[[bench]]
-name = "mstress"
-harness = false
+# [[bench]]
+# name = "mstress"
+# harness = false
 
-[[bench]]
-name = "rbstress"
-harness = false
+# [[bench]]
+# name = "rbstress"
+# harness = false
 
 [[bench]]
 name = "sh6bench"

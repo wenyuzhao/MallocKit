@@ -140,6 +140,7 @@ impl Bench {
             "rocksdb" => format!("{local_dev_dir}/rocksdb-8.1.1/db_bench"),
             "gs" => "gs".to_owned(),
             "rbstress" => "ruby".to_owned(),
+            "alloc-test1" => "./mimalloc-bench/out/bench/alloc-test".to_owned(),
             _ => format!("./mimalloc-bench/out/bench/{name}"),
         }
     }
@@ -193,6 +194,9 @@ impl Bench {
             "z3" => {
                 self.cmd
                     .args(["-smt2", "./mimalloc-bench/bench/z3/test1.smt2"]);
+            }
+            "alloc-test1" => {
+                self.cmd.args(["1"]);
             }
             "alloc-test" => {
                 let procs = usize::min(num_cpus::get(), 16).to_string();
