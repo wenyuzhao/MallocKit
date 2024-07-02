@@ -12,6 +12,7 @@
 #![feature(effects)]
 #![feature(asm_const)]
 #![feature(const_refs_to_cell)]
+#![feature(const_refs_to_static)]
 
 extern crate mallockit_macros;
 pub extern crate spin;
