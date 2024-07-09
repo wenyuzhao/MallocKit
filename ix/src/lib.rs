@@ -7,40 +7,40 @@
 
 extern crate mallockit;
 
-mod hoard_space;
+mod block;
+mod immix_space;
 mod pool;
-mod super_block;
 
-use hoard_space::*;
+use immix_space::*;
 use mallockit::{
     space::{large_object_space::*, *},
     util::*,
     Mutator, Plan,
 };
 
-const HOARD_SPACE: SpaceId = SpaceId::DEFAULT;
+const IMMIX_SPACE: SpaceId = SpaceId::DEFAULT;
 const LARGE_OBJECT_SPACE: SpaceId = SpaceId::LARGE_OBJECT_SPACE;
 
 #[mallockit::plan]
-struct Hoard {
-    hoard_space: HoardSpace,
+struct Immix {
+    immix_space: ImmixSpace,
     large_object_space: LargeObjectSpace,
 }
 
-impl Plan for Hoard {
-    type Mutator = HoardMutator;
+impl Plan for Immix {
+    type Mutator = ImmixMutator;
 
     fn new() -> Self {
         Self {
-            hoard_space: HoardSpace::new(HOARD_SPACE),
+            immix_space: ImmixSpace::new(IMMIX_SPACE),
             large_object_space: LargeObjectSpace::new(LARGE_OBJECT_SPACE),
         }
     }
 
     fn get_layout(ptr: Address) -> Layout {
-        debug_assert!(HOARD_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
-        if HOARD_SPACE.contains(ptr) {
-            HoardSpace::get_layout(ptr)
+        debug_assert!(IMMIX_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
+        if IMMIX_SPACE.contains(ptr) {
+            ImmixSpace::get_layout(ptr)
         } else {
             Self::get().large_object_space.get_layout::<Size4K>(ptr)
         }
@@ -48,18 +48,18 @@ impl Plan for Hoard {
 }
 
 #[mallockit::mutator]
-struct HoardMutator {
-    hoard: HoardAllocator,
+struct ImmixMutator {
+    hoard: ImmixAllocator,
     los: LargeObjectAllocator<Size4K, { 1 << 31 }, { 16 << 20 }>,
     _padding: [usize; 8],
 }
 
-impl Mutator for HoardMutator {
-    type Plan = Hoard;
+impl Mutator for ImmixMutator {
+    type Plan = Immix;
 
     fn new() -> Self {
         Self {
-            hoard: HoardAllocator::new(&Self::plan().hoard_space, HOARD_SPACE),
+            hoard: ImmixAllocator::new(&Self::plan().immix_space, IMMIX_SPACE),
             los: LargeObjectAllocator::new(&Self::plan().large_object_space),
             _padding: [0; 8],
         }
@@ -67,7 +67,7 @@ impl Mutator for HoardMutator {
 
     #[inline(always)]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
-        if HoardSpace::can_allocate(layout) {
+        if ImmixSpace::can_allocate(layout) {
             mallockit::stat::track_allocation(layout, false);
             self.hoard.alloc(layout)
         } else {
@@ -78,8 +78,8 @@ impl Mutator for HoardMutator {
 
     #[inline(always)]
     fn dealloc(&mut self, ptr: Address) {
-        debug_assert!(HOARD_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
-        if HOARD_SPACE.contains(ptr) {
+        debug_assert!(IMMIX_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
+        if IMMIX_SPACE.contains(ptr) {
             mallockit::stat::track_deallocation(false);
             self.hoard.dealloc(ptr)
         } else {
