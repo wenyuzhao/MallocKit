@@ -7,6 +7,7 @@ members = [
     "bump",
     "buddy",
     "hoard",
+    "ix",
     "sanity",
     "bench",
     "examples/rust-allocator",

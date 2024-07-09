@@ -1,0 +1,18 @@
+[package]
+name = "ix"
+version = { workspace = true }
+authors = ["Wenyu Zhao <wenyuzhaox@gmail.com>"]
+edition = { workspace = true }
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+mallockit = { path = "../mallockit" }
+spin = { workspace = true }
+
+[features]
+default = []
+malloc = []
