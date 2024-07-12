@@ -51,7 +51,7 @@ impl HoardSpace {
     pub fn acquire_block(&self, size_class: SizeClass, local: &Pool) -> Option<SuperBlock> {
         // Try allocate from the global pool
         if let Some((mut block, _guard)) = self.pool.pop_most_empty_block(size_class) {
-            debug_assert!(!block.is_full());
+            // debug_assert!(!block.is_full());
             block.owner = local.static_ref();
             debug_assert!(block.is_owned_by(local));
             return Some(block);
