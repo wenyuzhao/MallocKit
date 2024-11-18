@@ -1,8 +1,8 @@
-use std::panic::PanicInfo;
+use std::panic::PanicHookInfo;
 
 use crate::Plan;
 
-fn panic_handler(panic_info: &PanicInfo<'_>) {
+fn panic_handler(panic_info: &PanicHookInfo<'_>) {
     crate::println!("{}", panic_info);
     std::process::abort();
 }

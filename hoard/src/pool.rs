@@ -24,7 +24,7 @@ impl EmptyClass {
         }
     }
 
-    const fn group(block: SuperBlock) -> usize {
+    fn group(block: SuperBlock) -> usize {
         let t =
             SuperBlock::DATA_BYTES >> block.size_class.log_bytes() << block.size_class.log_bytes();
         let u = block.used_bytes();
