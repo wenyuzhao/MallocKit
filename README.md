@@ -27,6 +27,6 @@ $ cargo test
 - [ ] Windows/x86_64 support
 - [x] Performance
 - [x] Linux/aarch64 support
-- [x] MacOS/aarch64 support
+- [x] MacOS/aarch64 support (arm64 only. arm64e is currently unsupported)
 - [ ] Windows/aarch64 support
 - [x] Rust allocator interface
