@@ -6,6 +6,12 @@ pub struct DiscreteTLAB<const MAX_SIZE_CLASS: usize = { Address::LOG_BYTES }> {
     bytes: usize,
 }
 
+impl<const MAX_SIZE_CLASS: usize> Default for DiscreteTLAB<MAX_SIZE_CLASS> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<const MAX_SIZE_CLASS: usize> DiscreteTLAB<MAX_SIZE_CLASS> {
     pub const fn new() -> Self {
         Self {

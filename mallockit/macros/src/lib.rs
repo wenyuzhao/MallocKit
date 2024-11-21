@@ -45,7 +45,7 @@ pub fn plan(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
             static PLAN: ::mallockit::util::Lazy<Plan> = ::mallockit::util::Lazy::new(|| <Plan as ::mallockit::Plan>::new());
 
-            #[cfg(any(feature = "malloc", feature = "mallockit/malloc"))]
+            #[cfg(feature = "malloc")]
             #[::mallockit::ctor]
             unsafe fn ctor() {
                 <<Plan as ::mallockit::Plan>::Mutator as ::mallockit::mutator::TLS>::current();

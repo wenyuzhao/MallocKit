@@ -1,7 +1,6 @@
 #![feature(thread_local)]
 #![feature(step_trait)]
 #![feature(allocator_api)]
-#![feature(const_trait_impl)]
 
 extern crate mallockit;
 

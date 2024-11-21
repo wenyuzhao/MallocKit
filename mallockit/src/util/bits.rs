@@ -6,7 +6,6 @@ pub struct BitField {
     pub shift: usize,
 }
 
-#[const_trait]
 pub trait BitFieldSlot: Sized {
     fn get(&self, field: BitField) -> usize;
     fn set(&mut self, field: BitField, value: usize);
@@ -38,7 +37,7 @@ impl BitFieldSlot for AtomicUsize {
     }
 }
 
-impl const BitFieldSlot for usize {
+impl BitFieldSlot for usize {
     fn get(&self, field: BitField) -> usize {
         let value = *self;
         (value >> field.shift) & ((1usize << field.bits) - 1)
