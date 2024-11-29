@@ -3,6 +3,7 @@ use crate::{
     block::{self, Block, Line},
     pool::Pool,
 };
+use constants::{LOG_MIN_ALIGNMENT, MIN_ALIGNMENT};
 use mallockit::{
     space::{
         meta::{Box, Meta},
@@ -18,8 +19,10 @@ pub struct ImmixSpace {
     pub(crate) pool: Pool,
 }
 
+const SIZE_ENCODING_SHIFT: usize = 56;
+
 impl Space for ImmixSpace {
-    const MAX_ALLOCATION_SIZE: usize = Block::BYTES / 2;
+    const MAX_ALLOCATION_SIZE: usize = (256 - 1) * MIN_ALIGNMENT;
 
     type PR = BlockPageResource<Block>;
 
@@ -40,23 +43,31 @@ impl Space for ImmixSpace {
     }
 
     fn get_layout(ptr: Address) -> Layout {
-        let size = ptr 
-        let block = Block::containing(ptr);
-        block.size_class.layout()
+        let words = ptr.as_usize() >> SIZE_ENCODING_SHIFT;
+        let size = words << LOG_MIN_ALIGNMENT;
+        mallockit::println!("get_layout {ptr:?} {words} {size}");
+        Layout::from_size_align(size, MIN_ALIGNMENT).unwrap()
     }
 }
 
 impl ImmixSpace {
     pub fn can_allocate(layout: Layout) -> bool {
+        if layout.align() > MIN_ALIGNMENT {
+            return false;
+        }
         let layout = unsafe { layout.pad_to_align_unchecked() };
         let size = layout.size().next_power_of_two();
         size <= Self::MAX_ALLOCATION_SIZE
     }
 
-    pub fn get_clean_block(&self, owner: &ImmixAllocator) -> Option<Block> {
+    pub fn get_clean_block(&self) -> Option<Block> {
         let block = self.pr.acquire_block()?;
-        block.init(owner as *const ImmixAllocator as usize);
+        // block.init(owner as *const ImmixAllocator as usize);
         Some(block)
+    }
+
+    pub fn get_reusable_block(&self) -> Option<Block> {
+        None
     }
 
     pub fn release_block(&self, block: Block) {
@@ -93,17 +104,7 @@ impl ImmixAllocator {
     fn acquire_recyclable_block(&mut self) -> bool {
         match self.space.get_reusable_block() {
             Some(block) => {
-                self.line = Some(block.start_line());
-                true
-            }
-            _ => false,
-        }
-    }
-
-    fn acquire_recyclable_block(&mut self) -> bool {
-        match self.space.get_reusable_block() {
-            Some(block) => {
-                self.line = Some(block.start_line());
+                self.line = Some(block.lines().start);
                 true
             }
             _ => false,
@@ -113,6 +114,7 @@ impl ImmixAllocator {
     fn acquire_clean_block(&mut self) -> bool {
         match self.space.get_clean_block() {
             Some(block) => {
+                // mallockit::println!("get_clean_block {block:x?}");
                 if self.request_for_large {
                     self.large_cursor = block.start();
                     self.large_limit = block.end();
@@ -185,6 +187,7 @@ impl ImmixAllocator {
             if new_cursor > self.limit {
                 None
             } else {
+                self.cursor = new_cursor;
                 Some(result)
             }
         } else {
@@ -208,7 +211,7 @@ impl Allocator for ImmixAllocator {
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let result = self.cursor;
         let new_cursor = self.cursor + layout.size();
-        if new_cursor > self.limit {
+        let mut result = if new_cursor > self.limit {
             if layout.size() > Line::BYTES {
                 // Size larger than a line: do large allocation
                 self.overflow_alloc(layout)
@@ -217,8 +220,16 @@ impl Allocator for ImmixAllocator {
                 self.alloc_slow_hot(layout)
             }
         } else {
+            self.cursor = new_cursor;
             Some(result)
-        }
+        }?;
+        let words = layout.size() >> LOG_MIN_ALIGNMENT;
+        // mallockit::println!("alloc {result:?} {words} {layout:?}");
+        result = Address::from_usize(result.as_usize() | (words << SIZE_ENCODING_SHIFT));
+        // mallockit::println!("alloc -> {result:?} {words} {layout:?}");
+        let v = unsafe { result.load::<usize>() };
+        // mallockit::println!("alloc -> {v:?}");
+        return Some(result);
     }
 
     #[inline(always)]
