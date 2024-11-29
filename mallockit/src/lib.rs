@@ -1,6 +1,4 @@
 #![allow(incomplete_features)]
-#![feature(const_trait_impl)]
-#![feature(const_mut_refs)]
 #![feature(step_trait)]
 #![feature(thread_local)]
 #![feature(allocator_api)]
@@ -9,10 +7,6 @@
 #![feature(alloc_layout_extra)]
 #![feature(adt_const_params)]
 #![feature(generic_const_exprs)]
-#![feature(effects)]
-#![feature(asm_const)]
-#![feature(const_refs_to_cell)]
-#![feature(const_refs_to_static)]
 
 extern crate mallockit_macros;
 pub extern crate spin;

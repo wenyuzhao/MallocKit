@@ -9,6 +9,12 @@ pub struct Arena<T: Sized> {
     phanton: PhantomData<T>,
 }
 
+impl Default for Arena<u8> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: Sized> Arena<T> {
     pub const fn new() -> Self {
         Self {

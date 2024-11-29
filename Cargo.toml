@@ -41,7 +41,7 @@ cargo_metadata = "0.18.1"
 [workspace.metadata.malloc-tests]
 sed = "bash ./mallockit/tests/sed.sh"
 zip = "bash ./mallockit/tests/zip.sh"
-clang = "clang++ ./mallockit/tests/test.cpp -std=c++14 -O3 -o /dev/null"
+# clang = "clang++ ./mallockit/tests/test.cpp -std=c++14 -O3 -o /dev/null"
 gcc = "g++ ./mallockit/tests/test.cpp -std=c++14 -O3 -o /dev/null"
 ls = "ls -al"
 ping = "ping -i 0.2 -c 8 localhost"

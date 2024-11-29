@@ -205,7 +205,6 @@ macro_rules! impl_aligned_block {
     };
 }
 
-#[const_trait]
 pub trait AlignedBlockConfig: Sized {
     type Header: Sized = ();
 

@@ -108,7 +108,7 @@ impl<B: MemRegion> BlockPageResource<B> {
         }
     }
 
-    const fn set_next(b: B, next: Option<B>) {
+    fn set_next(b: B, next: Option<B>) {
         let a = b.start();
         let next = match next {
             Some(b) => b.start(),
@@ -117,7 +117,7 @@ impl<B: MemRegion> BlockPageResource<B> {
         unsafe { a.store(next) }
     }
 
-    const fn get_next(b: B) -> Option<B> {
+    fn get_next(b: B) -> Option<B> {
         let a = b.start();
         let next: Address = unsafe { a.load() };
         if next.is_zero() {

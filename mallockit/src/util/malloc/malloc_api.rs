@@ -236,7 +236,7 @@ impl<P: Plan> MallocAPI<P> {
 #[doc(hidden)]
 macro_rules! export_malloc_api {
     ($plan: expr, $plan_ty: ty) => {
-        #[cfg(any(feature = "malloc", feature = "mallockit/malloc"))]
+        #[cfg(feature = "malloc")]
         pub mod __mallockit_malloc_api {
             use super::*;
             use $crate::Plan;

@@ -1,6 +1,7 @@
 use std::{alloc::Layout, marker::PhantomData};
 
 use super::{
+    meta::Meta,
     page_resource::{FreelistPageResource, PageResource},
     Allocator, Space, SpaceId,
 };
@@ -59,11 +60,9 @@ pub struct LargeObjectAllocator<
     S: PageSize = Size4K,
     const MAX_CACHEABLE_SIZE: usize = 0,
     const THRESHOLD_SLOP: usize = 0,
-> where
-    [(); bins::<S>(MAX_CACHEABLE_SIZE)]: Sized,
-{
+> {
     space: &'static LargeObjectSpace,
-    bins: [Address; bins::<S>(MAX_CACHEABLE_SIZE)],
+    bins: Vec<Address, Meta>,
     max_live: usize,
     live: usize,
     cleared: bool,
@@ -72,15 +71,16 @@ pub struct LargeObjectAllocator<
 
 impl<S: PageSize, const MAX_CACHEABLE_SIZE: usize, const THRESHOLD_SLOP: usize>
     LargeObjectAllocator<S, MAX_CACHEABLE_SIZE, THRESHOLD_SLOP>
-where
-    [(); bins::<S>(MAX_CACHEABLE_SIZE)]: Sized,
 {
     const CACHE_ENABLED: bool = bins::<S>(MAX_CACHEABLE_SIZE) > 0;
 
     pub fn new(los: &'static LargeObjectSpace) -> Self {
+        let mut bins_vec = Vec::new_in(Meta);
+        bins_vec.resize(bins::<S>(MAX_CACHEABLE_SIZE), Address::ZERO);
+
         Self {
             space: los,
-            bins: [Address::ZERO; bins::<S>(MAX_CACHEABLE_SIZE)],
+            bins: bins_vec,
             max_live: 0,
             live: 0,
             cleared: false,
@@ -118,8 +118,6 @@ where
 
 impl<S: PageSize, const MAX_CACHEABLE_SIZE: usize, const THRESHOLD_SLOP: usize> Allocator
     for LargeObjectAllocator<S, MAX_CACHEABLE_SIZE, THRESHOLD_SLOP>
-where
-    [(); bins::<S>(MAX_CACHEABLE_SIZE)]: Sized,
 {
     #[cold]
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
@@ -171,8 +169,6 @@ where
 
 impl<S: PageSize, const MAX_CACHEABLE_SIZE: usize, const THRESHOLD_SLOP: usize> Drop
     for LargeObjectAllocator<S, MAX_CACHEABLE_SIZE, THRESHOLD_SLOP>
-where
-    [(); bins::<S>(MAX_CACHEABLE_SIZE)]: Sized,
 {
     fn drop(&mut self) {
         if Self::CACHE_ENABLED {

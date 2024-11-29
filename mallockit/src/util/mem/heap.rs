@@ -24,7 +24,7 @@ impl Heap {
     }
 
     pub const fn contains(&self, ptr: Address) -> bool {
-        self.start <= ptr && ptr < self.end
+        self.start.as_usize() <= ptr.as_usize() && ptr.as_usize() < self.end.as_usize()
     }
 
     pub const fn start(&self) -> Address {

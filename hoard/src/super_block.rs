@@ -64,15 +64,15 @@ impl SuperBlock {
         self.used_bytes = 0;
     }
 
-    pub const fn used_bytes(self) -> usize {
+    pub fn used_bytes(self) -> usize {
         self.used_bytes as _
     }
 
-    pub const fn is_empty(self) -> bool {
+    pub fn is_empty(self) -> bool {
         self.used_bytes == 0
     }
 
-    pub const fn is_full(self) -> bool {
+    pub fn is_full(self) -> bool {
         self.bump_cursor >= Self::BYTES as u32 && self.head_cell.is_zero()
     }
 
@@ -92,7 +92,7 @@ impl SuperBlock {
         Some(cell)
     }
 
-    pub const fn free_cell(&mut self, cell: Address) {
+    pub fn free_cell(&mut self, cell: Address) {
         unsafe {
             cell.store(self.head_cell);
         }
