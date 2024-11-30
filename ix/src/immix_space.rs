@@ -116,11 +116,11 @@ impl ImmixAllocator {
             Some(block) => {
                 // mallockit::println!("get_clean_block {block:x?}");
                 if self.request_for_large {
-                    self.large_cursor = block.start();
-                    self.large_limit = block.end();
+                    self.large_cursor = block.lines().start.start();
+                    self.large_limit = block.lines().end.start();
                 } else {
-                    self.cursor = block.start();
-                    self.limit = block.end();
+                    self.cursor = block.lines().start.start();
+                    self.limit = block.lines().end.start();
                 }
                 true
             }

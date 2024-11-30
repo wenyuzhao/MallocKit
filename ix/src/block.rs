@@ -4,11 +4,16 @@ use std::{
     sync::atomic::{AtomicU8, Ordering},
 };
 
-use mallockit::{space::page_resource::MemRegion, util::mem::size_class::SizeClass};
+use mallockit::{
+    space::page_resource::MemRegion,
+    util::{constants::MIN_ALIGNMENT, mem::size_class::SizeClass},
+};
 
 use crate::{pool::Pool, ImmixAllocator};
 
 use super::Address;
+
+const OBJS_IN_BLOCK: usize = Block::BYTES / MIN_ALIGNMENT;
 
 #[repr(C)]
 pub struct BlockMeta {
@@ -21,6 +26,7 @@ pub struct BlockMeta {
     // pub group: u8,
     // head_cell: Address,
     // pub owner: &'static Pool,
+    // pub obj_size: [AtomicU8; OBJS_IN_BLOCK],
     pub line_marks: [AtomicU8; 8],
 }
 
@@ -71,8 +77,8 @@ impl Block {
     }
 
     pub fn lines(self) -> Range<Line> {
-        let start = Line::from_address(self.data_start());
-        let end = Line::from_address(self.end());
+        let start = Line::from_address(self.data_start().align_up(Line::BYTES));
+        let end = Line::from_address(self.end().align_down(Line::BYTES));
         start..end
     }
 
