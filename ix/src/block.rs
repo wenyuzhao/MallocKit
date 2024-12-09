@@ -1,21 +1,16 @@
 use std::{
     alloc::Layout,
     num::NonZeroUsize,
-    ops::{Add, Deref, DerefMut, Range},
-    sync::atomic::{AtomicPtr, AtomicU8, AtomicUsize, Ordering},
+    ops::{Deref, DerefMut, Range},
+    sync::atomic::{AtomicU8, Ordering},
 };
 
 use atomic::Atomic;
 use mallockit::{
     space::page_resource::MemRegion,
-    util::{
-        constants::{LOG_MIN_ALIGNMENT, MIN_ALIGNMENT},
-        mem::size_class::SizeClass,
-    },
-    Mutator,
+    util::constants::{LOG_MIN_ALIGNMENT, MIN_ALIGNMENT},
+    Mutator, Plan,
 };
-
-use crate::{pool::Pool, ImmixAllocator};
 
 use super::Address;
 
@@ -41,6 +36,7 @@ pub struct BlockMeta {
     pub live_lines: usize,
     pub foreign_free: Atomic<Address>,
     pub state: BlockState,
+    pub prev: Option<Block>,
     pub next: Option<Block>,
 }
 
@@ -93,12 +89,36 @@ impl Block {
         self.foreign_free.store(Address::ZERO, Ordering::SeqCst);
         self.state = BlockState::Allocating;
         self.next = None;
+        self.prev = None;
+    }
+
+    pub fn deinit(&mut self) {
+        self.state = BlockState::Free;
+        self.live_lines = 0;
+        self.foreign_free.store(Address::ZERO, Ordering::SeqCst);
+        self.next = None;
+        self.prev = None;
     }
 
     pub fn lines(self) -> Range<Line> {
         let start = Line::from_address(self.data_start().align_up(Line::BYTES));
         let end = Line::from_address(self.end().align_down(Line::BYTES));
         start..end
+    }
+
+    fn remove_from_list(&mut self) {
+        let owner = &mut crate::ImmixMutator::current().ix;
+        if owner.reusable_blocks == Some(*self) {
+            owner.reusable_blocks = self.next;
+        }
+        if let Some(mut prev) = self.prev {
+            prev.next = self.next;
+        }
+        if let Some(mut next) = self.next {
+            next.prev = self.prev;
+        }
+        self.prev = None;
+        self.next = None;
     }
 
     pub fn get_next_available_lines(self, search_start: Line) -> Option<Range<Line>> {
@@ -171,6 +191,7 @@ impl Block {
             self.line_liveness[i] += 1;
         }
         self.live_lines += lines;
+        // println!(" - BA {:x?} live-lines {}", self, self.live_lines);
     }
 
     #[inline(always)]
@@ -187,6 +208,9 @@ impl Block {
                 if self.line_liveness[i] == 1 {
                     dead_lines += 1;
                 }
+                // if self.line_liveness[i] == 0 {
+                //     println!(" - inva;id block {:?}", self.start());
+                // }
                 self.line_liveness[i] -= 1;
             }
         } else {
@@ -194,15 +218,29 @@ impl Block {
             if self.line_liveness[i] == 1 {
                 dead_lines += 1;
             }
+            // if self.line_liveness[i] == 0 {
+            //     println!(" - inva;id block {:?}", self.start());
+            // }
             self.line_liveness[i] -= 1;
         }
         self.live_lines -= dead_lines;
-        // println!(" - S-{:?} dead-{}", self.state, dead_lines);
-        if dead_lines >= 1 && self.state == BlockState::Full {
-            let live_lines = self.live_lines;
-            if live_lines < Block::DATA_LINES / 2 {
-                let owner = &mut crate::ImmixMutator::current().ix;
-                owner.add_reusable_block(*self);
+        // println!(
+        //     " - BD {:x?} live-lines {} (dead {})",
+        //     self, self.live_lines, dead_lines
+        // );
+        if self.live_lines == 0 && self.state != BlockState::Allocating {
+            // The block is dead
+            self.remove_from_list();
+            let space = &crate::Immix::get().immix_space;
+            space.release_block(*self);
+        } else {
+            // println!(" - S-{:?} dead-{}", self.state, dead_lines);
+            if dead_lines >= 1 && self.state == BlockState::Full {
+                let live_lines = self.live_lines;
+                if live_lines < Block::DATA_LINES / 2 {
+                    let owner = &mut crate::ImmixMutator::current().ix;
+                    owner.add_reusable_block(*self);
+                }
             }
         }
     }

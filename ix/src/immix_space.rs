@@ -1,24 +1,12 @@
-use std::sync::atomic::Ordering;
-
 use super::{page_resource::BlockPageResource, Allocator, Space, SpaceId};
-use crate::{
-    block::{self, Block, BlockState, Line},
-    pool::Pool,
-};
-use constants::{LOG_MIN_ALIGNMENT, MIN_ALIGNMENT};
-use mallockit::{
-    space::{
-        meta::{Box, Meta},
-        page_resource::MemRegion,
-    },
-    util::{mem::alloc::discrete_tlab::DiscreteTLAB, *},
-};
+use crate::block::{Block, BlockState, Line};
+use constants::MIN_ALIGNMENT;
+use mallockit::{space::page_resource::MemRegion, util::*};
 
 /// Global heap
 pub struct ImmixSpace {
     id: SpaceId,
     pr: BlockPageResource<Block>,
-    pub(crate) pool: Pool,
 }
 
 // const SIZE_ENCODING_SHIFT: usize = 56;
@@ -32,7 +20,6 @@ impl Space for ImmixSpace {
         Self {
             id,
             pr: BlockPageResource::new(id),
-            pool: Pool::new(true),
         }
     }
 
@@ -66,8 +53,10 @@ impl ImmixSpace {
         Some(block)
     }
 
-    pub fn release_block(&self, block: Block) {
-        self.pr.release_block(block)
+    pub fn release_block(&self, mut block: Block) {
+        // println!(" - release_block {:x?}", block);
+        block.deinit();
+        self.pr.release_block(block);
     }
 }
 
@@ -81,13 +70,10 @@ pub struct ImmixAllocator {
     request_for_large: bool,
     space: &'static ImmixSpace,
     line: Option<Line>,
-    reusable_blocks: Option<Block>,
+    pub reusable_blocks: Option<Block>,
 }
 
 impl ImmixAllocator {
-    const LOCAL_HEAP_THRESHOLD: usize = 16 * 1024 * 1024;
-    const LARGEST_SMALL_OBJECT: usize = 1024;
-
     pub fn new(space: &'static ImmixSpace, _space_id: SpaceId) -> Self {
         Self {
             cursor: Address::ZERO,
@@ -106,7 +92,11 @@ impl ImmixAllocator {
     pub fn add_reusable_block(&mut self, mut block: Block) {
         // println!(" - add_reusable_block {:x?}", block);
         block.state = BlockState::Reusable;
+        block.prev = None;
         block.next = self.reusable_blocks;
+        if let Some(mut next) = self.reusable_blocks {
+            next.prev = Some(block);
+        }
         self.reusable_blocks = Some(block);
     }
 
@@ -114,10 +104,19 @@ impl ImmixAllocator {
         let Some(mut b) = self.reusable_blocks else {
             return false;
         };
-        // println!(" - acquire_reusable_block {:x?}", b);
-        self.reusable_blocks = b.next;
+        let next = b.next;
         b.next = None;
+        b.prev = None;
+        if let Some(mut next) = next {
+            next.prev = None;
+        }
+        self.reusable_blocks = next;
+        // println!(
+        //     " - acquire_reusable_block {:x?} next = {:x?}",
+        //     b, self.reusable_blocks
+        // );
         self.line = Some(b.lines().start);
+        self.retire_block(false);
         true
     }
 
@@ -130,7 +129,12 @@ impl ImmixAllocator {
             // );
             let live_lines = b.live_lines;
             if b.state == BlockState::Allocating {
-                if live_lines < Block::DATA_LINES / 2 {
+                if live_lines == 0 {
+                    debug_assert!(b.next.is_none());
+                    debug_assert!(b.prev.is_none());
+                    debug_assert_ne!(Some(b), self.reusable_blocks);
+                    self.space.release_block(b);
+                } else if live_lines < Block::DATA_LINES / 2 {
                     self.add_reusable_block(b);
                 } else {
                     b.state = BlockState::Full;
@@ -166,7 +170,6 @@ impl ImmixAllocator {
     }
 
     fn acquire_reusable_lines(&mut self) -> bool {
-        self.retire_block(false);
         while self.line.is_some() || self.acquire_reusable_block() {
             let line = self.line.unwrap();
             let block = line.block();
