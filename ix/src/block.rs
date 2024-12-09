@@ -46,7 +46,7 @@ pub struct Block(NonZeroUsize);
 impl MemRegion for Block {
     type Meta = BlockMeta;
 
-    const LOG_BYTES: usize = 15;
+    const LOG_BYTES: usize = LOG_BYTES_IN_BLOCK;
 
     fn start(&self) -> Address {
         Address::from(self.0.get())

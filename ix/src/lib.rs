@@ -7,7 +7,7 @@ extern crate mallockit;
 
 mod block;
 mod immix_space;
-mod pool;
+// mod pool;
 
 use immix_space::*;
 use mallockit::{
