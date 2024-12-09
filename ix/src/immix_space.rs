@@ -61,7 +61,7 @@ impl ImmixSpace {
     }
 
     pub fn get_clean_block(&self, owner: *const ImmixAllocator) -> Option<Block> {
-        let block = self.pr.acquire_block()?;
+        let mut block = self.pr.acquire_block()?;
         block.init(owner as usize);
         Some(block)
     }
@@ -128,7 +128,7 @@ impl ImmixAllocator {
             //     " - retire_block lrg={:?} {:x?} {:?}",
             //     large, b, b.line_liveness
             // );
-            let live_lines = b.live_lines.load(Ordering::Relaxed);
+            let live_lines = b.live_lines;
             if b.state == BlockState::Allocating {
                 if live_lines < Block::DATA_LINES / 2 {
                     self.add_reusable_block(b);
@@ -265,14 +265,14 @@ impl Allocator for ImmixAllocator {
             self.cursor = new_cursor;
             Some(result)
         }?;
-        let block = Block::containing(result);
+        let mut block = Block::containing(result);
         block.on_alloc(result, layout);
         return Some(result);
     }
 
     #[inline(always)]
     fn dealloc(&mut self, ptr: Address) {
-        let block = Block::containing(ptr);
+        let mut block = Block::containing(ptr);
         if block.owner == self as *const ImmixAllocator as usize {
             let layout = block.get_layout(ptr);
             block.on_dealloc(ptr, layout);

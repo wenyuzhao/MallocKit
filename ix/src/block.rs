@@ -37,8 +37,8 @@ pub struct BlockMeta {
     pub owner: usize,
     pub obj_size: [AtomicU8; OBJS_IN_BLOCK],
     /// Num. live objects per line.
-    pub line_liveness: [AtomicU8; LINES_IN_BLOCK],
-    pub live_lines: AtomicUsize,
+    pub line_liveness: [u8; LINES_IN_BLOCK],
+    pub live_lines: usize,
     pub foreign_free: Atomic<Address>,
     pub state: BlockState,
     pub next: Option<Block>,
@@ -83,12 +83,12 @@ impl Block {
     #[allow(unused)]
     pub const DATA_LINES: usize = Self::DATA_BYTES / Line::BYTES;
 
-    pub fn init(mut self, owner: usize) {
+    pub fn init(&mut self, owner: usize) {
         // debug_assert_eq!(Self::META_BYTES, Address::BYTES * 8);
         self.owner = owner;
-        self.live_lines.store(0, Ordering::SeqCst);
+        self.live_lines = 0;
         for i in 0..LINES_IN_BLOCK {
-            self.line_liveness[i].store(0, Ordering::SeqCst);
+            self.line_liveness[i] = 0;
         }
         self.foreign_free.store(Address::ZERO, Ordering::SeqCst);
         self.state = BlockState::Allocating;
@@ -106,7 +106,7 @@ impl Block {
         let mut cursor = start_cursor;
         // Find start
         while cursor < self.line_liveness.len() {
-            let mark = self.line_liveness[cursor].load(Ordering::SeqCst);
+            let mark = self.line_liveness[cursor];
             if mark == 0 {
                 break;
             }
@@ -121,7 +121,7 @@ impl Block {
         let start = Line::from_address(self.start() + cursor * Line::BYTES);
         // Find limit
         while cursor < self.line_liveness.len() {
-            let mark = self.line_liveness[cursor].load(Ordering::SeqCst);
+            let mark = self.line_liveness[cursor];
             if mark != 0 {
                 break;
             }
@@ -144,7 +144,7 @@ impl Block {
     }
 
     #[inline]
-    pub fn on_alloc(&self, ptr: Address, layout: Layout) {
+    pub fn on_alloc(&mut self, ptr: Address, layout: Layout) {
         let block_start = self.start();
         // Record obj size
         let words = layout.size() >> LOG_MIN_ALIGNMENT;
@@ -158,21 +158,23 @@ impl Block {
             let start = (ptr - block_start) >> Line::LOG_BYTES;
             let limit = (end_addr - block_start) >> Line::LOG_BYTES;
             for i in start..limit {
-                if self.line_liveness[i].fetch_add(1, Ordering::Relaxed) == 0 {
+                if self.line_liveness[i] == 0 {
                     lines += 1;
                 }
+                self.line_liveness[i] += 1;
             }
         } else {
             let i = (ptr - block_start) >> Line::LOG_BYTES;
-            if self.line_liveness[i].fetch_add(1, Ordering::Relaxed) == 0 {
+            if self.line_liveness[i] == 0 {
                 lines += 1;
             }
+            self.line_liveness[i] += 1;
         }
-        self.live_lines.fetch_add(lines, Ordering::Relaxed);
+        self.live_lines += lines;
     }
 
     #[inline(always)]
-    fn dealloc_impl(&self, ptr: Address, layout: Layout) {
+    fn dealloc_impl(&mut self, ptr: Address, layout: Layout) {
         let block_start = self.start();
         // Update liveness counters
         let mut dead_lines: usize = 0;
@@ -182,22 +184,22 @@ impl Block {
             let start = (ptr - block_start) >> Line::LOG_BYTES;
             let limit = (end_addr - block_start) >> Line::LOG_BYTES;
             for i in start..limit {
-                if self.line_liveness[i].fetch_sub(1, Ordering::Relaxed) == 1 {
-                    // println!(" - FLinex {:?}", block_start + (i << Line::LOG_BYTES));
+                if self.line_liveness[i] == 1 {
                     dead_lines += 1;
                 }
+                self.line_liveness[i] -= 1;
             }
         } else {
             let i = (ptr - block_start) >> Line::LOG_BYTES;
-            if self.line_liveness[i].fetch_sub(1, Ordering::SeqCst) == 1 {
-                // println!(" - FLine {:?}", block_start + (i << Line::LOG_BYTES));
+            if self.line_liveness[i] == 1 {
                 dead_lines += 1;
             }
+            self.line_liveness[i] -= 1;
         }
-        self.live_lines.fetch_sub(dead_lines, Ordering::Relaxed);
+        self.live_lines -= dead_lines;
         // println!(" - S-{:?} dead-{}", self.state, dead_lines);
         if dead_lines >= 1 && self.state == BlockState::Full {
-            let live_lines = self.live_lines.load(Ordering::Relaxed);
+            let live_lines = self.live_lines;
             if live_lines < Block::DATA_LINES / 2 {
                 let owner = &mut crate::ImmixMutator::current().ix;
                 owner.add_reusable_block(*self);
@@ -206,7 +208,7 @@ impl Block {
     }
 
     #[inline]
-    pub fn on_dealloc(&self, ptr: Address, layout: Layout) {
+    pub fn on_dealloc(&mut self, ptr: Address, layout: Layout) {
         // println!("FLocal {:?}", ptr..(ptr + layout.size()));
         self.dealloc_impl(ptr, layout);
     }
