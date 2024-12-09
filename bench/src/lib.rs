@@ -246,7 +246,7 @@ impl Bench {
             "lean" => {
                 let makefile = PathBuf::from(format!("{local_dev_dir}/lean/out/release/Makefile"));
                 let content = std::fs::read_to_string(makefile).unwrap();
-                let status = if content.contains("/root/mimalloc-bench/extern/lean/src") {
+                let status = if content.contains(format!("{local_dev_dir}/lean/src")) {
                     Command::new("docker")
                         .args([
                             "compose",
@@ -254,7 +254,7 @@ impl Bench {
                             "mimalloc-bench",
                             "/bin/bash",
                             "-c",
-                            "cd /root/mimalloc-bench/extern/lean/out/release && make clean-olean",
+                            &format!("cd {local_dev_dir}/lean/out/release && make clean-olean"),
                         ])
                         .status()
                         .unwrap()
