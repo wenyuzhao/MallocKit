@@ -14,6 +14,7 @@ use crate::{pool::Pool, ImmixAllocator};
 use super::Address;
 
 const OBJS_IN_BLOCK: usize = Block::BYTES / MIN_ALIGNMENT;
+const LINES_IN_BLOCK: usize = (1 << 15) >> Line::LOG_BYTES;
 
 #[repr(C)]
 pub struct BlockMeta {
@@ -26,8 +27,9 @@ pub struct BlockMeta {
     // pub group: u8,
     // head_cell: Address,
     // pub owner: &'static Pool,
-    // pub obj_size: [AtomicU8; OBJS_IN_BLOCK],
-    pub line_marks: [AtomicU8; 8],
+    pub obj_size: [AtomicU8; OBJS_IN_BLOCK],
+    /// Num. dead objects per line.
+    pub line_liveness: [AtomicU8; LINES_IN_BLOCK],
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -85,28 +87,29 @@ impl Block {
     pub fn get_next_available_lines(self, search_start: Line) -> Option<Range<Line>> {
         let start_cursor = search_start.get_index_within_block();
         let mut cursor = start_cursor;
+        unreachable!()
         // Find start
-        while cursor < self.line_marks.len() {
-            let mark = self.line_marks[cursor].load(Ordering::SeqCst);
-            if mark == 0 {
-                break;
-            }
-            cursor += 1;
-        }
-        if cursor == self.line_marks.len() {
-            return None;
-        }
-        let start = Line::from_address(self.data_start() + cursor * Line::BYTES);
-        // Find limit
-        while cursor < self.line_marks.len() {
-            let mark = self.line_marks[cursor].load(Ordering::SeqCst);
-            if mark != 0 {
-                break;
-            }
-            cursor += 1;
-        }
-        let end = Line::from_address(self.data_start() + cursor * Line::BYTES);
-        Some(start..end)
+        // while cursor < self.line_marks.len() {
+        //     let mark = self.line_marks[cursor].load(Ordering::SeqCst);
+        //     if mark == 0 {
+        //         break;
+        //     }
+        //     cursor += 1;
+        // }
+        // if cursor == self.line_marks.len() {
+        //     return None;
+        // }
+        // let start = Line::from_address(self.data_start() + cursor * Line::BYTES);
+        // // Find limit
+        // while cursor < self.line_marks.len() {
+        //     let mark = self.line_marks[cursor].load(Ordering::SeqCst);
+        //     if mark != 0 {
+        //         break;
+        //     }
+        //     cursor += 1;
+        // }
+        // let end = Line::from_address(self.data_start() + cursor * Line::BYTES);
+        // Some(start..end)
     }
 }
 

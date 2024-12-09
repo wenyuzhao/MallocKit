@@ -1,3 +1,5 @@
+use std::sync::atomic::Ordering;
+
 use super::{page_resource::BlockPageResource, Allocator, Space, SpaceId};
 use crate::{
     block::{self, Block, Line},
@@ -19,7 +21,7 @@ pub struct ImmixSpace {
     pub(crate) pool: Pool,
 }
 
-const SIZE_ENCODING_SHIFT: usize = 56;
+// const SIZE_ENCODING_SHIFT: usize = 56;
 
 impl Space for ImmixSpace {
     const MAX_ALLOCATION_SIZE: usize = (256 - 1) * MIN_ALIGNMENT;
@@ -43,7 +45,9 @@ impl Space for ImmixSpace {
     }
 
     fn get_layout(ptr: Address) -> Layout {
-        let words = ptr.as_usize() >> SIZE_ENCODING_SHIFT;
+        let block = Block::containing(ptr);
+        let index = (ptr - block.start()) >> LOG_MIN_ALIGNMENT;
+        let words = block.obj_size[index].load(Ordering::Relaxed) as usize;
         let size = words << LOG_MIN_ALIGNMENT;
         mallockit::println!("get_layout {ptr:?} {words} {size}");
         Layout::from_size_align(size, MIN_ALIGNMENT).unwrap()
@@ -224,10 +228,13 @@ impl Allocator for ImmixAllocator {
             Some(result)
         }?;
         let words = layout.size() >> LOG_MIN_ALIGNMENT;
+        let block = Block::containing(result);
+        let index = (result - block.start()) >> LOG_MIN_ALIGNMENT;
+        block.obj_size[index].store(words as u8, Ordering::Relaxed);
         // mallockit::println!("alloc {result:?} {words} {layout:?}");
-        result = Address::from_usize(result.as_usize() | (words << SIZE_ENCODING_SHIFT));
+        // result = Address::from_usize(result.as_usize() | (words << SIZE_ENCODING_SHIFT));
         // mallockit::println!("alloc -> {result:?} {words} {layout:?}");
-        let v = unsafe { result.load::<usize>() };
+        // let v = unsafe { result.load::<usize>() };
         // mallockit::println!("alloc -> {v:?}");
         return Some(result);
     }
