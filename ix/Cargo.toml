@@ -12,6 +12,7 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 [dependencies]
 mallockit = { path = "../mallockit" }
 spin = { workspace = true }
+atomic = { workspace = true }
 
 [features]
 default = []

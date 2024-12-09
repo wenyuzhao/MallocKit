@@ -1,35 +1,47 @@
 use std::{
+    alloc::Layout,
     num::NonZeroUsize,
-    ops::{Deref, DerefMut, Range},
-    sync::atomic::{AtomicU8, Ordering},
+    ops::{Add, Deref, DerefMut, Range},
+    sync::atomic::{AtomicPtr, AtomicU8, AtomicUsize, Ordering},
 };
 
+use atomic::Atomic;
 use mallockit::{
     space::page_resource::MemRegion,
-    util::{constants::MIN_ALIGNMENT, mem::size_class::SizeClass},
+    util::{
+        constants::{LOG_MIN_ALIGNMENT, MIN_ALIGNMENT},
+        mem::size_class::SizeClass,
+    },
+    Mutator,
 };
 
 use crate::{pool::Pool, ImmixAllocator};
 
 use super::Address;
 
+const LOG_BYTES_IN_BLOCK: usize = 15;
 const OBJS_IN_BLOCK: usize = Block::BYTES / MIN_ALIGNMENT;
-const LINES_IN_BLOCK: usize = (1 << 15) >> Line::LOG_BYTES;
+const LINES_IN_BLOCK: usize = (1 << LOG_BYTES_IN_BLOCK) >> Line::LOG_BYTES;
+
+#[derive(Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum BlockState {
+    Free,
+    Allocating,
+    Full,
+    Reusable,
+}
 
 #[repr(C)]
 pub struct BlockMeta {
     pub owner: usize,
-    // bump_cursor: u32,
-    // used_bytes: u32,
-    // pub prev: Option<Block>,
-    // pub next: Option<Block>,
-    // pub size_class: SizeClass,
-    // pub group: u8,
-    // head_cell: Address,
-    // pub owner: &'static Pool,
     pub obj_size: [AtomicU8; OBJS_IN_BLOCK],
-    /// Num. dead objects per line.
+    /// Num. live objects per line.
     pub line_liveness: [AtomicU8; LINES_IN_BLOCK],
+    pub live_lines: AtomicUsize,
+    pub foreign_free: Atomic<Address>,
+    pub state: BlockState,
+    pub next: Option<Block>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,16 +78,21 @@ impl DerefMut for Block {
 }
 
 impl Block {
-    pub const LINES: usize = Self::DATA_BYTES / Line::BYTES;
+    #[allow(unused)]
+    pub const LINES: usize = Self::BYTES / Line::BYTES;
+    #[allow(unused)]
+    pub const DATA_LINES: usize = Self::DATA_BYTES / Line::BYTES;
 
     pub fn init(mut self, owner: usize) {
+        // debug_assert_eq!(Self::META_BYTES, Address::BYTES * 8);
         self.owner = owner;
-        debug_assert_eq!(Self::META_BYTES, Address::BYTES * 8);
-        // self.size_class = size_class;
-        // let size = size_class.bytes();
-        // self.head_cell = Address::ZERO;
-        // self.bump_cursor = (Address::ZERO + Self::META_BYTES).align_up(size).as_usize() as u32;
-        // self.used_bytes = 0;
+        self.live_lines.store(0, Ordering::SeqCst);
+        for i in 0..LINES_IN_BLOCK {
+            self.line_liveness[i].store(0, Ordering::SeqCst);
+        }
+        self.foreign_free.store(Address::ZERO, Ordering::SeqCst);
+        self.state = BlockState::Allocating;
+        self.next = None;
     }
 
     pub fn lines(self) -> Range<Line> {
@@ -87,29 +104,127 @@ impl Block {
     pub fn get_next_available_lines(self, search_start: Line) -> Option<Range<Line>> {
         let start_cursor = search_start.get_index_within_block();
         let mut cursor = start_cursor;
-        unreachable!()
         // Find start
-        // while cursor < self.line_marks.len() {
-        //     let mark = self.line_marks[cursor].load(Ordering::SeqCst);
-        //     if mark == 0 {
-        //         break;
-        //     }
-        //     cursor += 1;
-        // }
-        // if cursor == self.line_marks.len() {
-        //     return None;
-        // }
-        // let start = Line::from_address(self.data_start() + cursor * Line::BYTES);
-        // // Find limit
-        // while cursor < self.line_marks.len() {
-        //     let mark = self.line_marks[cursor].load(Ordering::SeqCst);
-        //     if mark != 0 {
-        //         break;
-        //     }
-        //     cursor += 1;
-        // }
-        // let end = Line::from_address(self.data_start() + cursor * Line::BYTES);
-        // Some(start..end)
+        while cursor < self.line_liveness.len() {
+            let mark = self.line_liveness[cursor].load(Ordering::SeqCst);
+            if mark == 0 {
+                break;
+            }
+            cursor += 1;
+        }
+        if cursor != start_cursor {
+            cursor += 1;
+        }
+        if cursor >= self.line_liveness.len() {
+            return None;
+        }
+        let start = Line::from_address(self.start() + cursor * Line::BYTES);
+        // Find limit
+        while cursor < self.line_liveness.len() {
+            let mark = self.line_liveness[cursor].load(Ordering::SeqCst);
+            if mark != 0 {
+                break;
+            }
+            cursor += 1;
+        }
+        let end = Line::from_address(self.start() + cursor * Line::BYTES);
+        if end.start() <= start.start() {
+            return None;
+        }
+        Some(start..end)
+    }
+
+    #[inline]
+    pub fn get_layout(&self, ptr: Address) -> Layout {
+        let index = (ptr - self.start()) >> LOG_MIN_ALIGNMENT;
+        let words = self.obj_size[index].load(Ordering::Relaxed) as usize;
+        let size = words << LOG_MIN_ALIGNMENT;
+        // mallockit::println!("get_layout {ptr:?} {words} {size}");
+        Layout::from_size_align(size, MIN_ALIGNMENT).unwrap()
+    }
+
+    #[inline]
+    pub fn on_alloc(&self, ptr: Address, layout: Layout) {
+        let block_start = self.start();
+        // Record obj size
+        let words = layout.size() >> LOG_MIN_ALIGNMENT;
+        let index = (ptr - block_start) >> LOG_MIN_ALIGNMENT;
+        self.obj_size[index].store(words as u8, Ordering::Relaxed);
+        // Update liveness counters
+        let is_straddle = layout.size() > Line::BYTES;
+        let mut lines = 0;
+        if is_straddle {
+            let end_addr = ptr + layout.size();
+            let start = (ptr - block_start) >> Line::LOG_BYTES;
+            let limit = (end_addr - block_start) >> Line::LOG_BYTES;
+            for i in start..limit {
+                if self.line_liveness[i].fetch_add(1, Ordering::Relaxed) == 0 {
+                    lines += 1;
+                }
+            }
+        } else {
+            let i = (ptr - block_start) >> Line::LOG_BYTES;
+            if self.line_liveness[i].fetch_add(1, Ordering::Relaxed) == 0 {
+                lines += 1;
+            }
+        }
+        self.live_lines.fetch_add(lines, Ordering::Relaxed);
+    }
+
+    #[inline(always)]
+    fn dealloc_impl(&self, ptr: Address, layout: Layout) {
+        let block_start = self.start();
+        // Update liveness counters
+        let mut dead_lines: usize = 0;
+        let is_straddle = layout.size() > Line::BYTES;
+        if is_straddle {
+            let end_addr = ptr + layout.size();
+            let start = (ptr - block_start) >> Line::LOG_BYTES;
+            let limit = (end_addr - block_start) >> Line::LOG_BYTES;
+            for i in start..limit {
+                if self.line_liveness[i].fetch_sub(1, Ordering::Relaxed) == 1 {
+                    // println!(" - FLinex {:?}", block_start + (i << Line::LOG_BYTES));
+                    dead_lines += 1;
+                }
+            }
+        } else {
+            let i = (ptr - block_start) >> Line::LOG_BYTES;
+            if self.line_liveness[i].fetch_sub(1, Ordering::SeqCst) == 1 {
+                // println!(" - FLine {:?}", block_start + (i << Line::LOG_BYTES));
+                dead_lines += 1;
+            }
+        }
+        self.live_lines.fetch_sub(dead_lines, Ordering::Relaxed);
+        // println!(" - S-{:?} dead-{}", self.state, dead_lines);
+        if dead_lines >= 1 && self.state == BlockState::Full {
+            let live_lines = self.live_lines.load(Ordering::Relaxed);
+            if live_lines < Block::DATA_LINES / 2 {
+                let owner = &mut crate::ImmixMutator::current().ix;
+                owner.add_reusable_block(*self);
+            }
+        }
+    }
+
+    #[inline]
+    pub fn on_dealloc(&self, ptr: Address, layout: Layout) {
+        // println!("FLocal {:?}", ptr..(ptr + layout.size()));
+        self.dealloc_impl(ptr, layout);
+    }
+
+    #[inline]
+    pub fn on_dealloc_foreign(&self, ptr: Address) {
+        // println!("FF {:?}", ptr);
+        loop {
+            let next = self.foreign_free.load(Ordering::SeqCst);
+            unsafe { ptr.store(next) };
+            if self
+                .foreign_free
+                .compare_exchange(next, ptr, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+            {
+                break;
+            }
+        }
     }
 }
 
@@ -122,11 +237,12 @@ impl Line {
     }
 
     pub fn get_index_within_block(self) -> usize {
-        (self.start() - self.block().data_start()) / Self::BYTES
+        (self.start() - self.block().start()) / Self::BYTES
     }
 }
 
 impl MemRegion for Line {
+    type Meta = ();
     const LOG_BYTES: usize = 8;
 
     fn start(&self) -> Address {

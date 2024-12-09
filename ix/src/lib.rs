@@ -47,7 +47,7 @@ impl Plan for Immix {
 
 #[mallockit::mutator]
 struct ImmixMutator {
-    hoard: ImmixAllocator,
+    ix: ImmixAllocator,
     los: LargeObjectAllocator,
     _padding: [usize; 8],
 }
@@ -57,7 +57,7 @@ impl Mutator for ImmixMutator {
 
     fn new() -> Self {
         Self {
-            hoard: ImmixAllocator::new(&Self::plan().immix_space, IMMIX_SPACE),
+            ix: ImmixAllocator::new(&Self::plan().immix_space, IMMIX_SPACE),
             los: LargeObjectAllocator::new(&Self::plan().large_object_space),
             _padding: [0; 8],
         }
@@ -67,24 +67,25 @@ impl Mutator for ImmixMutator {
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let x = if ImmixSpace::can_allocate(layout) {
             mallockit::stat::track_allocation(layout, false);
-            self.hoard.alloc(layout)
+            self.ix.alloc(layout)
         } else {
             mallockit::stat::track_allocation(layout, true);
             self.los.alloc(layout)
         };
-        // println!("A {x:?}");
+        debug_assert!(x.is_some());
+        // println!("A {:?}", x.unwrap()..(x.unwrap() + layout.size()));
         x
     }
 
     #[inline(always)]
     fn dealloc(&mut self, ptr: Address) {
-        // debug_assert!(IMMIX_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
-        // if IMMIX_SPACE.contains(ptr) {
-        //     mallockit::stat::track_deallocation(false);
-        //     self.hoard.dealloc(ptr)
-        // } else {
-        //     mallockit::stat::track_deallocation(false);
-        //     self.los.dealloc(ptr)
-        // }
+        debug_assert!(IMMIX_SPACE.contains(ptr) || LARGE_OBJECT_SPACE.contains(ptr));
+        if IMMIX_SPACE.contains(ptr) {
+            mallockit::stat::track_deallocation(false);
+            self.ix.dealloc(ptr)
+        } else {
+            mallockit::stat::track_deallocation(false);
+            self.los.dealloc(ptr)
+        }
     }
 }

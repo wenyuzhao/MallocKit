@@ -2,7 +2,7 @@ use std::sync::atomic::Ordering;
 
 use super::{page_resource::BlockPageResource, Allocator, Space, SpaceId};
 use crate::{
-    block::{self, Block, Line},
+    block::{self, Block, BlockState, Line},
     pool::Pool,
 };
 use constants::{LOG_MIN_ALIGNMENT, MIN_ALIGNMENT};
@@ -46,11 +46,7 @@ impl Space for ImmixSpace {
 
     fn get_layout(ptr: Address) -> Layout {
         let block = Block::containing(ptr);
-        let index = (ptr - block.start()) >> LOG_MIN_ALIGNMENT;
-        let words = block.obj_size[index].load(Ordering::Relaxed) as usize;
-        let size = words << LOG_MIN_ALIGNMENT;
-        mallockit::println!("get_layout {ptr:?} {words} {size}");
-        Layout::from_size_align(size, MIN_ALIGNMENT).unwrap()
+        block.get_layout(ptr)
     }
 }
 
@@ -64,14 +60,10 @@ impl ImmixSpace {
         size <= Self::MAX_ALLOCATION_SIZE
     }
 
-    pub fn get_clean_block(&self) -> Option<Block> {
+    pub fn get_clean_block(&self, owner: *const ImmixAllocator) -> Option<Block> {
         let block = self.pr.acquire_block()?;
-        // block.init(owner as *const ImmixAllocator as usize);
+        block.init(owner as usize);
         Some(block)
-    }
-
-    pub fn get_reusable_block(&self) -> Option<Block> {
-        None
     }
 
     pub fn release_block(&self, block: Block) {
@@ -82,11 +74,14 @@ impl ImmixSpace {
 pub struct ImmixAllocator {
     cursor: Address,
     limit: Address,
-    space: &'static ImmixSpace,
+    block: Option<Block>,
     large_cursor: Address,
     large_limit: Address,
+    large_block: Option<Block>,
     request_for_large: bool,
+    space: &'static ImmixSpace,
     line: Option<Line>,
+    reusable_blocks: Option<Block>,
 }
 
 impl ImmixAllocator {
@@ -97,34 +92,72 @@ impl ImmixAllocator {
         Self {
             cursor: Address::ZERO,
             limit: Address::ZERO,
+            block: None,
             space,
             large_cursor: Address::ZERO,
             large_limit: Address::ZERO,
+            large_block: None,
             request_for_large: false,
             line: None,
+            reusable_blocks: None,
         }
     }
 
-    fn acquire_recyclable_block(&mut self) -> bool {
-        match self.space.get_reusable_block() {
-            Some(block) => {
-                self.line = Some(block.lines().start);
-                true
+    pub fn add_reusable_block(&mut self, mut block: Block) {
+        // println!(" - add_reusable_block {:x?}", block);
+        block.state = BlockState::Reusable;
+        block.next = self.reusable_blocks;
+        self.reusable_blocks = Some(block);
+    }
+
+    fn acquire_reusable_block(&mut self) -> bool {
+        let Some(mut b) = self.reusable_blocks else {
+            return false;
+        };
+        // println!(" - acquire_reusable_block {:x?}", b);
+        self.reusable_blocks = b.next;
+        b.next = None;
+        self.line = Some(b.lines().start);
+        true
+    }
+
+    fn retire_block(&mut self, large: bool) {
+        let block_slot = if large { self.large_block } else { self.block };
+        if let Some(mut b) = block_slot {
+            // println!(
+            //     " - retire_block lrg={:?} {:x?} {:?}",
+            //     large, b, b.line_liveness
+            // );
+            let live_lines = b.live_lines.load(Ordering::Relaxed);
+            if b.state == BlockState::Allocating {
+                if live_lines < Block::DATA_LINES / 2 {
+                    self.add_reusable_block(b);
+                } else {
+                    b.state = BlockState::Full;
+                }
             }
-            _ => false,
+        }
+        if large {
+            self.large_block = None;
+        } else {
+            self.block = None;
         }
     }
 
     fn acquire_clean_block(&mut self) -> bool {
-        match self.space.get_clean_block() {
+        match self.space.get_clean_block(self) {
             Some(block) => {
-                // mallockit::println!("get_clean_block {block:x?}");
+                // println!("get_clean_block {block:x?}");
                 if self.request_for_large {
+                    self.retire_block(true);
                     self.large_cursor = block.lines().start.start();
                     self.large_limit = block.lines().end.start();
+                    self.large_block = Some(block);
                 } else {
+                    self.retire_block(false);
                     self.cursor = block.lines().start.start();
                     self.limit = block.lines().end.start();
+                    self.block = Some(block);
                 }
                 true
             }
@@ -132,15 +165,19 @@ impl ImmixAllocator {
         }
     }
 
-    fn acquire_recyclable_lines(&mut self) -> bool {
-        while self.line.is_some() || self.acquire_recyclable_block() {
+    fn acquire_reusable_lines(&mut self) -> bool {
+        self.retire_block(false);
+        while self.line.is_some() || self.acquire_reusable_block() {
             let line = self.line.unwrap();
             let block = line.block();
             if let Some(lines) = block.get_next_available_lines(line) {
-                // Find recyclable lines. Update the bump allocation cursor and limit.
+                // Find reusable lines. Update the bump allocation cursor and limit.
+                // println!("R {:x?}", lines);
                 self.cursor = lines.start.start();
                 self.limit = lines.end.start();
-                let block = line.block();
+                self.block = Some(block);
+                let mut block = line.block();
+                block.state = BlockState::Allocating;
                 self.line = if lines.end == block.lines().end {
                     None
                 } else {
@@ -148,6 +185,7 @@ impl ImmixAllocator {
                 };
                 return true;
             } else {
+                self.block = None;
                 self.line = None;
             }
         }
@@ -185,7 +223,7 @@ impl ImmixAllocator {
     }
 
     fn alloc_slow_hot(&mut self, layout: Layout) -> Option<Address> {
-        if self.acquire_recyclable_lines() {
+        if self.acquire_reusable_lines() {
             let result = self.cursor;
             let new_cursor = self.cursor + layout.size();
             if new_cursor > self.limit {
@@ -215,7 +253,7 @@ impl Allocator for ImmixAllocator {
     fn alloc(&mut self, layout: Layout) -> Option<Address> {
         let result = self.cursor;
         let new_cursor = self.cursor + layout.size();
-        let mut result = if new_cursor > self.limit {
+        let result = if new_cursor > self.limit {
             if layout.size() > Line::BYTES {
                 // Size larger than a line: do large allocation
                 self.overflow_alloc(layout)
@@ -227,20 +265,21 @@ impl Allocator for ImmixAllocator {
             self.cursor = new_cursor;
             Some(result)
         }?;
-        let words = layout.size() >> LOG_MIN_ALIGNMENT;
         let block = Block::containing(result);
-        let index = (result - block.start()) >> LOG_MIN_ALIGNMENT;
-        block.obj_size[index].store(words as u8, Ordering::Relaxed);
-        // mallockit::println!("alloc {result:?} {words} {layout:?}");
-        // result = Address::from_usize(result.as_usize() | (words << SIZE_ENCODING_SHIFT));
-        // mallockit::println!("alloc -> {result:?} {words} {layout:?}");
-        // let v = unsafe { result.load::<usize>() };
-        // mallockit::println!("alloc -> {v:?}");
+        block.on_alloc(result, layout);
         return Some(result);
     }
 
     #[inline(always)]
-    fn dealloc(&mut self, cell: Address) {}
+    fn dealloc(&mut self, ptr: Address) {
+        let block = Block::containing(ptr);
+        if block.owner == self as *const ImmixAllocator as usize {
+            let layout = block.get_layout(ptr);
+            block.on_dealloc(ptr, layout);
+        } else {
+            block.on_dealloc_foreign(ptr);
+        }
+    }
 }
 
 impl Drop for ImmixAllocator {
