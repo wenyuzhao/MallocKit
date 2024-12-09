@@ -246,7 +246,7 @@ impl Bench {
             "lean" => {
                 let makefile = PathBuf::from(format!("{local_dev_dir}/lean/out/release/Makefile"));
                 let content = std::fs::read_to_string(makefile).unwrap();
-                let status = if content.contains(format!("{local_dev_dir}/lean/src")) {
+                let status = if content.contains(&format!("{local_dev_dir}/lean/src")) {
                     Command::new("docker")
                         .args([
                             "compose",
