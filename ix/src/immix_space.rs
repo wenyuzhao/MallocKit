@@ -110,6 +110,7 @@ impl ImmixAllocator {
         if let Some(mut next) = next {
             next.prev = None;
         }
+        b.drain_foreign_free();
         self.reusable_blocks = next;
         // println!(
         //     " - acquire_reusable_block {:x?} next = {:x?}",
@@ -134,7 +135,7 @@ impl ImmixAllocator {
                     debug_assert!(b.prev.is_none());
                     debug_assert_ne!(Some(b), self.reusable_blocks);
                     self.space.release_block(b);
-                } else if live_lines < Block::DATA_LINES / 2 {
+                } else if live_lines <= Block::REUSABLE_THRESHOLD {
                     self.add_reusable_block(b);
                 } else {
                     b.state = BlockState::Full;
@@ -257,6 +258,8 @@ impl Allocator for ImmixAllocator {
         let result = self.cursor;
         let new_cursor = self.cursor + layout.size();
         let result = if new_cursor > self.limit {
+            self.large_block.map(|mut b| b.drain_foreign_free());
+            self.block.map(|mut b| b.drain_foreign_free());
             if layout.size() > Line::BYTES {
                 // Size larger than a line: do large allocation
                 self.overflow_alloc(layout)
@@ -289,5 +292,11 @@ impl Drop for ImmixAllocator {
     fn drop(&mut self) {
         // self.tlab
         //     .clear(|cell| self.local.free_cell(cell, self.space));
+        // println!(" - ImmixAllocator.drop {:x?}", self as *const Self);
+        let mut reusable_blocks = self.reusable_blocks;
+        while let Some(mut block) = reusable_blocks {
+            reusable_blocks = block.next;
+            block.drain_foreign_free();
+        }
     }
 }

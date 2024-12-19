@@ -122,4 +122,4 @@ mi = { env = { MALLOC = "mi", IS_MALLOCKIT = "0" } }
 # je = { env = { MALLOC = "je", IS_MALLOCKIT = "0" } }
 
 [package.metadata.harness.profiles.default.probes]
-harness-probe-perf = { events = "PERF_COUNT_SW_TASK_CLOCK,PERF_COUNT_HW_CPU_CYCLES,PERF_COUNT_HW_INSTRUCTIONS", inherit = true }
+harness-probe-perf = { events = "PERF_COUNT_SW_TASK_CLOCK,PERF_COUNT_HW_CPU_CYCLES,PERF_COUNT_HW_INSTRUCTIONS,PERF_COUNT_SW_PAGE_FAULTS,PERF_COUNT_SW_CONTEXT_SWITCHES", inherit = true }

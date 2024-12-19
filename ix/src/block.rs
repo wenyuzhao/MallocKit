@@ -78,15 +78,12 @@ impl Block {
     pub const LINES: usize = Self::BYTES / Line::BYTES;
     #[allow(unused)]
     pub const DATA_LINES: usize = Self::DATA_BYTES / Line::BYTES;
+    pub const REUSABLE_THRESHOLD: usize = Self::LINES / 2;
 
     pub fn init(&mut self, owner: usize) {
-        // debug_assert_eq!(Self::META_BYTES, Address::BYTES * 8);
         self.owner = owner;
         self.live_lines = 0;
-        for i in 0..LINES_IN_BLOCK {
-            self.line_liveness[i] = 0;
-        }
-        self.foreign_free.store(Address::ZERO, Ordering::SeqCst);
+        self.foreign_free.store(Address::ZERO, Ordering::Relaxed);
         self.state = BlockState::Allocating;
         self.next = None;
         self.prev = None;
@@ -95,7 +92,7 @@ impl Block {
     pub fn deinit(&mut self) {
         self.state = BlockState::Free;
         self.live_lines = 0;
-        self.foreign_free.store(Address::ZERO, Ordering::SeqCst);
+        self.foreign_free.store(Address::ZERO, Ordering::Relaxed);
         self.next = None;
         self.prev = None;
     }
@@ -132,7 +129,8 @@ impl Block {
             }
             cursor += 1;
         }
-        if cursor != start_cursor {
+        let first_cursor = self.lines().start.get_index_within_block();
+        if cursor != start_cursor && cursor != first_cursor {
             cursor += 1;
         }
         if cursor >= self.line_liveness.len() {
@@ -191,6 +189,7 @@ impl Block {
             self.line_liveness[i] += 1;
         }
         self.live_lines += lines;
+        // self.drain_foreign_free();
         // println!(" - BA {:x?} live-lines {}", self, self.live_lines);
     }
 
@@ -237,12 +236,40 @@ impl Block {
             // println!(" - S-{:?} dead-{}", self.state, dead_lines);
             if dead_lines >= 1 && self.state == BlockState::Full {
                 let live_lines = self.live_lines;
-                if live_lines < Block::DATA_LINES / 2 {
+                if live_lines <= Block::REUSABLE_THRESHOLD {
                     let owner = &mut crate::ImmixMutator::current().ix;
                     owner.add_reusable_block(*self);
                 }
             }
         }
+    }
+
+    pub fn drain_foreign_free(&mut self) {
+        let mut ptr;
+        loop {
+            ptr = self.foreign_free.load(Ordering::Relaxed);
+            if ptr.is_zero() {
+                break;
+            }
+            if self
+                .foreign_free
+                .compare_exchange(ptr, Address::ZERO, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+            {
+                break;
+            }
+        }
+        // let mut count = 0;
+        while !ptr.is_zero() {
+            let next = unsafe { ptr.load() };
+            self.dealloc_impl(ptr, self.get_layout(ptr));
+            ptr = next;
+            // count += 1;
+        }
+        // if count > 0 {
+        //     //
+        //     println!(" - DF {:x?} freed {}", self, count);
+        // }
     }
 
     #[inline]
