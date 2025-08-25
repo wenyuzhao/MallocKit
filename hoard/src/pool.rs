@@ -284,7 +284,7 @@ impl Pool {
     pub fn pop_most_empty_block(
         &self,
         size_class: SizeClass,
-    ) -> Option<(SuperBlock, MutexGuard<BlockList>)> {
+    ) -> Option<(SuperBlock, MutexGuard<'_, BlockList>)> {
         debug_assert!(self.global);
         let mut blocks = self.lock_blocks(size_class);
         if let Some(block) = blocks.pop_most_empty_block() {
@@ -294,7 +294,7 @@ impl Pool {
         None
     }
 
-    fn lock_blocks(&self, size_class: SizeClass) -> MutexGuard<BlockList> {
+    fn lock_blocks(&self, size_class: SizeClass) -> MutexGuard<'_, BlockList> {
         unsafe { self.blocks.get_unchecked(size_class.as_usize()).lock() }
     }
 

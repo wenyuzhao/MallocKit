@@ -330,11 +330,12 @@ impl fmt::Debug for Address {
 }
 
 impl Step for Address {
-    fn steps_between(start: &Self, end: &Self) -> Option<usize> {
+    fn steps_between(start: &Self, end: &Self) -> (usize, Option<usize>) {
         if start.0 > end.0 {
-            None
+            (0, None)
         } else {
-            Some(*end - *start)
+            let steps = *end - *start;
+            (steps, Some(steps))
         }
     }
 

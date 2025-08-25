@@ -174,11 +174,12 @@ impl<S: PageSize> Ord for Page<S> {
 }
 
 impl<S: PageSize> Step for Page<S> {
-    fn steps_between(start: &Self, end: &Self) -> Option<usize> {
+    fn steps_between(start: &Self, end: &Self) -> (usize, Option<usize>) {
         if start.0.get() > end.0.get() {
-            None
+            (0, None)
         } else {
-            Some((end.start() - start.start()) >> Self::LOG_BYTES)
+            let steps = (end.start() - start.start()) >> Self::LOG_BYTES;
+            (steps, Some(steps))
         }
     }
 
