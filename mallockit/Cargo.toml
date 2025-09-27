@@ -1,8 +1,12 @@
 [package]
 name = "mallockit"
-version = { workspace = true }
-authors = ["Wenyu Zhao <wenyuzhaox@gmail.com>"]
-edition = { workspace = true }
+description = "A framework for building malloc implementations in Rust"
+homepage.workspace = true
+repository.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
