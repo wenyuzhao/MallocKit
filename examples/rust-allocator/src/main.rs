@@ -1,6 +1,6 @@
 use std::{fs::File, io::Read};
 
-use hoard::Global;
+use mk_hoard::Global;
 
 #[global_allocator]
 static GLOBAL: Global = Global;
