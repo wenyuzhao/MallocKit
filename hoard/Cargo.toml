@@ -1,8 +1,12 @@
 [package]
-name = "hoard"
-version = { workspace = true }
-authors = ["Wenyu Zhao <wenyuzhaox@gmail.com>"]
-edition = { workspace = true }
+name = "mk-hoard"
+description = "A reimplementation of Hoard memory allocator in Rust"
+homepage.workspace = true
+repository.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -10,7 +14,7 @@ edition = { workspace = true }
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
-mallockit = { path = "../mallockit" }
+mallockit = { version = "0.1.0", path = "../mallockit" }
 spin = { workspace = true }
 
 [features]
