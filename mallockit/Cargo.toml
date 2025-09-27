@@ -18,7 +18,7 @@ ctor = { workspace = true }
 num_cpus = { workspace = true }
 atomic = { workspace = true }
 shell-words = { workspace = true }
-mallockit-macros = { path = "./macros" }
+mallockit-macros = { version = "0.1.0", path = "./macros" }
 
 [build-dependencies]
 cargo_metadata = { workspace = true }
