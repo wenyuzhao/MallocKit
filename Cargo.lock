@@ -130,6 +130,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf4b9d6a944f767f8e5e0db018570623c85f3d925ac718db4e06d0187adb21c1"
 
 [[package]]
+name = "buddy"
+version = "0.1.0"
+dependencies = [
+ "mallockit",
+]
+
+[[package]]
+name = "bump"
+version = "0.1.0"
+dependencies = [
+ "mallockit",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -493,6 +507,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
 
 [[package]]
+name = "hoard"
+version = "0.1.0"
+dependencies = [
+ "mallockit",
+ "spin",
+]
+
+[[package]]
 name = "http"
 version = "0.2.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -736,35 +758,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mk-buddy"
-version = "0.1.0"
-dependencies = [
- "mallockit",
-]
-
-[[package]]
-name = "mk-bump"
-version = "0.1.0"
-dependencies = [
- "mallockit",
-]
-
-[[package]]
-name = "mk-hoard"
-version = "0.1.0"
-dependencies = [
- "mallockit",
- "spin",
-]
-
-[[package]]
-name = "mk-sanity"
-version = "0.1.0"
-dependencies = [
- "mallockit",
-]
-
-[[package]]
 name = "native-tls"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -967,7 +960,7 @@ name = "rust-allocator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "mk-hoard",
+ "hoard",
  "toml",
 ]
 
@@ -1004,6 +997,13 @@ name = "ryu"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
+
+[[package]]
+name = "sanity"
+version = "0.1.0"
+dependencies = [
+ "mallockit",
+]
 
 [[package]]
 name = "schannel"

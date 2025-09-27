@@ -1,5 +1,5 @@
 [package]
-name = "mk-hoard"
+name = "hoard"
 description = "A reimplementation of Hoard memory allocator in Rust"
 homepage.workspace = true
 repository.workspace = true

@@ -1,5 +1,5 @@
 [package]
-name = "mk-bump"
+name = "bump"
 description = "bump-pointer allocator in Rust"
 homepage.workspace = true
 repository.workspace = true

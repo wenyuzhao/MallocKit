@@ -1,5 +1,5 @@
 [package]
-name = "mk-buddy"
+name = "buddy"
 description = "buddy allocator in Rust"
 homepage.workspace = true
 repository.workspace = true

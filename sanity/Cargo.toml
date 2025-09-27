@@ -1,5 +1,5 @@
 [package]
-name = "mk-sanity"
+name = "sanity"
 description = "sanity allocator"
 homepage.workspace = true
 repository.workspace = true
