@@ -15,6 +15,10 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+authors = ["Wenyu Zhao <wenyuzhaox@gmail.com>"]
+license = "MIT"
+homepage = "https://github.com/wenyuzhao/MallocKit"
+repository = "https://github.com/wenyuzhao/MallocKit"
 
 [profile.dev]
 panic = "abort"
@@ -33,7 +37,7 @@ ctor = "0.1"
 num_cpus = "1.13.1"
 atomic = "0.5.1"
 quote = "1.0.20"
-syn = "1.0.98"
+syn = { version = "1.0.98", features = ["full"] }
 shell-words = "1.1.0"
 cargo_metadata = "0.18.1"
 
