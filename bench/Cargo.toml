@@ -110,8 +110,8 @@ harness = false
 [package.metadata.harness.profiles.default.builds]
 sys = { env = { MALLOC = "sys", IS_MALLOCKIT = "0" } }
 # mallockit allocators
-mk_hoard = { env = { MALLOC = "mk_hoard", IS_MALLOCKIT = "1" } }
-# mk_buddy = { env = { MALLOC = "mk_buddy", IS_MALLOCKIT = "1" } }
+mk_hoard = { env = { MALLOC = "hoard", IS_MALLOCKIT = "1" } }
+# mk_buddy = { env = { MALLOC = "buddy", IS_MALLOCKIT = "1" } }
 # other allocators
 hd = { env = { MALLOC = "hd", IS_MALLOCKIT = "0" } }
 mi = { env = { MALLOC = "mi", IS_MALLOCKIT = "0" } }
